@@ -12,7 +12,7 @@ export function MovimentacaoTimeline({ movimentacoes }: MovimentacaoTimelineProp
     <div className="flex flex-col h-full">
       <div className="mb-4">
         <p className="text-[10px] font-semibold text-[#6B7280] tracking-[0.18em] uppercase">
-          Etapas Judiciais ({movimentacoes.length}/5)
+          Etapas Judiciais
         </p>
         <p className="text-[11px] text-[#9CA3AF] mt-1">
           Selecione para carregar a documentação relacionada
@@ -36,16 +36,19 @@ export function MovimentacaoTimeline({ movimentacoes }: MovimentacaoTimelineProp
               ].join(' ')}
             >
               <div className="flex items-center justify-between gap-3 mb-2">
-                <span className="text-[11px] font-medium text-[#6B7280]">{mov.data}</span>
+                <span className="text-[11px] font-medium text-[#6B7280] tabular-nums">
+                  {mov.data}
+                </span>
                 <span
                   className={[
-                    'text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-md border',
+                    'text-[9px] font-bold tracking-wide px-2 py-0.5 rounded-md border max-w-[55%] text-right truncate',
                     isSelected
                       ? 'border-[#8B5CF6] bg-[#8B5CF6] text-white'
                       : 'border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]',
                   ].join(' ')}
+                  title={mov.nomeEtapa}
                 >
-                  {mov.fase}
+                  {mov.nomeEtapa}
                 </span>
               </div>
               <p className="text-[12px] text-[#374151] leading-relaxed">

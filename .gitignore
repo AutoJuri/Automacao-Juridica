@@ -1,15 +1,44 @@
-node_modules
-.DS_Store
-dist
-dist-ssr
-*.local
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/.venv/
+
+# Builds
+dist/
+frontend/dist/
+dist-ssr/
+.output/
+.vinxi/
+.nitro/
+.wrangler/
+
+# Env / secrets
 .env
-.nitro
-.tanstack
-.wrangler
-.output
-.vinxi
+*.local
+frontend/.env
+backend/.env
+
+# Tooling caches
+.tanstack/
+frontend/.tanstack/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 __unconfig*
+
+# OS / IDE
+.DS_Store
+.cursor/
+.vscode/
 todos.json
-.cursor
-.vscode
+
+# Lab e-SAJ (sessions, results, credentials)
+scripts/esaj/.venv/
+scripts/esaj/sessions/
+scripts/esaj/results/
+scripts/esaj/debug/
+scripts/esaj/gmail/credentials.json
+scripts/esaj/gmail/token.json
+scripts/esaj/.env.esaj.local

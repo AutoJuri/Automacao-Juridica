@@ -1,0 +1,23 @@
+[project]
+name = "automacao-juridica-backend"
+version = "0.1.0"
+description = "Backend FastAPI da Automação Jurídica (e-SAJ / TJSP)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+]
+
+# Próximas etapas (não instalar agora):
+# playwright, httpx, beautifulsoup4, lxml, apscheduler,
+# python-jose, passlib, cryptography
+
+[dependency-groups]
+dev = []
+
+[tool.uv]
+package = false

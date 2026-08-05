@@ -1,0 +1,1 @@
+# Stub — PIPE C petições.

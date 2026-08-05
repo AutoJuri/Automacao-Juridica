@@ -1,0 +1,1 @@
+# Stub — PIPE D processos.

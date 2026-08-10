@@ -10,14 +10,24 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
+    "bcrypt>=4.2.0",
+    "pyjwt>=2.9.0",
+    "slowapi>=0.1.9",
+    "email-validator>=2.2.0",
 ]
 
 # Próximas etapas (não instalar agora):
-# playwright, httpx, beautifulsoup4, lxml, apscheduler,
-# python-jose, passlib, cryptography
+# playwright, httpx, beautifulsoup4, lxml, apscheduler, cryptography
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.uv]
 package = false

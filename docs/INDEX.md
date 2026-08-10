@@ -28,6 +28,9 @@
 - Logs **nunca** contêm CPF, senha, cookie ou token OAuth2
 - IDs são sempre **UUID** — nunca sequenciais
 - Senhas da plataforma com **bcrypt** (mínimo 12 rounds)
+- JWT: access token (~15 min) só em memória (Zustand); refresh (~7 dias) em cookie HttpOnly + Secure + SameSite=Strict
+- Refresh token no banco só como **hash SHA-256**; rotacionado a cada `/auth/refresh`
+- Sessão da SPA: restore silencioso no boot via `ensureSessionRestored()` (ADR-004)
 - CORS aceita **apenas** a origem do frontend em produção — nunca `allow_origins=["*"]`
 - `DATABASE_URL` do `.env` pode ser a URL crua do Railway; use sempre `settings.sqlalchemy_url` (ADR-001)
 - Estados de domínio (`status`, `tipo`) são `VARCHAR` + constantes Python — sem ENUM nativo (ADR-002)
@@ -92,6 +95,7 @@ automacao-juridica/
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
 | Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo |
+| Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo |
 
 ---
 
@@ -101,3 +105,13 @@ automacao-juridica/
 |---|---|---|
 | ADR-001 | Normalização da DATABASE_URL do Railway para asyncpg | `/docs/decisions/001-normalizacao-database-url-railway.md` |
 | ADR-002 | VARCHAR + constantes Python em vez de ENUM nativo do Postgres | `/docs/decisions/002-varchar-em-vez-de-enum-postgres.md` |
+| ADR-003 | Recuperação de senha via log (sem provedor de e-mail ainda) | `/docs/decisions/003-recuperacao-senha-via-log.md` |
+| ADR-004 | Restauração silenciosa de sessão no boot da SPA | `/docs/decisions/004-bootstrap-sessao-spa.md` |
+
+---
+
+## Backlog
+
+| Backlog | Origem | Arquivo |
+|---|---|---|
+| Hardening de Auth (itens 7+) | Code review das Etapas 3–4 | `/docs/backlog-auth-hardening.md` |

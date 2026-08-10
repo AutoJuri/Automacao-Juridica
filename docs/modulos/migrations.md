@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-08-05
+> Última atualização: 2026-08-09
 > Camada: Infra / Backend
 
 ---
@@ -81,10 +81,12 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (revisão `0b7c41e5d9a3`):
+Tabelas (revisões `0b7c41e5d9a3` + `34c3ebb0c7e4` + `38d4177c211b`):
 
 ```
 users
+├── refresh_tokens          (auth — só hash SHA-256 do token)
+├── password_reset_tokens   (auth — uso único, expiração curta)
 ├── tribunal_credentials
 ├── tribunal_sessions
 ├── processos
@@ -123,6 +125,8 @@ Arquivos de model por domínio:
 | Arquivo | Tabelas |
 |---|---|
 | `user.py` | `users` |
+| `refresh_token.py` | `refresh_tokens` |
+| `password_reset_token.py` | `password_reset_tokens` |
 | `tribunal.py` | `tribunal_credentials`, `tribunal_sessions` |
 | `processo.py` | `processos` |
 | `movimentacao.py` | `movimentacoes` |
@@ -145,7 +149,7 @@ Módulos futuros que vão depender deste:
 
 | Módulo | Uso |
 |---|---|
-| `auth` | Tabela `users`, hash de senha, JWT |
+| `auth` | `users`, `refresh_tokens`, `password_reset_tokens`, JWT/bcrypt |
 | `credentials` | `tribunal_credentials` + AES-256 |
 | `processos` / pipes / etl | `processos`, `movimentacoes`, `intimacoes`, `audiencias` |
 | `notifications` | Tabela `notifications` |
@@ -173,3 +177,4 @@ Módulos futuros que vão depender deste:
 |---|---|
 | 2026-08-05 | Implementação inicial (Etapa 2): models, sessão async, Alembic, migration `0b7c41e5d9a3` aplicada no Postgres do Railway, `GET /health/db` |
 | 2026-08-05 | Ajustes pós code-review: `UniqueConstraint(user_id, id_esaj)` em `intimacoes`/`audiencias`, `UniqueConstraint(user_id, tribunal)` em `tribunal_credentials`/`tribunal_sessions`, índice composto `status`+`proximo_retry` em `tribunal_sessions`, coluna `descricao_hash` (SHA-256) em `movimentacoes` para evitar estourar o limite de tamanho do índice UNIQUE, migration `34c3ebb0c7e4` aplicada; `echo=False` no engine; Dockerfile passa a rodar como usuário não-root |
+| 2026-08-09 | Etapa 3 (auth): tabelas `refresh_tokens` e `password_reset_tokens` — migration `38d4177c211b` |

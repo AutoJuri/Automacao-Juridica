@@ -1,32 +1,49 @@
 import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { useAuthStore } from '#/store/auth.store'
+import { login } from './auth.api'
+import { MUITAS_TENTATIVAS, mensagemDeErro } from './auth.errors'
+import { loginSchema, type LoginFormValues } from './auth.schemas'
+import { FieldError, FormError } from './AuthFormFeedback'
 
 interface LoginFormProps {
   onSwitchToRegister: () => void
+  onForgotPassword: () => void
 }
 
-export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
+export function LoginForm({ onSwitchToRegister, onForgotPassword }: LoginFormProps) {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    // Mock: define auth em memória e redireciona — sem chamada real de API
-    setAuth('mock-access-token-15min', {
-      id: '1',
-      name: 'João Advogado',
-      email: email || 'joao@advocacia.com',
-    })
-    navigate({ to: '/' })
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) })
+
+  const entrar = useMutation({
+    mutationFn: login,
+    onSuccess: ({ access_token, user }) => {
+      setAuth(access_token, user)
+      navigate({ to: '/' })
+    },
+  })
+
+  const erroApi = entrar.error
+    ? mensagemDeErro(entrar.error, {
+        401: 'E-mail ou senha inválidos.',
+        429: MUITAS_TENTATIVAS,
+      })
+    : null
 
   return (
     <div className="animate-fade-in-up">
@@ -42,7 +59,9 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit((valores) => entrar.mutate(valores))} className="space-y-5" noValidate>
+        <FormError message={erroApi} />
+
         <div className="space-y-1.5">
           <Label htmlFor="login-email" className="text-xs font-medium text-[#374151] uppercase tracking-wide">
             E-mail
@@ -54,11 +73,12 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
               type="email"
               autoComplete="email"
               placeholder="seu@email.com.br"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={errors.email !== undefined}
+              {...register('email')}
               className="pl-10 h-11 border-[#E5E7EB] bg-white text-[#111827] placeholder:text-[#9CA3AF] focus-visible:ring-[#3B5BDB] focus-visible:border-[#3B5BDB]"
             />
           </div>
+          <FieldError message={errors.email?.message} />
         </div>
 
         <div className="space-y-1.5">
@@ -72,8 +92,8 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={errors.password !== undefined}
+              {...register('password')}
               className="pl-10 pr-10 h-11 border-[#E5E7EB] bg-white text-[#111827] placeholder:text-[#9CA3AF] focus-visible:ring-[#3B5BDB] focus-visible:border-[#3B5BDB]"
             />
             <button
@@ -85,9 +105,11 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          <FieldError message={errors.password?.message} />
           <div className="flex justify-end">
             <button
               type="button"
+              onClick={onForgotPassword}
               className="text-xs text-[#3B5BDB] hover:text-[#2d4cba] transition-colors mt-1"
             >
               Esqueci minha senha
@@ -97,9 +119,17 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
         <Button
           type="submit"
-          className="w-full h-11 bg-[#3B5BDB] hover:bg-[#2d4cba] text-white font-medium text-sm tracking-wide transition-all duration-200 shadow-sm hover:shadow-md"
+          disabled={entrar.isPending}
+          className="w-full h-11 bg-[#3B5BDB] hover:bg-[#2d4cba] text-white font-medium text-sm tracking-wide transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-70"
         >
-          Entrar na plataforma
+          {entrar.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Entrando...
+            </>
+          ) : (
+            'Entrar na plataforma'
+          )}
         </Button>
       </form>
 

@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from app.models.intimacao import Intimacao
     from app.models.job_log import JobLog
     from app.models.notification import Notification
+    from app.models.password_reset_token import PasswordResetToken
     from app.models.processo import Processo
+    from app.models.refresh_token import RefreshToken
     from app.models.tribunal import TribunalCredential, TribunalSession
 
 
@@ -44,6 +46,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     job_logs: Mapped[list["JobLog"]] = relationship(
         back_populates="user", passive_deletes=True
+    )
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
 
     def __repr__(self) -> str:

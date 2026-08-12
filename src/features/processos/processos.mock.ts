@@ -1,29 +1,42 @@
+import type { ProcessoPortalKey } from './portais.mock'
+
 export type TribunalKey = 'TJSP' | 'TRF3' | 'STJ'
-export type PrazoKey = 'PRAZO CRÍTICO' | 'PRAZO MÉDIO' | 'PRAZO NORMAL' | 'SEM PRAZO'
 
 export interface Processo {
   id: number
   tribunal: TribunalKey
   tribunalColor: string
+  /** Portal de origem do processo (e-SAJ, PJe, etc.). */
+  portal: ProcessoPortalKey
   numero: string
   cliente: string
-  prazo: PrazoKey
-  prazoColor: string
+  /** Data de início do prazo (DD/MM/YYYY) — usada para calcular urgência. */
+  prazoInicio: string
+  /** Data limite do prazo (DD/MM/YYYY) — exibida no card. */
+  prazoFim: string
+  /** Data em que ocorreu a última movimentação (DD/MM/YYYY). */
+  dataUltimaAlteracao: string
   ultimaAlteracao: string
+  /** Ação sugerida com base no estágio processual atual. */
+  proximoPasso: string
   ativo: boolean
   classeJudicial: string
   assunto: string
   magistrado: string
   ultimaAtualizacaoTecnica: string
+  /** Resumo do objeto/causa da ação exibido no cabeçalho do detalhe. */
+  objetoAcao: string
 }
 
 export interface Movimentacao {
   id: number
   processoId: number
+  /** Data exata do andamento no tribunal (DD/MM/YYYY). */
   data: string
-  fase: string
+  /** Nome real da etapa conforme consta no andamento do e-SAJ. */
+  nomeEtapa: string
+  /** Descrição literal do andamento no site do tribunal. */
   descricao: string
-  tipo: string
 }
 
 export interface Documento {
@@ -41,33 +54,43 @@ export const processosMockados: Processo[] = [
     id: 1,
     tribunal: 'TJSP',
     tribunalColor: '#3B5BDB',
+    portal: 'esaj_tjsp',
     numero: '1002561-84.2026.8.26.0100',
     cliente: 'Acme Industrial Brasil S.A.',
-    prazo: 'PRAZO CRÍTICO',
-    prazoColor: '#EF4444',
+    prazoInicio: '28/05/2026',
+    prazoFim: '05/06/2026',
+    dataUltimaAlteracao: '28/05/2026',
     ultimaAlteracao:
       'Remetidos os autos ao Ministério Público com urgência legal extrema',
+    proximoPasso: 'Montar a contestação',
     ativo: true,
     classeJudicial: 'PROCEDIMENTO COMUM CÍVEL',
     assunto: 'Tutela de Urgência / Liminar Automotiva',
     magistrado: 'Dr. Alexandre de Oliveira Marcondes',
     ultimaAtualizacaoTecnica: '28/05/2026',
+    objetoAcao:
+      'Tutela de urgência para restrição de transferência de veículo perante o DETRAN/SP',
   },
   {
     id: 2,
     tribunal: 'TRF3',
     tribunalColor: '#F97316',
+    portal: 'pje_trf3',
     numero: '5001429-12.2026.4.03.6100',
     cliente: 'Carlos Eduardo da Silva Prado',
-    prazo: 'PRAZO MÉDIO',
-    prazoColor: '#F59E0B',
+    prazoInicio: '25/05/2026',
+    prazoFim: '25/07/2026',
+    dataUltimaAlteracao: '25/05/2026',
     ultimaAlteracao:
       'Ato ordinatório praticado - Vista ao autor para manifestação sobre contestação da autarquia federal',
+    proximoPasso: 'Manifestar sobre a contestação da autarquia federal',
     ativo: false,
     classeJudicial: 'MANDADO DE SEGURANÇA',
     assunto: 'Ato Administrativo / Servidor Público Federal',
     magistrado: 'Dra. Patrícia Andrade Freitas',
     ultimaAtualizacaoTecnica: '25/05/2026',
+    objetoAcao:
+      'Anulação de ato administrativo que negou progressão funcional de servidor público federal',
   },
 ]
 
@@ -76,44 +99,38 @@ export const movimentacoesMockadas: Movimentacao[] = [
     id: 1,
     processoId: 1,
     data: '28/05/2026',
-    fase: 'FASE 3',
-    descricao:
-      'Remetidos os autos ao Ministério Público com urgência legal extrema',
-    tipo: 'Remessa',
+    nomeEtapa: 'Remessa ao MP',
+    descricao: 'Remetidos os Autos ao Ministério Público',
   },
   {
     id: 2,
     processoId: 1,
     data: '25/05/2026',
-    fase: 'FASE 2',
+    nomeEtapa: 'Decisão Interlocutória',
     descricao:
-      'Decisão proferida ou despacho interlocutório - Determinada a averbação de restrição parante a Detran no prazo de 24 horas sob pena de busca e apreensão',
-    tipo: 'Decisão',
+      'Proferido despacho de mero expediente - Determinada a averbação de restrição de transferência perante o DETRAN/SP no prazo de 24 horas',
   },
   {
     id: 3,
     processoId: 1,
     data: '15/05/2026',
-    fase: 'FASE 1',
-    descricao: 'Petição Inicial protocolada',
-    tipo: 'Petição',
+    nomeEtapa: 'Petição Inicial',
+    descricao: 'Petição inicial protocolada',
   },
   {
     id: 4,
     processoId: 2,
     data: '25/05/2026',
-    fase: 'FASE 2',
+    nomeEtapa: 'Ato Ordinatório',
     descricao:
-      'Ato ordinatório praticado - Vista ao autor para manifestação sobre contestação da autarquia federal',
-    tipo: 'Ato Ordinatório',
+      'Publicado Ato Ordinatório em 25/05/2026 - Vista ao autor para manifestação sobre contestação da autarquia federal',
   },
   {
     id: 5,
     processoId: 2,
     data: '10/05/2026',
-    fase: 'FASE 1',
-    descricao: 'Impetração do Mandado de Segurança distribuída por sorteio',
-    tipo: 'Distribuição',
+    nomeEtapa: 'Distribuição',
+    descricao: 'Distribuído por sorteio',
   },
 ]
 

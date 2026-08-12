@@ -14,6 +14,11 @@
   --color-surface: #FFFFFF;
   --color-surface-hover: #F8F9FC;
 
+  /* Elaboração — painéis laterais (tom periwinkle derivado do accent-blue) */
+  --color-elaboracao-sidebar: #E4E9F7;
+  --color-elaboracao-sidebar-muted: #D8E0F2;
+  --color-elaboracao-sidebar-hover: #CED8EE;
+
   /* Borders */
   --color-border-subtle: #E5E7EB;
   --color-border-active: #C7D0E8;

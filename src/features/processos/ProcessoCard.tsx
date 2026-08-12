@@ -1,4 +1,6 @@
 import type { Processo } from './processos.mock'
+import { getPrazoUrgencia } from './prazo.utils'
+import { getPortalDoProcesso } from './portais.mock'
 
 interface ProcessoCardProps {
   processo: Processo
@@ -7,6 +9,9 @@ interface ProcessoCardProps {
 }
 
 export function ProcessoCard({ processo, selecionado, onClick }: ProcessoCardProps) {
+  const { cor: prazoCor } = getPrazoUrgencia(processo.prazoInicio, processo.prazoFim)
+  const portal = getPortalDoProcesso(processo.portal)
+
   return (
     <button
       type="button"
@@ -18,20 +23,28 @@ export function ProcessoCard({ processo, selecionado, onClick }: ProcessoCardPro
           : 'border-[#E5E7EB] bg-white hover:bg-[#F8F9FC] hover:border-[#C7D0E8]',
       ].join(' ')}
     >
-      {/* Top row — tribunal badge + prazo badge */}
+      {/* Top row — tag do portal + data do prazo */}
       <div className="flex items-center justify-between mb-3">
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold tracking-wide text-[#374151] bg-[#F3F4F6] border border-[#E5E7EB]">
-          {processo.tribunal}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide text-white"
+            style={{ backgroundColor: portal.cor }}
+          >
+            {portal.tag}
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide text-[#374151] bg-[#F3F4F6] border border-[#E5E7EB]">
+            {processo.tribunal}
+          </span>
+        </div>
         <span
-          className="inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.08em] uppercase"
-          style={{ color: processo.prazoColor }}
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold tabular-nums"
+          style={{ color: prazoCor }}
         >
           <span
-            className="inline-block w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: processo.prazoColor }}
+            className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: prazoCor }}
           />
-          {processo.prazo}
+          {processo.prazoFim}
         </span>
       </div>
 
@@ -48,13 +61,28 @@ export function ProcessoCard({ processo, selecionado, onClick }: ProcessoCardPro
       {/* Divider */}
       <div className="h-px bg-[#F3F4F6] mb-3" />
 
-      {/* Last update label */}
-      <p className="text-[9px] font-semibold text-[#9CA3AF] uppercase tracking-[0.14em] mb-1.5">
-        Última Alteração:
-      </p>
-      <p className="text-[11px] text-[#6B7280] leading-relaxed line-clamp-3">
+      {/* Last update — label + date on same line */}
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <p className="text-[9px] font-semibold text-[#9CA3AF] uppercase tracking-[0.14em]">
+          Última Alteração:
+        </p>
+        <p className="text-[10px] font-medium text-[#6B7280] tabular-nums flex-shrink-0">
+          {processo.dataUltimaAlteracao}
+        </p>
+      </div>
+      <p className="text-[11px] text-[#6B7280] leading-relaxed line-clamp-3 mb-3">
         {processo.ultimaAlteracao}
       </p>
+
+      {/* Próximo passo */}
+      <div className="rounded-lg border border-[#E5E7EB] bg-[#F8F9FC] px-3 py-2.5">
+        <p className="text-[9px] font-semibold text-[#9CA3AF] uppercase tracking-[0.14em] mb-1">
+          Próximo Passo
+        </p>
+        <p className="text-[11px] font-semibold text-[#111827] leading-snug uppercase">
+          {processo.proximoPasso}
+        </p>
+      </div>
     </button>
   )
 }

@@ -1,8 +1,9 @@
-import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { LogOut, Scale } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { LogOut, Scale, Settings } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { logout } from '#/features/auth/auth.api'
+import { CREDENTIALS_STATUS_QUERY_KEY } from '#/features/settings/credentials.constants'
 import { useAuthStore } from '#/store/auth.store'
 
 export const NAVBAR_HEIGHT = 64
@@ -10,6 +11,7 @@ export const NAVBAR_HEIGHT = 64
 export function Navbar() {
   const navigate = useNavigate()
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const queryClient = useQueryClient()
 
   const sair = useMutation({
     mutationFn: logout,
@@ -17,6 +19,8 @@ export function Navbar() {
     // estar expirado, e deixar o estado local autenticado seria pior.
     onSettled: () => {
       clearAuth()
+      // Evita flash dos dados do advogado anterior na próxima sessão.
+      queryClient.removeQueries({ queryKey: CREDENTIALS_STATUS_QUERY_KEY })
       navigate({ to: '/login', replace: true })
     },
   })
@@ -56,6 +60,18 @@ export function Navbar() {
             GCM
           </span>
         </div>
+
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 px-3 text-[11px] font-medium text-white/70 hover:text-white hover:bg-white/10 border border-white/10"
+        >
+          <Link to="/configuracoes">
+            <Settings className="w-3.5 h-3.5" />
+            Configurações
+          </Link>
+        </Button>
 
         <Button
           type="button"

@@ -11,12 +11,19 @@ from uuid import UUID
 
 import bcrypt
 import jwt
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from app.core.config import get_settings
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_TYPE = "access"
+OAUTH_STATE_TOKEN_TYPE = "oauth_state"
+OAUTH_STATE_EXPIRE_MINUTES = 10
 BCRYPT_ROUNDS = 12
+# Tamanho padrão do nonce do AES-GCM (96 bits) — não é segredo, só precisa
+# ser único por chave, por isso pode ir concatenado no próprio blob salvo.
+AES_GCM_NONCE_BYTES = 12
 # bcrypt trunca silenciosamente em 72 bytes; rejeitamos antes para não aceitar
 # uma senha longa cuja cauda seria ignorada na verificação.
 BCRYPT_MAX_PASSWORD_BYTES = 72
@@ -28,7 +35,16 @@ _DUMMY_PASSWORD_HASH = "$2b$12$pZPE28UKmgzyPfcEOKeMKON21R4fqXAqm3Q8CSkmUbzUuastE
 
 
 class TokenInvalidoError(Exception):
-    """Access token ausente, malformado, adulterado ou expirado."""
+    """Access token (ou state de OAuth2) ausente, malformado, adulterado ou expirado."""
+
+
+class DecriptografiaError(Exception):
+    """Blob AES-GCM corrompido, adulterado ou decriptado com a chave errada.
+
+    O `InvalidTag` da lib `cryptography` já cobre os três casos — não dá para
+    diferenciar "chave errada" de "dado adulterado" sem abrir uma janela de
+    oráculo, então tratamos os dois igual.
+    """
 
 
 def hash_password(password: str) -> str:
@@ -107,3 +123,86 @@ def generate_refresh_token() -> tuple[str, str]:
     """Gera (token bruto para o cookie, hash para persistir no banco)."""
     token = secrets.token_urlsafe(48)
     return token, hash_token(token)
+
+
+def encrypt_secret(plaintext: str) -> bytes:
+    """Criptografa CPF, senha ou token OAuth2 do e-SAJ com AES-256-GCM.
+
+    Retorna `nonce || ciphertext_com_tag` prontos para ir numa coluna BYTEA.
+    Cada chamada usa um nonce novo — nunca reaproveitar nonce com a mesma
+    chave, senão o GCM perde a garantia de confidencialidade.
+    """
+    settings = get_settings()
+    nonce = secrets.token_bytes(AES_GCM_NONCE_BYTES)
+    ciphertext = AESGCM(settings.derive_aes_key()).encrypt(nonce, plaintext.encode("utf-8"), None)
+    return nonce + ciphertext
+
+
+def decrypt_secret(blob: bytes) -> str:
+    """Reverte `encrypt_secret`.
+
+    Levanta `DecriptografiaError` se o blob foi adulterado ou a chave não é a
+    mesma usada para criptografar — nunca decripta "quase certo": o GCM
+    verifica a tag de autenticação antes de devolver qualquer byte.
+    """
+    settings = get_settings()
+    nonce, ciphertext = blob[:AES_GCM_NONCE_BYTES], blob[AES_GCM_NONCE_BYTES:]
+    try:
+        plaintext = AESGCM(settings.derive_aes_key()).decrypt(nonce, ciphertext, None)
+    except InvalidTag as exc:
+        raise DecriptografiaError("TagInvalida") from exc
+    return plaintext.decode("utf-8")
+
+
+def create_oauth_state_token(user_id: UUID, provider: str) -> str:
+    """State assinado do fluxo OAuth2 (Gmail/Outlook) — sem tabela de sessão.
+
+    O callback do provedor chega como navegação pura do browser (sem header
+    Authorization), então o `state` é a única forma de recuperar com segurança
+    de qual usuário e provedor é aquele `code`. `nonce` garante um valor novo
+    a cada `/authorize`, e a expiração curta limita a janela de um state
+    interceptado/reaproveitado.
+    """
+    settings = get_settings()
+    agora = datetime.now(UTC)
+    payload = {
+        "sub": str(user_id),
+        "type": OAUTH_STATE_TOKEN_TYPE,
+        "provider": provider,
+        "nonce": secrets.token_urlsafe(16),
+        "iat": agora,
+        "exp": agora + timedelta(minutes=OAUTH_STATE_EXPIRE_MINUTES),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=JWT_ALGORITHM)
+
+
+def decode_oauth_state_token(token: str) -> tuple[UUID, str]:
+    """Decodifica o `state` e devolve `(user_id, provider)`.
+
+    Quem chama ainda precisa comparar `provider` com o provider da URL do
+    callback — o state prova quem gerou o pedido, não substitui essa checagem.
+    """
+    settings = get_settings()
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub", "exp", "type", "provider"]},
+        )
+    except jwt.PyJWTError as exc:
+        raise TokenInvalidoError(type(exc).__name__) from exc
+
+    if payload.get("type") != OAUTH_STATE_TOKEN_TYPE:
+        raise TokenInvalidoError("TipoDeTokenInesperado")
+
+    try:
+        user_id = UUID(payload["sub"])
+    except (TypeError, ValueError) as exc:
+        raise TokenInvalidoError("SubjectInvalido") from exc
+
+    provider = payload.get("provider")
+    if not isinstance(provider, str) or not provider:
+        raise TokenInvalidoError("ProviderAusente")
+
+    return user_id, provider

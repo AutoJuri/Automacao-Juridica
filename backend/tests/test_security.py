@@ -10,9 +10,14 @@ import pytest
 from app.core.config import get_settings
 from app.core.security import (
     JWT_ALGORITHM,
+    DecriptografiaError,
     TokenInvalidoError,
     create_access_token,
+    create_oauth_state_token,
     decode_access_token,
+    decode_oauth_state_token,
+    decrypt_secret,
+    encrypt_secret,
     generate_refresh_token,
     hash_password,
     hash_token,
@@ -183,3 +188,93 @@ class TestRefreshToken:
         tokens = {generate_refresh_token()[0] for _ in range(100)}
 
         assert len(tokens) == 100
+
+
+class TestEncryptSecret:
+    def test_roundtrip_devolve_o_texto_original(self):
+        segredo = "12345678900"
+
+        blob = encrypt_secret(segredo)
+
+        assert decrypt_secret(blob) == segredo
+
+    def test_blob_nao_contem_o_texto_original(self):
+        segredo = "senha-do-esaj-super-secreta"
+
+        blob = encrypt_secret(segredo)
+
+        assert segredo.encode("utf-8") not in blob
+
+    def test_criptografar_o_mesmo_segredo_duas_vezes_gera_blobs_diferentes(self):
+        segredo = "12345678900"
+
+        primeiro = encrypt_secret(segredo)
+        segundo = encrypt_secret(segredo)
+
+        assert primeiro != segundo  # nonce aleatório por chamada
+
+    def test_blob_adulterado_nao_decripta(self):
+        blob = bytearray(encrypt_secret("12345678900"))
+        blob[-1] ^= 0xFF  # inverte o último byte (parte da tag de autenticação)
+
+        with pytest.raises(DecriptografiaError):
+            decrypt_secret(bytes(blob))
+
+    def test_blob_curto_demais_nao_decripta(self):
+        with pytest.raises(DecriptografiaError):
+            decrypt_secret(b"blob-muito-curto")
+
+
+class TestOAuthStateToken:
+    def test_roundtrip_devolve_user_id_e_provider(self):
+        user_id = uuid4()
+
+        token = create_oauth_state_token(user_id, "gmail")
+
+        assert decode_oauth_state_token(token) == (user_id, "gmail")
+
+    def test_states_gerados_para_o_mesmo_usuario_sao_distintos(self):
+        user_id = uuid4()
+
+        primeiro = create_oauth_state_token(user_id, "gmail")
+        segundo = create_oauth_state_token(user_id, "gmail")
+
+        assert primeiro != segundo  # nonce aleatório por chamada
+
+    def test_state_expirado_e_rejeitado(self):
+        settings = get_settings()
+        token = jwt.encode(
+            {
+                "sub": str(uuid4()),
+                "type": "oauth_state",
+                "provider": "gmail",
+                "nonce": "abc",
+                "exp": 1,
+            },
+            settings.jwt_secret,
+            algorithm=JWT_ALGORITHM,
+        )
+
+        with pytest.raises(TokenInvalidoError):
+            decode_oauth_state_token(token)
+
+    def test_state_adulterado_e_rejeitado(self):
+        token = create_oauth_state_token(uuid4(), "gmail")
+        adulterado = token[:-2] + ("cd" if token.endswith("ab") else "ab")
+
+        with pytest.raises(TokenInvalidoError):
+            decode_oauth_state_token(adulterado)
+
+    def test_state_de_outro_tipo_e_rejeitado(self):
+        """Um access token não pode ser reaproveitado como state do OAuth2."""
+        token = create_access_token(uuid4())
+
+        with pytest.raises(TokenInvalidoError):
+            decode_oauth_state_token(token)
+
+    def test_access_token_rejeita_state_reaproveitado(self):
+        """E o inverso: um state não pode logar o usuário como access token."""
+        token = create_oauth_state_token(uuid4(), "gmail")
+
+        with pytest.raises(TokenInvalidoError):
+            decode_access_token(token)

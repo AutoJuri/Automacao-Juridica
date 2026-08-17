@@ -2,6 +2,8 @@ import axios from 'axios'
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
 import type { TokenResponse } from '#/features/auth/auth.types'
+import { CREDENTIALS_STATUS_QUERY_KEY } from '#/features/settings/credentials.constants'
+import { queryClient } from '#/lib/query-client'
 import { useAuthStore } from '#/store/auth.store'
 
 /** Marca uma request que já passou pelo fluxo de refresh, evitando loop infinito. */
@@ -61,6 +63,7 @@ export function refreshAccessToken(): Promise<string | null> {
       })
       .catch(() => {
         useAuthStore.getState().clearAuth()
+        queryClient.removeQueries({ queryKey: CREDENTIALS_STATUS_QUERY_KEY })
         return null
       })
       .finally(() => {

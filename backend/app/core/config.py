@@ -1,3 +1,4 @@
+import hashlib
 from functools import lru_cache
 
 from pydantic import model_validator
@@ -25,6 +26,18 @@ class Settings(BaseSettings):
     password_reset_token_expire_minutes: int = 60
     aes_key: str = PLACEHOLDER_AES_KEY
     cors_origins: str = "http://localhost:3000"
+
+    # OAuth2 — captura do código de verificação do e-SAJ via e-mail. Vazio por
+    # padrão: não trava o boot, mas os endpoints /credentials/email/{provider}
+    # respondem erro claro enquanto não forem preenchidos.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_oauth_redirect_uri: str = "http://localhost:8000/credentials/email/gmail/callback"
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_oauth_redirect_uri: str = (
+        "http://localhost:8000/credentials/email/outlook/callback"
+    )
 
     @model_validator(mode="after")
     def _rejeita_segredos_placeholder(self) -> "Settings":
@@ -62,6 +75,14 @@ class Settings(BaseSettings):
         """Base do frontend, usada para montar links enviados ao usuário."""
         origens = self.cors_origins_list
         return origens[0] if origens else "http://localhost:3000"
+
+    def derive_aes_key(self) -> bytes:
+        """Normaliza `AES_KEY` para exatos 32 bytes via SHA-256.
+
+        Evita depender de o valor configurado ter exatamente 32 bytes em
+        UTF-8 — qualquer string secreta suficientemente longa serve.
+        """
+        return hashlib.sha256(self.aes_key.encode("utf-8")).digest()
 
     @property
     def sqlalchemy_url(self) -> str:

@@ -49,8 +49,11 @@ bun run build
 cd backend
 cp .env.example .env
 python -m uv sync
+python -m uv run playwright install chromium   # binário do browser (só na 1ª vez)
 python -m uv run uvicorn app.main:app --reload --port 8000
 ```
+
+> Sem o `playwright install chromium`, a validação de credenciais do e-SAJ falha com “portal indisponível” — o Chromium headless não está no PATH até esse comando baixar o binário.
 
 Health check: [http://localhost:8000/health](http://localhost:8000/health) → `{ "status": "ok" }`
 

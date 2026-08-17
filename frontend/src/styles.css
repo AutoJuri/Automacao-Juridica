@@ -7,9 +7,11 @@
   --font-serif-display: 'DM Serif Display', Georgia, serif;
   --font-sans: 'DM Sans', system-ui, sans-serif;
 
-  /* Layout backgrounds */
+  /* Layout backgrounds — NÃO usar o nome `base`: em Tailwind v4,
+     `--color-base` gera a utility `text-base` como COR e sobrescreve
+     o `text-base` de font-size, deixando o texto dos inputs quase branco. */
+  --color-page: #F0F2F7;
   --color-navbar: #0D0F14;
-  --color-base: #F0F2F7;
   --color-sidebar: #F5F6FA;
   --color-surface: #FFFFFF;
   --color-surface-hover: #F8F9FC;
@@ -52,6 +54,11 @@ body,
 body {
   margin: 0;
   font-family: 'DM Sans', system-ui, sans-serif;
+  /* A UI é light — sem isso, no Windows/Chrome com tema escuro do SO
+     os <input> herdavam color-scheme:dark e o texto digitado ficava
+     quase branco sobre fundo branco. */
+  color-scheme: light;
+  color: var(--color-text-primary);
 }
 
 @keyframes pulse-dot {
@@ -79,5 +86,18 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.25s ease forwards;
+}
+
+/* Autofill do Chrome/Edge às vezes força -webkit-text-fill-color claro,
+   deixando o valor digitado ilegível em fundos brancos. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text-primary);
+  caret-color: var(--color-text-primary);
+  transition: background-color 99999s ease-in-out 0s;
 }
 

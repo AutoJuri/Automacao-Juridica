@@ -7,9 +7,7 @@
 
 import { z } from 'zod'
 
-const SENHA_MIN = 8
-/** Teto do bcrypt: acima de 72 bytes a cauda da senha seria ignorada. */
-const SENHA_MAX = 72
+import { cabeEmBytesDoBcrypt, SENHA_MAX, SENHA_MIN } from '#/lib/password-validation'
 
 const email = z
   .string()
@@ -17,14 +15,6 @@ const email = z
   .min(1, 'Informe seu e-mail')
   .max(255, 'E-mail muito longo')
   .pipe(z.email('E-mail inválido'))
-
-/**
- * `.max(72)` do Zod conta caracteres, mas o teto do bcrypt é em bytes UTF-8 —
- * um emoji ou acento pode ocupar de 2 a 4 bytes. Sem este `.refine`, uma
- * senha com 72 caracteres multibyte passaria no frontend e só seria
- * rejeitada pelo 422 do backend, numa UX pior.
- */
-const cabeEmBytesDoBcrypt = (senha: string) => new TextEncoder().encode(senha).length <= SENHA_MAX
 
 const novaSenha = z
   .string()

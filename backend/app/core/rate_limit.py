@@ -17,6 +17,8 @@ limiter = Limiter(key_func=get_remote_address)
 LIMITE_CADASTRO = "5/hour"
 LIMITE_LOGIN = "10/hour"
 LIMITE_RECUPERAR_SENHA = "3/hour"
+LIMITE_CREDENCIAL_ESAJ = "5/hour"
+LIMITE_OAUTH_AUTHORIZE = "10/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

@@ -25,6 +25,7 @@ SESSION_STATUS_BLOQUEADO = "bloqueado"
 SESSION_STATUS_CREDENCIAL_INVALIDA = "credencial_invalida"
 SESSION_STATUS_EMAIL_DESCONECTADO = "email_desconectado"
 SESSION_STATUS_PORTAL_INDISPONIVEL = "portal_indisponivel"
+SESSION_STATUS_CODIGO_NAO_ENCONTRADO = "codigo_nao_encontrado"
 
 SESSION_STATUSES = (
     SESSION_STATUS_ATIVO,
@@ -33,6 +34,7 @@ SESSION_STATUSES = (
     SESSION_STATUS_CREDENCIAL_INVALIDA,
     SESSION_STATUS_EMAIL_DESCONECTADO,
     SESSION_STATUS_PORTAL_INDISPONIVEL,
+    SESSION_STATUS_CODIGO_NAO_ENCONTRADO,
 )
 
 
@@ -50,6 +52,11 @@ class TribunalCredential(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     tribunal: Mapped[str] = mapped_column(String(50), nullable=False)
     cpf_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     senha_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    # Versão mascarada do CPF (ex.: "***.456.789-**"), calculada uma vez no
+    # cadastro e guardada em texto puro — evita decriptar `cpf_encrypted`
+    # (que só deve ser lido em memória pelo job do Playwright) só para exibir
+    # no frontend. Ver ADR-005.
+    cpf_mascarado: Mapped[str] = mapped_column(String(20), nullable=False)
     email_provider: Mapped[str | None] = mapped_column(String(20))
     email_oauth_token_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
     last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -77,8 +84,10 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
     )
     tribunal: Mapped[str] = mapped_column(String(50), nullable=False)
-    # JSESSIONID + CASTGC criptografados (AES-256).
-    cookie_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    # JSESSIONID + CASTGC criptografados (AES-256). Nulo enquanto a
+    # credencial nunca foi validada com sucesso (ex.: primeira tentativa
+    # ainda rodando, ou credencial/e-mail inválidos) — ver ADR-007.
+    cookie_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, server_default=SESSION_STATUS_ATIVO
@@ -92,6 +101,11 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 
+    def anular_cookie(self) -> None:
+        """Remove o cookie de sessão do banco. Cookie válido só existe com `status=ativo`."""
+        self.cookie_encrypted = None
+        self.expires_at = None
+
     def __repr__(self) -> str:
         return f"<TribunalSession {self.tribunal} status={self.status}>"
 
@@ -101,6 +115,7 @@ __all__ = [
     "SESSION_STATUSES",
     "SESSION_STATUS_ATIVO",
     "SESSION_STATUS_BLOQUEADO",
+    "SESSION_STATUS_CODIGO_NAO_ENCONTRADO",
     "SESSION_STATUS_CREDENCIAL_INVALIDA",
     "SESSION_STATUS_EMAIL_DESCONECTADO",
     "SESSION_STATUS_PORTAL_INDISPONIVEL",

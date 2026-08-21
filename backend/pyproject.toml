@@ -17,10 +17,16 @@ dependencies = [
     "cryptography>=43.0.0",
     "httpx>=0.27.0",
     "playwright>=1.49.0",
+    # zoneinfo (stdlib) depende da base IANA do SO — no Windows (dev) e em
+    # imagens mínimas de container ela não vem instalada por padrão.
+    "tzdata>=2024.2",
+    # v3 (não v4/beta): API síncrona estável com AsyncIOScheduler, que roda
+    # dentro do próprio event loop do Uvicorn.
+    "apscheduler>=3.10,<4",
 ]
 
 # Próximas etapas (não instalar agora):
-# beautifulsoup4, lxml, apscheduler
+# beautifulsoup4, lxml
 
 [dependency-groups]
 dev = [

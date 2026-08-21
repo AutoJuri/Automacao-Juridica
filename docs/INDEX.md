@@ -29,6 +29,14 @@
 - `TribunalSession.cookie_encrypted` é nullable — só preenchido após 1º login bem-sucedido (ADR-007)
 - Validação de credencial roda em `BackgroundTask` + polling do frontend, nunca síncrona na resposta do cadastro (ADR-008)
 - Captura do código MFA usa `SessionLocal` própria — nunca a mesma sessão do orquestrador Playwright (ADR-009)
+- Pipes e-SAJ: `id_esaj` de audiência é composto; petições `tarefas-adv` fora do ciclo; CPO só com fixture de movimentações (ADR-010)
+- Payload bruto do e-SAJ: validar **item a item** (`validar_itens`); item inválido é omitido; log só tipo do erro + nome do campo — nunca o input (OAB no `id` da intimação)
+- `titulo` / `local` / `id_esaj` cabem em `VARCHAR(255)`: truncar no ETL, não alargar coluna agora
+- Depois de `gerar_notificacoes`, marcar intimação/audiência nova com `is_new=False` — a notificação já foi emitida
+- Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
+- Scheduler **off** em `APP_ENV=development` (override `SCHEDULER_ENABLED=true`); em produção liga sozinho
+- Rate limit (429) nos pipes vira `bloqueado` com backoff, sem invalidar o cookie — só sessão inválida/erro de login zera o cookie (ADR-011)
+- `reauth_pendente` e cookie `ativo` expirado disparam reauth no próximo tick de 10 min; duplicata de Playwright no mesmo processo é barrada por `_VALIDACOES_EM_ANDAMENTO` (fecha o gap da ADR-008)
 - Contexto Playwright **isolado por advogado** — nunca compartilhado, sempre headless em produção
 - Logs **nunca** contêm CPF, senha, cookie ou token OAuth2
 - IDs são sempre **UUID** — nunca sequenciais
@@ -47,10 +55,16 @@
 ## Ciclo de Coleta (referência rápida)
 
 ```
-Às 1h da manhã   → Playwright renova cookie de sessão por advogado
-A cada 10 minutos → 4 pipes paralelos por advogado (intimações, audiências, petições, processos)
+Às 1h da manhã (America/Sao_Paulo) → cron renova cookie de todo advogado com credencial ativa
+A cada 10 minutos → por advogado: Playwright em andamento → skip | ativo + cookie ok → pipes | ativo + cookie expirado / reauth_pendente → reauth | bloqueado + backoff passou → pipes | senão → espera
+                  → intimação (menu Manifestações/ciência) → audiência → upsert da ficha
+                  → CPO/movimentações só com fixture; petições (Assinar e enviar) fora do ciclo
                   → ETL normaliza → Diff compara → Notificação se mudou
 ```
+
+Contrato e validação ao vivo: `/docs/modulos/esaj-apis.md` (ADR-010). Scheduler e decisão por advogado: `/docs/modulos/scheduler.md` (ADR-011).
+
+`GET /credentials/status` inclui `sessao_expirada` (cookie `ativo` fora das ~22h) — a UI mostra Revalidar só nesse caso.
 
 **Status do advogado (`tribunal_sessions.status`):**
 - `ativo` — funcionando normalmente
@@ -104,6 +118,8 @@ automacao-juridica/
 | Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo |
+| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + hardening 2026-08-21) |
+| Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (Etapa 8 + hardening 2026-08-21) |
 
 ---
 
@@ -120,6 +136,8 @@ automacao-juridica/
 | ADR-007 | `TribunalSession.cookie_encrypted` nullable | `/docs/decisions/007-cookie-encrypted-nullable.md` |
 | ADR-008 | Validação de credenciais em background task + polling do frontend | `/docs/decisions/008-validacao-background-polling.md` |
 | ADR-009 | Sessão SQLAlchemy dedicada para captura do código MFA | `/docs/decisions/009-sessao-dedicada-captura-email.md` |
+| ADR-010 | Contrato dos pipes e-SAJ (id de audiência, carteira, CPO, petições) | `/docs/decisions/010-contrato-pipes-esaj.md` |
+| ADR-011 | Timezone explícito no scheduler, rate limit sem invalidar cookie, `reauth_pendente` no próximo tick | `/docs/decisions/011-scheduler-timezone-e-rate-limit.md` |
 
 ---
 
@@ -129,3 +147,4 @@ automacao-juridica/
 |---|---|---|
 | Hardening de Auth (itens 7+) | Code review das Etapas 3–4 | `/docs/backlog-auth-hardening.md` |
 | Hardening Credenciais / Login e-SAJ | Code review das Etapas 5–6 | `/docs/backlog-credentials-login-hardening.md` |
+| Hardening Pipes / Scheduler | Code review das Etapas 7–8 | `/docs/backlog-pipes-scheduler-hardening.md` |

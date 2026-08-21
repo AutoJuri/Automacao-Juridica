@@ -107,12 +107,14 @@ export function EsajCredentialForm() {
   const cadastrado = statusQuery.data?.cadastrado ?? false
   const emailConectado = statusQuery.data?.email_conectado ?? false
   const sessionStatus = statusQuery.data?.session_status ?? null
+  const sessaoExpirada = statusQuery.data?.sessao_expirada ?? false
   const validando = cadastrado && estaValidando(sessionStatus)
   const falhou = cadastrado && !validando && sessionStatus !== 'ativo' && sessionStatus !== null
   const aguardandoPrimeiraValidacao = cadastrado && sessionStatus === null
   const permiteRevalidar =
     (falhou && sessionStatus !== 'credencial_invalida') ||
-    (aguardandoPrimeiraValidacao && emailConectado)
+    (aguardandoPrimeiraValidacao && emailConectado) ||
+    (sessionStatus === 'ativo' && sessaoExpirada && emailConectado)
 
   return (
     <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
@@ -144,6 +146,14 @@ export function EsajCredentialForm() {
               <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#2563EB]" />
               <p className="text-sm text-[#1E40AF]">
                 Validando suas credenciais no e-SAJ... pode levar até 1 minuto.
+              </p>
+            </div>
+          ) : sessionStatus === 'ativo' && sessaoExpirada ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-[#D97706] mt-0.5" />
+              <p className="text-sm text-[#92400E]">
+                A sessão do e-SAJ expirou. Clique em Revalidar para renovar o acesso — CPF e senha
+                já estão cadastrados.
               </p>
             </div>
           ) : sessionStatus === 'ativo' ? (

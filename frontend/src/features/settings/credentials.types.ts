@@ -24,6 +24,8 @@ export interface CredentialStatus {
   last_validated_at: string | null
   is_active: boolean | null
   session_status: SessionStatus | null
+  /** `status=ativo` mas o cookie já passou do `expires_at` (ou sumiu). */
+  sessao_expirada: boolean
 }
 
 export interface AuthorizeUrlResponse {

@@ -1,7 +1,7 @@
 """Credenciais e sessões dos portais de tribunal (e-SAJ)."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
@@ -105,6 +105,19 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         """Remove o cookie de sessão do banco. Cookie válido só existe com `status=ativo`."""
         self.cookie_encrypted = None
         self.expires_at = None
+
+    def cookie_expirado(self) -> bool:
+        """True quando o status ainda é `ativo`, mas o cookie não autentica mais
+        as APIs (prazo passou ou o blob sumiu). O frontend usa isso para
+        mostrar Revalidar sem expor `expires_at` cru como único sinal.
+        """
+        if self.status != SESSION_STATUS_ATIVO:
+            return False
+        if self.cookie_encrypted is None:
+            return True
+        if self.expires_at is None:
+            return False
+        return self.expires_at <= datetime.now(UTC)
 
     def __repr__(self) -> str:
         return f"<TribunalSession {self.tribunal} status={self.status}>"

@@ -33,6 +33,8 @@ class Audiencia(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ForeignKey("processos.id", ondelete="SET NULL"),
         index=True,
     )
+    # A API de audiências não manda id. O ETL grava um composto estável
+    # `cdProcesso|{iso}|{titulo}` — ver ADR-010. Nunca UUID por captura.
     id_esaj: Mapped[str] = mapped_column(String(255), nullable=False)
     titulo: Mapped[str | None] = mapped_column(String(255))
     data_audiencia: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)

@@ -1,6 +1,6 @@
 # ADR-008: Validação de credenciais em background task + polling do frontend
 
-**Data:** 2026-08-13
+**Data:** 2026-08-13 (atualizado 2026-08-21: gap de `reauth_pendente` órfão fechado pelo scheduler, ADR-011)
 **Status:** Aceito
 
 ---
@@ -24,6 +24,6 @@ Uma requisição HTTP síncrona de formulário (`POST /credentials/esaj` esperan
 ## Consequências
 
 - O guard `_VALIDACOES_EM_ANDAMENTO` (em `credential_validation.py`) só protege contra execuções concorrentes **dentro do mesmo processo** — múltiplos workers do Uvicorn/Gunicorn poderiam, em teoria, rodar duas validações do mesmo advogado ao mesmo tempo. Aceitável por ora (o pior resultado é um dos dois logins "perder" a corrida e sobrescrever o status do outro, sem corrupção de dado), mas deve ser revisitado se o projeto migrar para múltiplos workers em produção.
-- Se o processo reiniciar no meio de uma validação, a `TribunalSession` fica presa em `reauth_pendente` indefinidamente até o advogado clicar "Revalidar" — não há um job de limpeza automática deste estado nesta etapa (fica para a Etapa 7, junto do scheduler).
+- Se o processo reiniciar no meio de uma validação, a `TribunalSession` fica presa em `reauth_pendente` até o próximo `job_ciclo_dez_minutos` — o scheduler chama `validar_credencial_esaj` no tick (ADR-011, hardening 2026-08-21). Duplicata no mesmo processo continua barrada por `_VALIDACOES_EM_ANDAMENTO`. Múltiplos workers continuam fora do escopo (mesmo limite desta ADR).
 - O frontend nunca deve tratar "resposta 200 de `POST /credentials/esaj`" como "credencial validada" — só `session_status === "ativo"` (obtido via polling) significa que o login de fato funcionou.
 - Abre caminho direto para a Etapa 7 (APScheduler): o mesmo `validar_credencial_esaj` será reaproveitado tanto pelo cron diário de reautenticação quanto por qualquer disparo manual futuro.

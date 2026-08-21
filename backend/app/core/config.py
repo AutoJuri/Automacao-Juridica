@@ -39,6 +39,11 @@ class Settings(BaseSettings):
         "http://localhost:8000/credentials/email/outlook/callback"
     )
 
+    # None = deriva de APP_ENV (off em development, on fora). Override
+    # explícito via SCHEDULER_ENABLED=true/false. Sem isso, `uvicorn --reload`
+    # local dispararia pipes/Playwright contra o e-SAJ de verdade.
+    scheduler_enabled: bool | None = None
+
     @model_validator(mode="after")
     def _rejeita_segredos_placeholder(self) -> "Settings":
         """Impede subir fora de development com os segredos de exemplo."""
@@ -60,6 +65,17 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"JWT_SECRET precisa ter ao menos {JWT_SECRET_MIN_LENGTH} caracteres"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _default_scheduler_enabled(self) -> "Settings":
+        """Liga o APScheduler por padrão só fora de development.
+
+        `SCHEDULER_ENABLED` explícito sempre ganha. Sem a variável: local
+        (`APP_ENV=development`) fica off; produção/staging fica on.
+        """
+        if self.scheduler_enabled is None:
+            self.scheduler_enabled = self.app_env != "development"
         return self
 
     @property

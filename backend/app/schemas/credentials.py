@@ -41,6 +41,9 @@ class CredentialStatusSchema(BaseModel):
     # Um dos `SESSION_STATUSES` (ver app.models.tribunal), ou `None` se
     # nenhuma validação de login jamais foi disparada para esta credencial.
     session_status: str | None = None
+    # `status=ativo` mas `expires_at` já passou (ou cookie nulo). O cookie
+    # em si nunca sai da API — só este booleano para a UI mostrar Revalidar.
+    sessao_expirada: bool = False
 
 
 class AuthorizeUrlSchema(BaseModel):

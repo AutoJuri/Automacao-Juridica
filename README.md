@@ -55,6 +55,8 @@ python -m uv run uvicorn app.main:app --reload --port 8000
 
 > Sem o `playwright install chromium`, a validação de credenciais do e-SAJ falha com “portal indisponível” — o Chromium headless não está no PATH até esse comando baixar o binário.
 
+> Os jobs do APScheduler (pipes a cada 10 min, renovação de cookie às 1h em Brasília) **não** rodam com `APP_ENV=development`. Para ligá-los localmente, defina `SCHEDULER_ENABLED=true` no `.env`. Em produção (`APP_ENV=production`) eles ligam sozinhos.
+
 Health check: [http://localhost:8000/health](http://localhost:8000/health) → `{ "status": "ok" }`
 
 Docs interativas (dev): [http://localhost:8000/docs](http://localhost:8000/docs)

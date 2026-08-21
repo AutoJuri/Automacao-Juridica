@@ -62,11 +62,12 @@ Resposta de status (`CredentialStatusSchema`) — nunca inclui CPF, senha ou tok
   "email_conectado": true,
   "last_validated_at": null,
   "is_active": true,
-  "session_status": "ativo"
+  "session_status": "ativo",
+  "sessao_expirada": false
 }
 ```
 
-> `session_status` (adicionado na Etapa 6 — ver `/docs/modulos/login-esaj.md`) reflete o resultado da última tentativa de login real no e-SAJ; `null` até a primeira validação rodar.
+> `session_status` (adicionado na Etapa 6 — ver `/docs/modulos/login-esaj.md`) reflete o resultado da última tentativa de login real no e-SAJ; `null` até a primeira validação rodar. `sessao_expirada` é `true` só quando `session_status` ainda é `ativo` mas o cookie passou do `expires_at` (~22h) — a UI mostra Revalidar nesse caso, sem devolver o cookie.
 
 ---
 

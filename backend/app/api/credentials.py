@@ -71,6 +71,7 @@ def _status_schema(
         last_validated_at=credencial.last_validated_at,
         is_active=credencial.is_active,
         session_status=sessao.status if sessao is not None else None,
+        sessao_expirada=sessao.cookie_expirado() if sessao is not None else False,
     )
 
 

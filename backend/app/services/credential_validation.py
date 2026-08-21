@@ -17,6 +17,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.core.backoff import calcular_proximo_retry
 from app.core.security import decrypt_secret, encrypt_secret
 from app.db.session import SessionLocal
 from app.models.job_log import JOB_STATUS_FALHA, JOB_STATUS_SUCESSO, JOB_TIPO_LOGIN, JobLog
@@ -37,9 +38,6 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT_VALIDACAO_SEGUNDOS = 60
 SESSAO_EXPIRA_HORAS = 22
-# Backoff usado só como bookkeeping (`proximo_retry`) — quem efetivamente
-# agenda o novo disparo é o scheduler da Etapa 7.
-BACKOFF_MINUTOS = (5, 15, 60)
 
 # Nível de processo: evita duas validações concorrentes do mesmo advogado
 # (ex.: clique duplo em "Revalidar" antes da primeira tentativa terminar).
@@ -48,9 +46,13 @@ BACKOFF_MINUTOS = (5, 15, 60)
 _VALIDACOES_EM_ANDAMENTO: set[UUID] = set()
 
 
-def _calcular_proximo_retry(tentativas_falha: int) -> datetime:
-    indice = min(max(tentativas_falha - 1, 0), len(BACKOFF_MINUTOS) - 1)
-    return datetime.now(UTC) + timedelta(minutes=BACKOFF_MINUTOS[indice])
+def validacao_em_andamento(user_id: UUID) -> bool:
+    """True enquanto `validar_credencial_esaj` está rodando para este
+    advogado neste processo. O scheduler usa isso para não disparar pipes
+    no mesmo instante em que o Playwright está anulando o cookie (choque
+    das 1h entre renovação noturna e ciclo de 10 min).
+    """
+    return user_id in _VALIDACOES_EM_ANDAMENTO
 
 
 async def _buscar_ou_criar_sessao(db, user_id: UUID) -> TribunalSession:
@@ -66,9 +68,11 @@ async def _buscar_ou_criar_sessao(db, user_id: UUID) -> TribunalSession:
     return sessao
 
 
-async def _registrar_job_log(db, user_id: UUID, status: str, erro: str | None, inicio: datetime) -> None:
+async def _registrar_job_log(
+    db, user_id: UUID, job_tipo: str, status: str, erro: str | None, inicio: datetime
+) -> None:
     duracao_ms = int((datetime.now(UTC) - inicio).total_seconds() * 1000)
-    db.add(JobLog(user_id=user_id, tipo=JOB_TIPO_LOGIN, status=status, erro=erro, duracao_ms=duracao_ms))
+    db.add(JobLog(user_id=user_id, tipo=job_tipo, status=status, erro=erro, duracao_ms=duracao_ms))
     await db.commit()
 
 
@@ -79,12 +83,13 @@ async def _marcar_falha(
     user_id: UUID,
     erro_tipo: str,
     inicio: datetime,
+    job_tipo: str,
 ) -> None:
     sessao.anular_cookie()
     sessao.status = erro_tipo
     sessao.ultimo_erro = erro_tipo
     sessao.tentativas_falha += 1
-    sessao.proximo_retry = _calcular_proximo_retry(sessao.tentativas_falha)
+    sessao.proximo_retry = calcular_proximo_retry(sessao.tentativas_falha)
     if erro_tipo == SESSION_STATUS_CREDENCIAL_INVALIDA:
         # Para de tentar sozinho até o advogado corrigir a senha —
         # demais erros (portal fora do ar, e-mail desconectado no
@@ -92,15 +97,20 @@ async def _marcar_falha(
         # credencial ativa para novas tentativas.
         credencial.is_active = False
     await db.commit()
-    await _registrar_job_log(db, user_id, JOB_STATUS_FALHA, erro_tipo, inicio)
+    await _registrar_job_log(db, user_id, job_tipo, JOB_STATUS_FALHA, erro_tipo, inicio)
     logger.info("Validação e-SAJ falhou (user_id=%s, tipo=%s)", user_id, erro_tipo)
 
 
-async def validar_credencial_esaj(user_id: UUID) -> None:
+async def validar_credencial_esaj(user_id: UUID, *, job_tipo: str = JOB_TIPO_LOGIN) -> None:
     """Executa uma tentativa completa de login no e-SAJ para `user_id` e
     grava o resultado no banco. Nunca levanta exceção para quem chamou (é
-    disparada como `BackgroundTask` — não há ninguém para tratar um erro
-    aqui além de logar e deixar `TribunalSession.status` refletir a falha).
+    disparada como `BackgroundTask` ou pelo scheduler — não há ninguém para
+    tratar um erro aqui além de logar e deixar `TribunalSession.status`
+    refletir a falha).
+
+    `job_tipo` só afeta o `JobLog` gravado (`login` para disparo do
+    advogado via `/credentials/esaj` ou `/revalidar`, `reauth` para o cron
+    noturno do scheduler) — a lógica de validação é idêntica nos dois casos.
     """
     if user_id in _VALIDACOES_EM_ANDAMENTO:
         logger.info("Validação e-SAJ já em andamento para user_id=%s — disparo ignorado", user_id)
@@ -130,7 +140,7 @@ async def validar_credencial_esaj(user_id: UUID) -> None:
 
                 if credencial.email_provider is None:
                     await _marcar_falha(
-                        db, sessao, credencial, user_id, SESSION_STATUS_EMAIL_DESCONECTADO, inicio
+                        db, sessao, credencial, user_id, SESSION_STATUS_EMAIL_DESCONECTADO, inicio, job_tipo
                     )
                     return
 
@@ -172,11 +182,11 @@ async def validar_credencial_esaj(user_id: UUID) -> None:
                     credencial.last_validated_at = datetime.now(UTC)
                     credencial.is_active = True
                     await db.commit()
-                    await _registrar_job_log(db, user_id, JOB_STATUS_SUCESSO, None, inicio)
+                    await _registrar_job_log(db, user_id, job_tipo, JOB_STATUS_SUCESSO, None, inicio)
                     logger.info("Validação e-SAJ concluída com sucesso (user_id=%s)", user_id)
                     return
 
-                await _marcar_falha(db, sessao, credencial, user_id, erro_tipo, inicio)
+                await _marcar_falha(db, sessao, credencial, user_id, erro_tipo, inicio, job_tipo)
             except Exception:
                 # Última rede: falha ao gravar status, commit, etc. Tenta
                 # ainda assim marcar portal_indisponivel para o polling parar.

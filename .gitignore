@@ -34,6 +34,9 @@ __unconfig*
 .vscode/
 todos.json
 
+# Snapshot local do smoke de coleta (contagens, sem credencial)
+backend/scripts/.coleta_snapshot.json
+
 # Lab e-SAJ (sessions, results, credentials)
 scripts/esaj/.venv/
 scripts/esaj/sessions/

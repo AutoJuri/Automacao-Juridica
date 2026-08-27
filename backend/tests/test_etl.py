@@ -5,11 +5,23 @@ from zoneinfo import ZoneInfo
 
 from app.etl.etl import (
     TIMEZONE_SP,
+    audiencia_cpo_para_campos,
     audiencia_para_campos,
+    capa_cpo_para_campos,
     intimacao_para_campos,
     montar_id_esaj_audiencia,
+    movimentacao_para_campos,
+    parse_data_movimentacao_cpo,
     parse_datetime_esaj,
+    peticao_identidade_hash,
+    peticao_para_campos,
     processo_para_campos,
+)
+from app.schemas.esaj_cpo_raw import (
+    AudienciaCpoRaw,
+    CapaCpoRaw,
+    MovimentacaoRaw,
+    PeticaoDiversaRaw,
 )
 from app.schemas.esaj_raw import AudienciaRaw, IntimacaoRaw, ProcessoRaw
 
@@ -149,6 +161,82 @@ class TestAudienciaParaCampos:
         assert len(campos["local"]) == LOCAL_MAX
 
 
+class TestParseDataMovimentacaoCpo:
+    def test_data_dd_mm_aaaa_e_localizada_em_sao_paulo_meia_noite(self):
+        resultado = parse_data_movimentacao_cpo("18/08/2026")
+
+        assert resultado == datetime(2026, 8, 18, 0, 0, 0, tzinfo=TIMEZONE_SP)
+
+    def test_valor_none_retorna_none(self):
+        assert parse_data_movimentacao_cpo(None) is None
+
+    def test_string_vazia_retorna_none(self):
+        assert parse_data_movimentacao_cpo("") is None
+
+    def test_formato_invalido_retorna_none_sem_levantar_excecao(self):
+        assert parse_data_movimentacao_cpo("não é uma data") is None
+        assert parse_data_movimentacao_cpo("2026-08-18") is None
+
+
+class TestMovimentacaoParaCampos:
+    def test_mapeia_data_titulo_e_descricao(self):
+        raw = MovimentacaoRaw(data="18/08/2026", titulo="Certidão de Publicação Expedida", descricao="Certidão de Publicação Expedida\nRelação: 999/2026")
+
+        campos = movimentacao_para_campos(raw)
+
+        assert campos["data_movimentacao"] == datetime(2026, 8, 18, 0, 0, 0, tzinfo=TIMEZONE_SP)
+        assert campos["titulo"] == "Certidão de Publicação Expedida"
+        assert campos["descricao"] == "Certidão de Publicação Expedida\nRelação: 999/2026"
+        assert campos["tem_documento"] is False
+        assert campos["url_documento"] is None
+
+    def test_mapeia_documento_quando_url_e_segura(self):
+        raw = MovimentacaoRaw(
+            data="18/08/2026",
+            titulo="Despacho",
+            descricao="Despacho",
+            tem_documento=True,
+            url_documento="https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do?cdDocumento=1",
+        )
+
+        campos = movimentacao_para_campos(raw)
+
+        assert campos["tem_documento"] is True
+        assert campos["url_documento"] == (
+            "https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do?cdDocumento=1"
+        )
+
+    def test_descarta_url_documento_que_nao_e_https_do_esaj(self):
+        raw = MovimentacaoRaw(
+            data="18/08/2026",
+            titulo="Despacho",
+            descricao="Despacho",
+            tem_documento=True,
+            url_documento="javascript:alert(1)",
+        )
+
+        campos = movimentacao_para_campos(raw)
+
+        assert campos["tem_documento"] is True
+        assert campos["url_documento"] is None
+
+    def test_titulo_longo_e_truncado(self):
+        from app.etl.etl import TITULO_MAX
+
+        raw = MovimentacaoRaw(data="18/08/2026", titulo="T" * 400, descricao="descrição qualquer")
+
+        campos = movimentacao_para_campos(raw)
+
+        assert len(campos["titulo"]) == TITULO_MAX
+
+    def test_data_invalida_gera_data_movimentacao_none(self):
+        raw = MovimentacaoRaw(data="data-invalida", titulo="Título", descricao="descrição qualquer")
+
+        campos = movimentacao_para_campos(raw)
+
+        assert campos["data_movimentacao"] is None
+
+
 class TestProcessoParaCampos:
     def test_mapeia_partes_como_dict_com_chaves_camelcase(self):
         raw = ProcessoRaw.model_validate(
@@ -178,3 +266,52 @@ class TestProcessoParaCampos:
 
         assert campos["parte_ativa"] is None
         assert campos["parte_passiva"] is None
+
+    def test_url_cpo_de_host_interno_vira_none(self):
+        raw = ProcessoRaw.model_validate(
+            {
+                "cdProcesso": "1A0000XXXX0000",
+                "urlCpo": "https://127.0.0.1/cpopg/show.do",
+            }
+        )
+
+        campos = processo_para_campos(raw)
+
+        assert campos["url_cpo"] is None
+
+
+class TestCapaCpoParaCampos:
+    def test_nao_inclui_classe_nem_assunto(self):
+        capa = CapaCpoRaw(foro="Foro Central", vara="1ª Vara", juiz="Fulano", valor_acao="R$ 1,00")
+        campos = capa_cpo_para_campos(capa)
+        assert campos["foro"] == "Foro Central"
+        assert "de_classe" not in campos
+        assert "de_assunto" not in campos
+
+    def test_capa_ausente_vira_dict_vazio(self):
+        assert capa_cpo_para_campos(None) == {}
+
+
+class TestPeticaoParaCampos:
+    def test_protocolo_define_identidade_independente_do_tipo(self):
+        a = PeticaoDiversaRaw(data="03/10/2023", tipo="Petição Intermediária", protocolo="FAKE.1")
+        b = PeticaoDiversaRaw(data="04/10/2023", tipo="Outro", protocolo="FAKE.1")
+        assert peticao_identidade_hash(a) == peticao_identidade_hash(b)
+        campos = peticao_para_campos(a)
+        assert campos["protocolo"] == "FAKE.1"
+        assert campos["data_peticao"] is not None
+
+    def test_sem_protocolo_tipo_igual_no_mesmo_dia_colapsa(self):
+        a = PeticaoDiversaRaw(data="03/10/2023", tipo="Petição Intermediária")
+        b = PeticaoDiversaRaw(data="03/10/2023", tipo="Petição Intermediária")
+        assert peticao_identidade_hash(a) == peticao_identidade_hash(b)
+
+
+class TestAudienciaCpoParaCampos:
+    def test_mapeia_data_titulo_situacao(self):
+        raw = AudienciaCpoRaw(data="25/08/2026", titulo="Instrução", situacao="Realizada", qt_pessoas="3")
+        campos = audiencia_cpo_para_campos(raw)
+        assert campos["titulo"] == "Instrução"
+        assert campos["situacao"] == "Realizada"
+        assert campos["qt_pessoas"] == "3"
+        assert campos["data_audiencia"] is not None

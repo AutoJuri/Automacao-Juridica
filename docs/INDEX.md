@@ -29,8 +29,10 @@
 - `TribunalSession.cookie_encrypted` é nullable — só preenchido após 1º login bem-sucedido (ADR-007)
 - Validação de credencial roda em `BackgroundTask` + polling do frontend, nunca síncrona na resposta do cadastro (ADR-008)
 - Captura do código MFA usa `SessionLocal` própria — nunca a mesma sessão do orquestrador Playwright (ADR-009)
-- Pipes e-SAJ: `id_esaj` de audiência é composto; petições `tarefas-adv` fora do ciclo; CPO só com fixture de movimentações (ADR-010)
+- Pipes e-SAJ: `id_esaj` de audiência é composto; petições `tarefas-adv` fora do ciclo; CPO (movimentações + capa/partes/petições/audiências da página) via o mesmo HTML, throttle por processo (ADR-010, ADR-012, ADR-013)
 - Payload bruto do e-SAJ: validar **item a item** (`validar_itens`); item inválido é omitido; log só tipo do erro + nome do campo — nunca o input (OAB no `id` da intimação)
+- API do painel **nunca** devolve `id_esaj` (intimação leva OAB). Id público = UUID nosso
+- Processo real no painel: campo sem coleta vira placeholder — não misturar mock jurídico com CNJ verdadeiro
 - `titulo` / `local` / `id_esaj` cabem em `VARCHAR(255)`: truncar no ETL, não alargar coluna agora
 - Depois de `gerar_notificacoes`, marcar intimação/audiência nova com `is_new=False` — a notificação já foi emitida
 - Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
@@ -58,11 +60,12 @@
 Às 1h da manhã (America/Sao_Paulo) → cron renova cookie de todo advogado com credencial ativa
 A cada 10 minutos → por advogado: Playwright em andamento → skip | ativo + cookie ok → pipes | ativo + cookie expirado / reauth_pendente → reauth | bloqueado + backoff passou → pipes | senão → espera
                   → intimação (menu Manifestações/ciência) → audiência → upsert da ficha
-                  → CPO/movimentações só com fixture; petições (Assinar e enviar) fora do ciclo
+                  → movimentações: lote pequeno de processos por ciclo (throttle round-robin, ADR-012); petições (Assinar e enviar) fora do ciclo
                   → ETL normaliza → Diff compara → Notificação se mudou
+                  → Painel (`GET /processos`, `GET /notifications`) lê o banco; timestamps em America/Sao_Paulo
 ```
 
-Contrato e validação ao vivo: `/docs/modulos/esaj-apis.md` (ADR-010). Scheduler e decisão por advogado: `/docs/modulos/scheduler.md` (ADR-011).
+Contrato e validação ao vivo: `/docs/modulos/esaj-apis.md` (ADR-010). Scheduler e decisão por advogado: `/docs/modulos/scheduler.md` (ADR-011). Painel: `/docs/modulos/processos.md`.
 
 `GET /credentials/status` inclui `sessao_expirada` (cookie `ativo` fora das ~22h) — a UI mostra Revalidar só nesse caso.
 
@@ -86,6 +89,7 @@ automacao-juridica/
 │       ├── features/
 │       │   ├── auth/
 │       │   ├── processos/
+│       │   ├── secoes/        → placeholders da navbar
 │       │   ├── notificacoes/
 │       │   └── settings/
 │       ├── store/             → Zustand (auth em memória)
@@ -114,12 +118,13 @@ automacao-juridica/
 
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
-| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo |
+| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `b7e4c9a1d2f0`, CPO 2026-08-26) |
 | Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
-| Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo |
-| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + hardening 2026-08-21) |
+| Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (polling `validacao_em_andamento`, 2026-08-23) |
+| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + CPO complementar 2026-08-25) |
 | Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (Etapa 8 + hardening 2026-08-21) |
+| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (API + home + detalhe CPO; navbar de seções 2026-08-26) |
 
 ---
 
@@ -138,6 +143,8 @@ automacao-juridica/
 | ADR-009 | Sessão SQLAlchemy dedicada para captura do código MFA | `/docs/decisions/009-sessao-dedicada-captura-email.md` |
 | ADR-010 | Contrato dos pipes e-SAJ (id de audiência, carteira, CPO, petições) | `/docs/decisions/010-contrato-pipes-esaj.md` |
 | ADR-011 | Timezone explícito no scheduler, rate limit sem invalidar cookie, `reauth_pendente` no próximo tick | `/docs/decisions/011-scheduler-timezone-e-rate-limit.md` |
+| ADR-012 | Pipe de movimentações via HTML do CPO: seletor real (`tabelaTodasMovimentacoes`), detecção de bloqueio pela ausência da tabela, throttle por processo | `/docs/decisions/012-movimentacoes-cpo-html.md` |
+| ADR-013 | CPO enriquece a ficha (capa, partes, petições, audiências da página); JSON segue classe/assunto/polos/intimações/agenda | `/docs/decisions/013-cpo-enriquece-ficha.md` |
 
 ---
 

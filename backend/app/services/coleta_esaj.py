@@ -1,5 +1,7 @@
 """Orquestra o ciclo de coleta e-SAJ: intimações → audiências → upsert de
-ficha → diff → notificações (ADR-010 — sem petições, sem movimentações).
+ficha → CPO (lote pequeno, throttle: movimentações + capa/partes/petições
+diversas/audiências da página) → diff → notificações
+(ADR-010/ADR-012/ADR-013 — rascunho `tarefas-adv/peticoes` continua fora).
 
 Decripta o cookie de sessão só em memória, aqui, e descarta assim que o
 ciclo termina — nunca em atributo de classe, cache global ou log (ver
@@ -19,15 +21,20 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.backoff import calcular_proximo_retry
 from app.core.security import decrypt_secret
 from app.db.session import SessionLocal
 from app.etl.diff import (
+    aplicar_complemento_cpo,
     completar_processo_id_map,
     diff_e_persistir_audiencias,
+    diff_e_persistir_audiencias_cpo,
     diff_e_persistir_intimacoes,
+    diff_e_persistir_movimentacoes,
+    diff_e_persistir_peticoes_diversas,
     gerar_notificacoes,
     upsert_processos,
 )
@@ -37,9 +44,11 @@ from app.models.job_log import (
     JOB_STATUS_SUCESSO,
     JOB_TIPO_PIPE_AUDIENCIAS,
     JOB_TIPO_PIPE_INTIMACOES,
+    JOB_TIPO_PIPE_MOVIMENTACOES,
     JOB_TIPO_PIPE_PROCESSOS,
     JobLog,
 )
+from app.models.movimentacao import Movimentacao
 from app.models.processo import Processo
 from app.models.tribunal import (
     SESSION_STATUS_ATIVO,
@@ -48,6 +57,7 @@ from app.models.tribunal import (
     TRIBUNAL_ESAJ_TJSP,
     TribunalSession,
 )
+from app.schemas.esaj_cpo_raw import CpoDetalheRaw
 from app.schemas.esaj_raw import AudienciaRaw, IntimacaoRaw, ProcessoRaw
 from app.services.esaj_http import (
     EsajPortalIndisponivelError,
@@ -55,7 +65,7 @@ from app.services.esaj_http import (
     EsajSessaoInvalidaError,
     montar_client,
 )
-from app.services.pipes import pipe_audiencias, pipe_intimacoes, pipe_processos
+from app.services.pipes import pipe_audiencias, pipe_intimacoes, pipe_movimentacoes, pipe_processos
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +148,41 @@ async def _cds_processo_persistidos(db, user_id: UUID) -> set[str]:
     return set(resultado.scalars().all())
 
 
+async def _selecionar_lote_movimentacoes(db, user_id: UUID, limite: int) -> list[Processo]:
+    """Round-robin entre ciclos, com prioridade para complemento incompleto.
+
+    1. Nunca buscado (`movimentacoes_synced_at` nulo)
+    2. Já buscado mas `partes_cpo = []` (parser antigo ignorava
+       `tablePartesPrincipais` — precisa de um fetch com o fallback)
+    3. Quem está mais atrasado no throttle
+
+    Nunca busca o mesmo processo duas vezes no mesmo ciclo. Ver ADR-012.
+    """
+    nunca_buscado = case((Processo.movimentacoes_synced_at.is_(None), 0), else_=1)
+    partes_ainda_vazias = case(
+        (
+            and_(
+                Processo.partes_cpo.isnot(None),
+                func.jsonb_typeof(Processo.partes_cpo) == "array",
+                func.jsonb_array_length(Processo.partes_cpo) == 0,
+            ),
+            0,
+        ),
+        else_=1,
+    )
+    resultado = await db.execute(
+        select(Processo)
+        .where(Processo.user_id == user_id, Processo.url_cpo.is_not(None))
+        .order_by(
+            nunca_buscado,
+            partes_ainda_vazias,
+            Processo.movimentacoes_synced_at.asc().nulls_first(),
+        )
+        .limit(limite)
+    )
+    return list(resultado.scalars().all())
+
+
 async def _executar_ciclo(db, user_id: UUID, sessao: TribunalSession, client: httpx.AsyncClient) -> None:
     intimacoes_raw: list[IntimacaoRaw] | None = await _coletar_pipe(
         db, sessao, user_id, JOB_TIPO_PIPE_INTIMACOES, pipe_intimacoes.coletar(client)
@@ -145,6 +190,7 @@ async def _executar_ciclo(db, user_id: UUID, sessao: TribunalSession, client: ht
     if sessao.status != SESSION_STATUS_ATIVO:
         await _skip_pipe(db, user_id, JOB_TIPO_PIPE_AUDIENCIAS, sessao)
         await _skip_pipe(db, user_id, JOB_TIPO_PIPE_PROCESSOS, sessao)
+        await _skip_pipe(db, user_id, JOB_TIPO_PIPE_MOVIMENTACOES, sessao)
         return
 
     audiencias_raw: list[AudienciaRaw] | None = await _coletar_pipe(
@@ -152,6 +198,7 @@ async def _executar_ciclo(db, user_id: UUID, sessao: TribunalSession, client: ht
     )
     if sessao.status != SESSION_STATUS_ATIVO:
         await _skip_pipe(db, user_id, JOB_TIPO_PIPE_PROCESSOS, sessao)
+        await _skip_pipe(db, user_id, JOB_TIPO_PIPE_MOVIMENTACOES, sessao)
         return
 
     intimacoes_raw = intimacoes_raw or []
@@ -174,8 +221,69 @@ async def _executar_ciclo(db, user_id: UUID, sessao: TribunalSession, client: ht
 
     novas_intimacoes = await diff_e_persistir_intimacoes(db, user_id, intimacoes_raw, processo_id_por_cd)
     novas_audiencias = await diff_e_persistir_audiencias(db, user_id, audiencias_raw, processo_id_por_cd)
-    await gerar_notificacoes(db, user_id, novas_intimacoes, novas_audiencias)
+
+    novas_movimentacoes = await _coletar_movimentacoes(db, sessao, user_id, client)
+
+    await gerar_notificacoes(db, user_id, novas_intimacoes, novas_audiencias, novas_movimentacoes)
     await db.commit()
+
+
+async def _coletar_movimentacoes(
+    db, sessao: TribunalSession, user_id: UUID, client: httpx.AsyncClient
+) -> list[Movimentacao]:
+    """Busca o HTML do CPO só para um lote pequeno de processos por ciclo
+    (`pipe_movimentacoes.MOVIMENTACOES_LOTE`) e persiste movimentações,
+    capa complementar, partes, petições diversas e audiências da página.
+    `movimentacoes_synced_at` só avança para quem teve fetch bem sucedido
+    **e** persistência ok (ou bloqueio por senha dos autos). Unique inesperado
+    no savepoint não marca o processo como sincronizado — ele volta à fila.
+    Quem falhou no portal (ausente no resultado) é tentado de novo no próximo ciclo.
+    """
+    await db.flush()
+    lote = await _selecionar_lote_movimentacoes(db, user_id, pipe_movimentacoes.MOVIMENTACOES_LOTE)
+    processos_por_cd = {processo.cd_processo: processo for processo in lote}
+
+    cpo_por_cd: dict[str, CpoDetalheRaw] | None = await _coletar_pipe(
+        db,
+        sessao,
+        user_id,
+        JOB_TIPO_PIPE_MOVIMENTACOES,
+        pipe_movimentacoes.coletar(client, [(p.cd_processo, p.url_cpo) for p in lote]),
+    )
+    cpo_por_cd = cpo_por_cd or {}
+
+    return await _aplicar_detalhes_cpo(db, processos_por_cd, cpo_por_cd, datetime.now(UTC))
+
+
+async def _aplicar_detalhes_cpo(
+    db, processos_por_cd: dict, cpo_por_cd: dict, agora: datetime
+) -> list[Movimentacao]:
+    """Persiste o parse de um lote já baixado. `IntegrityError` num processo
+    não avança `movimentacoes_synced_at` daquele processo.
+    """
+    novas_movimentacoes: list[Movimentacao] = []
+    for cd_processo, detalhe in cpo_por_cd.items():
+        processo = processos_por_cd[cd_processo]
+        if detalhe.requer_senha_processo:
+            processo.movimentacoes_synced_at = agora
+            continue
+        try:
+            async with db.begin_nested():
+                aplicar_complemento_cpo(processo, detalhe)
+                novas = await diff_e_persistir_movimentacoes(
+                    db, processo.id, detalhe.movimentacoes
+                )
+                novas_movimentacoes.extend(novas)
+                await diff_e_persistir_peticoes_diversas(db, processo.id, detalhe.peticoes)
+                await diff_e_persistir_audiencias_cpo(db, processo.id, detalhe.audiencias_cpo)
+                processo.movimentacoes_synced_at = agora
+        except IntegrityError:
+            # Um unique inesperado neste processo não pode abortar o commit
+            # das movimentações dos demais (nem o das intimações do ciclo).
+            logger.info(
+                "Unique de CPO colidiu em um processo — lote desse processo ignorado"
+            )
+    return novas_movimentacoes
 
 
 async def executar_ciclo_usuario(user_id: UUID) -> None:

@@ -44,6 +44,11 @@ class CredentialStatusSchema(BaseModel):
     # `status=ativo` mas `expires_at` já passou (ou cookie nulo). O cookie
     # em si nunca sai da API — só este booleano para a UI mostrar Revalidar.
     sessao_expirada: bool = False
+    # Playwright deste processo está rodando AGORA para este advogado
+    # (`_VALIDACOES_EM_ANDAMENTO`). Distinto de `session_status=reauth_pendente`,
+    # que também significa "cookie inválido, falta reauth" depois de um
+    # ciclo de coleta — sem este flag a UI entra em polling eterno.
+    validacao_em_andamento: bool = False
 
 
 class AuthorizeUrlSchema(BaseModel):

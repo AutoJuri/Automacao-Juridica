@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { KeyRound, Loader2, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react'
+import { useRef } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
 import { Button } from '#/components/ui/button'
@@ -16,7 +17,8 @@ import {
 } from './credentials.api'
 import { CREDENTIALS_STATUS_QUERY_KEY } from './credentials.constants'
 import { esajCredentialSchema, type EsajCredentialFormValues } from './credentials.schemas'
-import type { SessionStatus } from './credentials.types'
+import { deveFazerPolling, POLL_INTERVALO_MS } from './credentials.status'
+import type { CredentialStatus, SessionStatus } from './credentials.types'
 
 /** Mensagem final por `session_status` — nunca expõe detalhe técnico do login. */
 const MENSAGENS_SESSION_STATUS: Record<Exclude<SessionStatus, 'reauth_pendente'>, string> = {
@@ -33,11 +35,6 @@ const MENSAGENS_SESSION_STATUS: Record<Exclude<SessionStatus, 'reauth_pendente'>
     'Não encontramos o código de verificação no e-mail a tempo. Confira a caixa de entrada/spam e clique em Revalidar.',
 }
 
-/** Só `reauth_pendente` significa validação em andamento — `null` é "ainda não validou". */
-function estaValidando(status: SessionStatus | null | undefined): boolean {
-  return status === 'reauth_pendente'
-}
-
 function formatarCpf(valor: string): string {
   const digitos = valor.replace(/\D/g, '').slice(0, 11)
   const partes = [digitos.slice(0, 3), digitos.slice(3, 6), digitos.slice(6, 9)].filter(Boolean)
@@ -50,14 +47,21 @@ function formatarCpf(valor: string): string {
 
 export function EsajCredentialForm() {
   const queryClient = useQueryClient()
+  const disparoValidacaoEmRef = useRef<number | null>(null)
+
+  const marcarDisparoSePendente = (status: CredentialStatus) => {
+    disparoValidacaoEmRef.current =
+      status.session_status === 'reauth_pendente' ? Date.now() : null
+    queryClient.setQueryData(CREDENTIALS_STATUS_QUERY_KEY, status)
+  }
+
   const statusQuery = useQuery({
     queryKey: CREDENTIALS_STATUS_QUERY_KEY,
     queryFn: buscarStatusCredenciais,
-    refetchInterval: (query) => {
-      const dados = query.state.data
-      const emValidacao = dados?.cadastrado && estaValidando(dados.session_status)
-      return emValidacao ? 3000 : false
-    },
+    refetchInterval: (query) =>
+      deveFazerPolling(query.state.data, disparoValidacaoEmRef.current, Date.now())
+        ? POLL_INTERVALO_MS
+        : false,
   })
 
   const {
@@ -74,7 +78,7 @@ export function EsajCredentialForm() {
   const salvar = useMutation({
     mutationFn: salvarCredencialEsaj,
     onSuccess: (status) => {
-      queryClient.setQueryData(CREDENTIALS_STATUS_QUERY_KEY, status)
+      marcarDisparoSePendente(status)
       reset()
     },
   })
@@ -82,15 +86,14 @@ export function EsajCredentialForm() {
   const remover = useMutation({
     mutationFn: removerCredencialEsaj,
     onSuccess: (status) => {
+      disparoValidacaoEmRef.current = null
       queryClient.setQueryData(CREDENTIALS_STATUS_QUERY_KEY, status)
     },
   })
 
   const revalidar = useMutation({
     mutationFn: revalidarCredencialEsaj,
-    onSuccess: (status) => {
-      queryClient.setQueryData(CREDENTIALS_STATUS_QUERY_KEY, status)
-    },
+    onSuccess: marcarDisparoSePendente,
   })
 
   const erroSalvar = salvar.error
@@ -108,11 +111,22 @@ export function EsajCredentialForm() {
   const emailConectado = statusQuery.data?.email_conectado ?? false
   const sessionStatus = statusQuery.data?.session_status ?? null
   const sessaoExpirada = statusQuery.data?.sessao_expirada ?? false
-  const validando = cadastrado && estaValidando(sessionStatus)
-  const falhou = cadastrado && !validando && sessionStatus !== 'ativo' && sessionStatus !== null
+  const validando = deveFazerPolling(
+    statusQuery.data,
+    disparoValidacaoEmRef.current,
+    Date.now(),
+  )
+  const reauthOrfao = cadastrado && sessionStatus === 'reauth_pendente' && !validando
+  const falhou =
+    cadastrado &&
+    !validando &&
+    !reauthOrfao &&
+    sessionStatus !== 'ativo' &&
+    sessionStatus !== null
   const aguardandoPrimeiraValidacao = cadastrado && sessionStatus === null
   const permiteRevalidar =
     (falhou && sessionStatus !== 'credencial_invalida') ||
+    (reauthOrfao && emailConectado) ||
     (aguardandoPrimeiraValidacao && emailConectado) ||
     (sessionStatus === 'ativo' && sessaoExpirada && emailConectado)
 
@@ -146,6 +160,22 @@ export function EsajCredentialForm() {
               <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#2563EB]" />
               <p className="text-sm text-[#1E40AF]">
                 Validando suas credenciais no e-SAJ... pode levar até 1 minuto.
+              </p>
+            </div>
+          ) : reauthOrfao && !emailConectado ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-[#D97706] mt-0.5" />
+              <p className="text-sm text-[#92400E]">
+                A sessão do e-SAJ precisa ser renovada. Conecte um e-mail abaixo para
+                revalidar o login.
+              </p>
+            </div>
+          ) : reauthOrfao ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-[#D97706] mt-0.5" />
+              <p className="text-sm text-[#92400E]">
+                A sessão do e-SAJ expirou ou foi invalidada. Clique em Revalidar para
+                renovar o acesso — CPF e senha já estão cadastrados.
               </p>
             </div>
           ) : sessionStatus === 'ativo' && sessaoExpirada ? (

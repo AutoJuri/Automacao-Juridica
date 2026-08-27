@@ -96,6 +96,19 @@ def _headers_base(referer: str) -> dict[str, str]:
     }
 
 
+def _headers_html(referer: str) -> dict[str, str]:
+    # Sem `X-Requested-With`: essa é uma navegação de página inteira
+    # (`cpopg/show.do`), não um XHR — igual ao que o navegador manda.
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Referer": referer,
+        "User-Agent": USER_AGENT,
+    }
+
+
 def montar_client(cookies: dict[str, str]) -> httpx.AsyncClient:
     """Monta um `httpx.AsyncClient` autenticado com os cookies de sessão.
 
@@ -165,3 +178,36 @@ async def buscar_json(
     if not isinstance(dados, list):
         raise EsajPortalIndisponivelError("payload_formato_inesperado")
     return dados
+
+
+async def buscar_html(client: httpx.AsyncClient, url: str, *, referer: str) -> str:
+    """GET de uma página HTML de `cpopg` (não JSON) — usado pelo pipe de
+    movimentações e pelo script de captura de fixture (`scripts/capturar_cpo.py`).
+
+    `url` é normalmente `processos.url_cpo`, já absoluta. Mesmas checagens de
+    `buscar_json` (sessão inválida / rate limit / falha de portal); nunca loga
+    o corpo da resposta.
+    """
+    try:
+        response = await client.get(url, headers=_headers_html(referer))
+    except httpx.TimeoutException as exc:
+        raise EsajPortalIndisponivelError("timeout") from exc
+    except httpx.HTTPError as exc:
+        raise EsajPortalIndisponivelError(type(exc).__name__) from exc
+
+    content_type = response.headers.get("content-type", "")
+    final_url = str(response.url)
+
+    if "/sajcas/" in final_url.lower() or _e_html_de_login(content_type, response.text):
+        raise EsajSessaoInvalidaError("redirecionado_para_login")
+
+    if response.status_code == 429:
+        raise EsajRateLimitError("status_429")
+
+    if response.status_code != 200:
+        raise EsajPortalIndisponivelError(f"status_{response.status_code}")
+
+    if "text/html" not in content_type.lower():
+        raise EsajPortalIndisponivelError("resposta_nao_html")
+
+    return response.text

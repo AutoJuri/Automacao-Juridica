@@ -10,7 +10,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, credentials
+from app.api import auth, credentials, notifications, processos
 from app.core.config import get_settings
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.core.scheduler import iniciar_scheduler, parar_scheduler
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Automação Jurídica API",
-    description="Backend do MVP — autenticação, health checks e camada de dados",
+    description="Backend do MVP — autenticação, credenciais, painel de processos e notificações",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -51,6 +51,8 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(credentials.router)
+app.include_router(processos.router)
+app.include_router(notifications.router)
 
 
 @app.get("/health")

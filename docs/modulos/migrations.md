@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-08-09
+> Última atualização: 2026-08-26
 > Camada: Infra / Backend
 
 ---
@@ -70,7 +70,8 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
   - `UniqueConstraint(user_id, tribunal)` em `tribunal_credentials` e `tribunal_sessions` — um advogado tem no máximo uma credencial/sessão ativa por tribunal
   - `UniqueConstraint(user_id, id_esaj)` em `intimacoes` e `audiencias` — unicidade por advogado, não global, para não colidir se o e-SAJ reaproveitar `id_esaj` entre contas diferentes
   - `UniqueConstraint(processo_id, data_movimentacao, descricao_hash)` em `movimentacoes` — chave natural do diff do ETL, usando o hash em vez da coluna `Text` diretamente (ver `descricao_hash` abaixo)
-- **Índices adicionais:** `ix_tribunal_sessions_status_proximo_retry` (composto `status` + `proximo_retry`) — usado pelo scheduler para filtrar sessões pendentes de retry
+  - `UniqueConstraint(processo_id, identidade_hash)` em `peticoes_diversas` e `audiencias_cpo` (ADR-013)
+- **Índices adicionais:** `ix_tribunal_sessions_status_proximo_retry` (composto `status` + `proximo_retry`); `ix_processos_user_id_movimentacoes_synced_at` (composto `user_id` + `movimentacoes_synced_at`, parcial `url_cpo IS NOT NULL`) — lote CPO (ADR-012)
 - **Hash de conteúdo:** `Movimentacao.descricao_hash` (SHA-256, `String(64)`) é preenchido automaticamente por um `@validates("descricao")` sempre que `descricao` é atribuída — nenhum código chamador precisa calcular o hash manualmente. Necessário porque um índice UNIQUE do Postgres não aceita entradas maiores que ~2.7 KB, e a coluna `descricao` (`Text`) pode ultrapassar esse limite
 - **Naming convention:** nomes estáveis de PK/FK/UQ/IX no `Base.metadata` — evita nomes automáticos do Postgres nas migrations
 - **Autogenerate:** `app/models/__init__.py` importa e reexporta todos os models para o `Base.metadata` ficar completo
@@ -81,7 +82,7 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (revisões `0b7c41e5d9a3` + `34c3ebb0c7e4` + `38d4177c211b`):
+Tabelas (head atual: `b7e4c9a1d2f0`):
 
 ```
 users
@@ -89,10 +90,12 @@ users
 ├── password_reset_tokens   (auth — uso único, expiração curta)
 ├── tribunal_credentials
 ├── tribunal_sessions
-├── processos
-│   ├── movimentacoes
+├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at)
+│   ├── movimentacoes       (+ tem_documento, url_documento)
+│   ├── peticoes_diversas   (HTML CPO — ADR-013)
+│   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
 │   ├── intimacoes      (processo_id nullable)
-│   ├── audiencias      (processo_id nullable)
+│   ├── audiencias      (processo_id nullable — agenda JSON)
 │   └── notifications   (processo_id nullable)
 ├── intimacoes
 ├── audiencias
@@ -178,3 +181,7 @@ Módulos futuros que vão depender deste:
 | 2026-08-05 | Implementação inicial (Etapa 2): models, sessão async, Alembic, migration `0b7c41e5d9a3` aplicada no Postgres do Railway, `GET /health/db` |
 | 2026-08-05 | Ajustes pós code-review: `UniqueConstraint(user_id, id_esaj)` em `intimacoes`/`audiencias`, `UniqueConstraint(user_id, tribunal)` em `tribunal_credentials`/`tribunal_sessions`, índice composto `status`+`proximo_retry` em `tribunal_sessions`, coluna `descricao_hash` (SHA-256) em `movimentacoes` para evitar estourar o limite de tamanho do índice UNIQUE, migration `34c3ebb0c7e4` aplicada; `echo=False` no engine; Dockerfile passa a rodar como usuário não-root |
 | 2026-08-09 | Etapa 3 (auth): tabelas `refresh_tokens` e `password_reset_tokens` — migration `38d4177c211b` |
+| 2026-08-22 | `processos.movimentacoes_synced_at` — throttle do HTML CPO (ADR-012), migration `203b0274458c` |
+| 2026-08-24 | `movimentacoes.tem_documento` / `url_documento` — migration `c8f21a04b9d3` |
+| 2026-08-25 | Capa CPO em `processos` + tabelas `peticoes_diversas` e `audiencias_cpo` (ADR-013), migration `a1c0e5c0b013` |
+| 2026-08-26 | Índice parcial `(user_id, movimentacoes_synced_at) WHERE url_cpo IS NOT NULL` — migration `b7e4c9a1d2f0` |

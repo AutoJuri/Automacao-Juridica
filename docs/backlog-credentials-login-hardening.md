@@ -2,7 +2,7 @@
 
 Origem: code review das Etapas 5–6 (2026-08-17).
 
-Itens 1–7 e 9 foram implementados em 2026-08-17. Restam só o lock multi-worker e o `jti` OAuth.
+Itens 1–7 e 9 foram implementados em 2026-08-17. Callback OAuth ganhou rate limit em 2026-08-26. Restam o lock multi-worker, o `jti` OAuth e o limite nos DELETE.
 
 ---
 
@@ -23,3 +23,4 @@ Itens 1–7 e 9 foram implementados em 2026-08-17. Restam só o lock multi-worke
 
 8. Lock de validação por `user_id` no banco quando houver múltiplos workers. O guard `_VALIDACOES_EM_ANDAMENTO` só cobre o processo atual (ADR-008).
 10. State OAuth com `jti` one-time (opcional; o `code` do provedor já é one-time).
+11. Rate limit em `DELETE /credentials/esaj` e `DELETE /credentials/email` (o POST de cadastro e o `/authorize` já têm limite; o callback OAuth passou a ter 20/hora).

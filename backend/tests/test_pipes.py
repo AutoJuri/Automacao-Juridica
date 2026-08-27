@@ -5,7 +5,8 @@ rede real. Payloads baseados nos exemplos sanitizados de
 import httpx
 import pytest
 
-from app.services.pipes import pipe_audiencias, pipe_intimacoes, pipe_processos
+from app.services.esaj_http import EsajSessaoInvalidaError
+from app.services.pipes import pipe_audiencias, pipe_intimacoes, pipe_movimentacoes, pipe_processos
 
 
 def _client(handler) -> httpx.AsyncClient:
@@ -136,3 +137,112 @@ class TestPipeProcessos:
         assert len(lotes_recebidos) == 3
         assert all(len(lote) <= pipe_processos.CDS_PROCESSO_CHUNK_SIZE for lote in lotes_recebidos)
         assert len(resultado) == 120
+
+
+HTML_COM_MOVIMENTACAO = """
+<tbody id="tabelaTodasMovimentacoes">
+  <tr class="containerMovimentacao">
+    <td class="dataMovimentacao">01/01/2026</td>
+    <td class="descricaoMovimentacao">Movimentação de teste</td>
+  </tr>
+</tbody>
+"""
+
+HTML_BLOQUEADO = "<html><body><div>sem tabela de movimentações</div></body></html>"
+
+
+class TestPipeMovimentacoes:
+    @pytest.mark.asyncio
+    async def test_lista_vazia_nao_faz_requisicao(self):
+        chamadas = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            chamadas.append(request)
+            return httpx.Response(200, text=HTML_COM_MOVIMENTACAO)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(client, [])
+
+        assert resultado == {}
+        assert chamadas == []
+
+    @pytest.mark.asyncio
+    async def test_coleta_e_parseia_html_por_processo(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=HTML_COM_MOVIMENTACAO)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(
+                client, [("CD1", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1")]
+            )
+
+        assert list(resultado.keys()) == ["CD1"]
+        assert resultado["CD1"].requer_senha_processo is False
+        assert len(resultado["CD1"].movimentacoes) == 1
+
+    @pytest.mark.asyncio
+    async def test_falha_de_portal_em_um_processo_nao_aborta_os_demais(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if "CD_RUIM" in str(request.url):
+                return httpx.Response(500)
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=HTML_COM_MOVIMENTACAO)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(
+                client,
+                [
+                    ("CD_RUIM", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD_RUIM"),
+                    ("CD_BOM", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD_BOM"),
+                ],
+            )
+
+        assert list(resultado.keys()) == ["CD_BOM"]
+
+    @pytest.mark.asyncio
+    async def test_processo_bloqueado_e_marcado_sem_erro(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=HTML_BLOQUEADO)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(
+                client, [("CD1", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1")]
+            )
+
+        assert resultado["CD1"].requer_senha_processo is True
+        assert resultado["CD1"].movimentacoes == []
+
+    @pytest.mark.asyncio
+    async def test_sessao_invalida_sobe_para_o_chamador(self):
+        html_login = (
+            "<!doctype html><html><body>"
+            "<form id='usernameForm'></form><form id='passwordForm'></form>"
+            "</body></html>"
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=html_login)
+
+        async with _client(handler) as client:
+            with pytest.raises(EsajSessaoInvalidaError):
+                await pipe_movimentacoes.coletar(
+                    client, [("CD1", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1")]
+                )
+
+    @pytest.mark.asyncio
+    async def test_url_cpo_invalida_nao_faz_requisicao(self, caplog):
+        chamadas = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            chamadas.append(request)
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=HTML_COM_MOVIMENTACAO)
+
+        with caplog.at_level("INFO"):
+            async with _client(handler) as client:
+                resultado = await pipe_movimentacoes.coletar(
+                    client, [("CD1", "https://127.0.0.1/cpopg/show.do")]
+                )
+
+        assert resultado == {}
+        assert chamadas == []
+        assert "url_cpo_invalida" in caplog.text
+        assert "127.0.0.1" not in caplog.text

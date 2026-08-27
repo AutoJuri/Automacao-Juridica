@@ -17,7 +17,12 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.cpf import mask_cpf
-from app.core.rate_limit import LIMITE_CREDENCIAL_ESAJ, LIMITE_OAUTH_AUTHORIZE, limiter
+from app.core.rate_limit import (
+    LIMITE_CREDENCIAL_ESAJ,
+    LIMITE_OAUTH_AUTHORIZE,
+    LIMITE_OAUTH_CALLBACK,
+    limiter,
+)
 from app.core.security import (
     TokenInvalidoError,
     create_oauth_state_token,
@@ -38,7 +43,7 @@ from app.schemas.credentials import (
     EsajCredentialCreateSchema,
 )
 from app.services import oauth_gmail, oauth_outlook
-from app.services.credential_validation import validar_credencial_esaj
+from app.services.credential_validation import validacao_em_andamento, validar_credencial_esaj
 from app.services.oauth_common import OAuthTokenExchangeError
 
 logger = logging.getLogger(__name__)
@@ -72,7 +77,21 @@ def _status_schema(
         is_active=credencial.is_active,
         session_status=sessao.status if sessao is not None else None,
         sessao_expirada=sessao.cookie_expirado() if sessao is not None else False,
+        validacao_em_andamento=validacao_em_andamento(credencial.user_id),
     )
+
+
+def _status_apos_disparo(
+    credencial: TribunalCredential, sessao: TribunalSession
+) -> CredentialStatusSchema:
+    """Resposta imediatamente após `add_task(validar_credencial_esaj)`.
+
+    A BackgroundTask só entra em `_VALIDACOES_EM_ANDAMENTO` depois que o
+    HTTP já saiu — sem este override a UI veria `reauth_pendente` +
+    `validacao_em_andamento=false` e mostraria "precisa revalidar" em vez
+    do spinner.
+    """
+    return _status_schema(credencial, sessao).model_copy(update={"validacao_em_andamento": True})
 
 
 async def _buscar_credencial_esaj(db: DbSession, user_id: UUID) -> TribunalCredential | None:
@@ -188,7 +207,7 @@ async def salvar_credencial_esaj(
         await db.commit()
 
     logger.info("Credencial e-SAJ salva para user_id=%s", current_user.id)
-    return _status_schema(credencial, sessao)
+    return _status_apos_disparo(credencial, sessao) if sessao is not None else _status_schema(credencial, sessao)
 
 
 @router.post("/esaj/revalidar", response_model=CredentialStatusSchema)
@@ -223,7 +242,7 @@ async def revalidar_credencial_esaj(
     background_tasks.add_task(validar_credencial_esaj, current_user.id)
 
     logger.info("Revalidação e-SAJ disparada para user_id=%s", current_user.id)
-    return _status_schema(credencial, sessao)
+    return _status_apos_disparo(credencial, sessao)
 
 
 @router.delete("/esaj", response_model=CredentialStatusSchema)
@@ -298,6 +317,7 @@ async def autorizar_email(
 
 
 @router.get("/email/{provider}/callback", include_in_schema=False)
+@limiter.limit(LIMITE_OAUTH_CALLBACK)
 async def callback_email(
     provider: EmailProvider,
     request: Request,

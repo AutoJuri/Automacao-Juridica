@@ -11,7 +11,7 @@
      `--color-base` gera a utility `text-base` como COR e sobrescreve
      o `text-base` de font-size, deixando o texto dos inputs quase branco. */
   --color-page: #F0F2F7;
-  --color-navbar: #0D0F14;
+  --color-navbar: #FFFFFF;
   --color-sidebar: #F5F6FA;
   --color-surface: #FFFFFF;
   --color-surface-hover: #F8F9FC;
@@ -28,7 +28,7 @@
   /* Typography */
   --color-text-primary: #111827;
   --color-text-muted: #6B7280;
-  --color-text-navbar: #FFFFFF;
+  --color-text-navbar: #111827;
 
   /* Accent */
   --color-accent-blue: #3B5BDB;

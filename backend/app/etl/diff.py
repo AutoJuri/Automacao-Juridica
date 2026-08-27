@@ -6,18 +6,39 @@ faz I/O via SQLAlchemy — upsert de `Processo` e insert append-only de
 correspondentes só para o que é de fato novo.
 """
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.etl.etl import audiencia_para_campos, intimacao_para_campos, montar_id_esaj_audiencia, parse_datetime_esaj, processo_para_campos
+from app.etl.etl import (
+    audiencia_cpo_para_campos,
+    audiencia_para_campos,
+    capa_cpo_para_campos,
+    intimacao_para_campos,
+    montar_id_esaj_audiencia,
+    movimentacao_para_campos,
+    parse_datetime_esaj,
+    partes_cpo_para_json,
+    peticao_para_campos,
+    processo_para_campos,
+)
 from app.models.audiencia import Audiencia
+from app.models.audiencia_cpo import AudienciaCpo
 from app.models.intimacao import Intimacao
-from app.models.notification import NOTIFICATION_TIPO_AUDIENCIA, NOTIFICATION_TIPO_INTIMACAO, Notification
+from app.models.movimentacao import Movimentacao
+from app.models.notification import (
+    NOTIFICATION_TIPO_AUDIENCIA,
+    NOTIFICATION_TIPO_INTIMACAO,
+    NOTIFICATION_TIPO_MOVIMENTACAO,
+    Notification,
+)
+from app.models.peticao_diversa import PeticaoDiversa
 from app.models.processo import Processo
 from app.models.tribunal import TRIBUNAL_ESAJ_TJSP
+from app.schemas.esaj_cpo_raw import AudienciaCpoRaw, CpoDetalheRaw, MovimentacaoRaw, PeticaoDiversaRaw
 from app.schemas.esaj_raw import AudienciaRaw, IntimacaoRaw, ProcessoRaw
 
 
@@ -153,6 +174,212 @@ async def diff_e_persistir_audiencias(
     return novas
 
 
+def _identidade_movimentacao(raw: MovimentacaoRaw) -> tuple[datetime, str] | None:
+    """`None` quando a data não é parseável — nunca inventa data para
+    conseguir persistir (ver `parse_data_movimentacao_cpo`)."""
+    campos = movimentacao_para_campos(raw)
+    data_movimentacao = campos["data_movimentacao"]
+    if data_movimentacao is None:
+        return None
+    descricao_hash = hashlib.sha256(campos["descricao"].encode("utf-8")).hexdigest()
+    return data_movimentacao, descricao_hash
+
+
+def selecionar_novas_movimentacoes(
+    existentes: set[tuple[datetime, str]],
+    combos: list[tuple[MovimentacaoRaw, datetime, str]],
+) -> list[tuple[MovimentacaoRaw, datetime, str]]:
+    """Dedupe contra o banco **e** contra o próprio lote.
+
+    O CPO lista a mesma movimentação mais de uma vez (mesmo dia + mesmo
+    texto) — visto ao vivo, ex.: 3× "Documento Juntado" em 11/08/2026.
+    Sem colapsar o lote, o INSERT estoura o unique e o commit inteiro
+    some (nenhuma movimentação aparece no painel).
+    """
+    novas: list[tuple[MovimentacaoRaw, datetime, str]] = []
+    vistos = set(existentes)
+    for item in combos:
+        chave = (item[1], item[2])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        novas.append(item)
+    return novas
+
+
+async def diff_e_persistir_movimentacoes(
+    db: AsyncSession,
+    processo_id: uuid.UUID,
+    brutos: list[MovimentacaoRaw],
+) -> list[Movimentacao]:
+    """Chave de dedupe `(processo_id, data_movimentacao, descricao_hash)` —
+    mesmo unique do model `Movimentacao`. `descricao_hash` é calculado aqui
+    com o mesmo algoritmo do `@validates` do model, só para comparar contra
+    o banco antes do insert (a coluna em si continua sendo preenchida pelo
+    validator na hora do `Movimentacao(...)`)."""
+    if not brutos:
+        return []
+
+    combos: list[tuple[MovimentacaoRaw, datetime, str]] = []
+    for raw in brutos:
+        identidade = _identidade_movimentacao(raw)
+        if identidade is None:
+            continue
+        combos.append((raw, identidade[0], identidade[1]))
+    if not combos:
+        return []
+
+    hashes = [descricao_hash for _, _, descricao_hash in combos]
+    resultado = await db.execute(
+        select(Movimentacao).where(
+            Movimentacao.processo_id == processo_id,
+            Movimentacao.descricao_hash.in_(hashes),
+        )
+    )
+    por_chave: dict[tuple[datetime, str], Movimentacao] = {}
+    for mov in resultado.scalars():
+        if mov.data_movimentacao is None:
+            continue
+        por_chave[(mov.data_movimentacao, mov.descricao_hash)] = mov
+
+    vistos: set[tuple[datetime, str]] = set()
+    for raw, data_movimentacao, descricao_hash in combos:
+        chave = (data_movimentacao, descricao_hash)
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        existente = por_chave.get(chave)
+        if existente is None:
+            continue
+        campos = movimentacao_para_campos(raw)
+        existente.tem_documento = campos["tem_documento"]
+        existente.url_documento = campos["url_documento"]
+
+    existentes = set(por_chave)
+    novas_combos = selecionar_novas_movimentacoes(existentes, combos)
+    novas: list[Movimentacao] = []
+    for raw, data_movimentacao, descricao_hash in novas_combos:
+        campos = movimentacao_para_campos(raw)
+        movimentacao = Movimentacao(processo_id=processo_id, **campos)
+        db.add(movimentacao)
+        novas.append(movimentacao)
+        existentes.add((data_movimentacao, descricao_hash))
+    return novas
+
+
+def aplicar_complemento_cpo(processo: Processo, detalhe: CpoDetalheRaw) -> None:
+    """Upsert da capa/partes/flags no processo já carregado. Não toca
+    `de_classe` / `de_assunto` / polos JSON (fonte: API de processos).
+
+    Campo de capa vazio no HTML **não apaga** valor já gravado. Lista de
+    partes vazia no parse também não zera `partes_cpo` já preenchido.
+    Flag `True` (empty state) não volta a `False` só porque o marcador
+    sumiu do HTML; `None` (CPO ainda não passou) aceita o parse atual.
+    """
+    for nome, valor in capa_cpo_para_campos(detalhe.capa).items():
+        if valor:
+            setattr(processo, nome, valor)
+    novas_partes = partes_cpo_para_json(detalhe.partes)
+    if novas_partes:
+        processo.partes_cpo = novas_partes
+    elif processo.partes_cpo is None:
+        processo.partes_cpo = []
+    processo.sem_incidentes = _upsert_flag_cpo(processo.sem_incidentes, detalhe.sem_incidentes)
+    processo.sem_apensos = _upsert_flag_cpo(processo.sem_apensos, detalhe.sem_apensos)
+
+
+def _upsert_flag_cpo(atual: bool | None, novo: bool) -> bool | None:
+    if novo:
+        return True
+    if atual is None:
+        return False
+    return atual
+
+
+async def diff_e_persistir_peticoes_diversas(
+    db: AsyncSession,
+    processo_id: uuid.UUID,
+    brutos: list[PeticaoDiversaRaw],
+) -> list[PeticaoDiversa]:
+    if not brutos:
+        return []
+
+    campos_lista: list[dict] = []
+    hashes: list[str] = []
+    vistos: set[str] = set()
+    for raw in brutos:
+        campos = peticao_para_campos(raw)
+        if not campos["tipo"]:
+            continue
+        identidade = campos["identidade_hash"]
+        if identidade in vistos:
+            continue
+        vistos.add(identidade)
+        campos_lista.append(campos)
+        hashes.append(identidade)
+    if not hashes:
+        return []
+
+    resultado = await db.execute(
+        select(PeticaoDiversa.identidade_hash).where(
+            PeticaoDiversa.processo_id == processo_id,
+            PeticaoDiversa.identidade_hash.in_(hashes),
+        )
+    )
+    existentes = set(resultado.scalars().all())
+    novas: list[PeticaoDiversa] = []
+    for campos in campos_lista:
+        if campos["identidade_hash"] in existentes:
+            continue
+        peticao = PeticaoDiversa(processo_id=processo_id, **campos)
+        db.add(peticao)
+        novas.append(peticao)
+        existentes.add(campos["identidade_hash"])
+    return novas
+
+
+async def diff_e_persistir_audiencias_cpo(
+    db: AsyncSession,
+    processo_id: uuid.UUID,
+    brutos: list[AudienciaCpoRaw],
+) -> list[AudienciaCpo]:
+    if not brutos:
+        return []
+
+    campos_lista: list[dict] = []
+    hashes: list[str] = []
+    vistos: set[str] = set()
+    for raw in brutos:
+        campos = audiencia_cpo_para_campos(raw)
+        if not campos["titulo"]:
+            continue
+        identidade = campos["identidade_hash"]
+        if identidade in vistos:
+            continue
+        vistos.add(identidade)
+        campos_lista.append(campos)
+        hashes.append(identidade)
+    if not hashes:
+        return []
+
+    resultado = await db.execute(
+        select(AudienciaCpo.identidade_hash).where(
+            AudienciaCpo.processo_id == processo_id,
+            AudienciaCpo.identidade_hash.in_(hashes),
+        )
+    )
+    existentes = set(resultado.scalars().all())
+    novas: list[AudienciaCpo] = []
+    for campos in campos_lista:
+        if campos["identidade_hash"] in existentes:
+            continue
+        audiencia = AudienciaCpo(processo_id=processo_id, **campos)
+        db.add(audiencia)
+        novas.append(audiencia)
+        existentes.add(campos["identidade_hash"])
+    return novas
+
+
 def _titulo_notificacao_intimacao(intimacao: Intimacao) -> str:
     base = intimacao.titulo or "Mero expediente"
     return f"Nova intimação: {base}"[:255]
@@ -163,20 +390,27 @@ def _titulo_notificacao_audiencia(audiencia: Audiencia) -> str:
     return f"Nova audiência: {base}"[:255]
 
 
+def _titulo_notificacao_movimentacao(movimentacao: Movimentacao) -> str:
+    base = movimentacao.titulo or "Nova movimentação"
+    return f"Nova movimentação: {base}"[:255]
+
+
 async def gerar_notificacoes(
     db: AsyncSession,
     user_id: uuid.UUID,
     novas_intimacoes: list[Intimacao],
     novas_audiencias: list[Audiencia],
+    novas_movimentacoes: list[Movimentacao] | None = None,
 ) -> None:
     """Cria uma `Notification` por evento novo. Depois de emitir, marca
-    `is_new=False` nas intimações/audiências recém-persistidas — a
-    notificação já foi gerada; a flag deixa de mentir para o painel.
+    `is_new=False` nas intimações/audiências/movimentações recém-persistidas
+    — a notificação já foi gerada; a flag deixa de mentir para o painel.
 
     Mensagens em texto simples — o front sanitiza (DOMPurify) qualquer
     trecho vindo do e-SAJ antes de exibir, mas aqui não formatamos como
     HTML de propósito.
     """
+    novas_movimentacoes = novas_movimentacoes or []
     for intimacao in novas_intimacoes:
         db.add(
             Notification(
@@ -201,3 +435,14 @@ async def gerar_notificacoes(
             )
         )
         audiencia.is_new = False
+    for movimentacao in novas_movimentacoes:
+        db.add(
+            Notification(
+                user_id=user_id,
+                processo_id=movimentacao.processo_id,
+                tipo=NOTIFICATION_TIPO_MOVIMENTACAO,
+                titulo=_titulo_notificacao_movimentacao(movimentacao),
+                message=movimentacao.descricao,
+            )
+        )
+        movimentacao.is_new = False

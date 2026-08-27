@@ -1,20 +1,21 @@
-import type { Processo } from './processos.mock'
+import type { ProcessoLista } from './processos.types'
 import { ProcessoCard } from './ProcessoCard'
 
 interface ProcessoSidebarProps {
-  processos: Processo[]
-  processoSelecionadoId: number
-  onSelect: (id: number) => void
+  processos: ProcessoLista[]
+  processoSelecionadoId: string | null
+  onSelect: (id: string) => void
+  carregando?: boolean
 }
 
 export function ProcessoSidebar({
   processos,
   processoSelecionadoId,
   onSelect,
+  carregando = false,
 }: ProcessoSidebarProps) {
   return (
     <aside className="flex flex-col w-[340px] min-w-[340px] max-w-[340px] h-full rounded-xl border border-[#E5E7EB] bg-[#F5F6FA] overflow-hidden shadow-sm">
-      {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-[#E5E7EB]">
         <p className="text-[10px] font-semibold text-[#9CA3AF] tracking-[0.2em] uppercase mb-1.5">
           Módulo Lateral
@@ -24,16 +25,20 @@ export function ProcessoSidebar({
             Processos em Acompanhamento
           </h2>
           <span className="inline-flex flex-shrink-0 items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white border border-[#E5E7EB] text-[#6B7280]">
-            {processos.length} Ativos
+            {carregando ? '…' : `${processos.length} Ativos`}
           </span>
         </div>
       </div>
 
-      {/* Cards list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {processos.length === 0 ? (
+        {carregando ? (
           <p className="text-center text-[12px] text-[#9CA3AF] py-8 px-2 leading-relaxed">
-            Nenhum processo encontrado para os filtros selecionados.
+            Carregando processos…
+          </p>
+        ) : processos.length === 0 ? (
+          <p className="text-center text-[12px] text-[#9CA3AF] py-8 px-2 leading-relaxed">
+            Nenhum processo coletado ainda. O ciclo puxa processos que tiveram intimação ou
+            audiência.
           </p>
         ) : (
           processos.map((processo) => (
@@ -45,15 +50,6 @@ export function ProcessoSidebar({
             />
           ))
         )}
-      </div>
-
-      {/* Footer note */}
-      <div className="px-5 py-4 border-t border-[#E5E7EB] bg-[#F5F6FA]">
-        <p className="text-[10px] text-[#9CA3AF] leading-relaxed">
-          * Para fixar ou desfixar qualquer processo da barra lateral de acompanhamento, use o botão
-          &quot;Fixar Acompanhamento&quot; presente no painel central do respectivo auto processual
-          pesquisado.
-        </p>
       </div>
     </aside>
   )

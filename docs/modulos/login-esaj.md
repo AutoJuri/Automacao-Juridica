@@ -1,6 +1,6 @@
 # Módulo: Login Automatizado no e-SAJ (Playwright)
 
-> Última atualização: 2026-08-21
+> Última atualização: 2026-08-23
 > Camada: Backend
 
 ---
@@ -32,7 +32,7 @@ Faz o login real do advogado no e-SAJ (TJSP) usando Playwright: preenche CPF + s
 |---|---|---|---|---|
 | POST | `/credentials/esaj` | Salva CPF/senha; dispara validação em background **só se o e-mail já estiver conectado** | Bearer | 5/hora por IP |
 | POST | `/credentials/esaj/revalidar` | Dispara nova tentativa de login sem reenviar CPF/senha (exige e-mail conectado) | Bearer | 5/hora por IP |
-| GET | `/credentials/status` | Inclui `session_status` (join com `TribunalSession`) | Bearer | — |
+| GET | `/credentials/status` | Inclui `session_status` (join com `TribunalSession`) e `validacao_em_andamento` (Playwright deste processo rodando agora) | Bearer | — |
 
 `session_status` é um dos `SESSION_STATUSES` (`ativo`, `reauth_pendente`, `bloqueado`, `credencial_invalida`, `email_desconectado`, `portal_indisponivel`, `codigo_nao_encontrado`) ou `None` se nenhuma validação nunca foi disparada para a credencial.
 
@@ -45,9 +45,10 @@ Fluxo de onboarding típico: salvar CPF/senha → conectar e-mail (callback OAut
 | Nome | Arquivo | Descrição |
 |---|---|---|
 | `revalidarCredencialEsaj` | `features/settings/credentials.api.ts` | `POST /credentials/esaj/revalidar` |
-| `estaValidando` / `MENSAGENS_SESSION_STATUS` | `features/settings/EsajCredentialForm.tsx` | Deriva o estado de UI (validando/sucesso/falha) e a mensagem final por `session_status` |
+| `MENSAGENS_SESSION_STATUS` | `features/settings/EsajCredentialForm.tsx` | Mensagem final por `session_status` de falha/sucesso |
+| `deveFazerPolling` | `features/settings/credentials.status.ts` | Polling só com Playwright rodando (`validacao_em_andamento`) ou na janela de graça após Revalidar — `reauth_pendente` órfão não gira para sempre |
 
-`EsajCredentialForm` usa `refetchInterval` do TanStack Query: 3s **somente** enquanto `session_status === "reauth_pendente"`; `null` não é tratado como “validando” (mostra aviso para conectar e-mail ou clicar em Revalidar). Com `session_status=ativo` e `sessao_expirada=true` (cookie passou das ~22h), a UI troca o banner verde por um aviso âmbar e mostra Revalidar — cookie válido continua sem o botão.
+`EsajCredentialForm` usa `refetchInterval` do TanStack Query: 3s **somente** enquanto `deveFazerPolling` for verdadeiro (`validacao_em_andamento` ou janela de 15s após o POST que disparou o Playwright). `session_status === "reauth_pendente"` sozinho **não** é “validando” — após coleta com cookie inválido, ou restart do uvicorn, a UI mostra aviso âmbar + Revalidar. Teto de 90s para o spinner. `null` continua sendo “ainda não validou”. Com `session_status=ativo` e `sessao_expirada=true` (cookie passou das ~22h), a UI troca o banner verde por um aviso âmbar e mostra Revalidar.
 
 ---
 
@@ -94,7 +95,7 @@ O browser roda via Playwright **sync** em `asyncio.to_thread` (necessário no Wi
 - **Guarda de concorrência em memória:** `_VALIDACOES_EM_ANDAMENTO` (processo) evita duas validações simultâneas do mesmo `user_id`. `validacao_em_andamento(user_id)` expõe o mesmo set ao scheduler, que não dispara pipes enquanto o Playwright está no ar. Limitação conhecida da ADR-008: não protege entre múltiplos workers
 - **`JobLog` sempre gravado:** toda tentativa (sucesso ou falha) grava uma linha com `duracao_ms` e `erro` (tipo, nunca detalhe sensível). Disparo manual: `tipo=login`; cron noturno / tick de reauth: `tipo=reauth`
 - **Timeout duro de 60s:** `asyncio.wait_for` no orquestrador, conforme `security.mdc` §8
-- **Resposta:** `CredentialStatusSchema` ganha `session_status: str | None` — nunca expõe cookie, CPF ou senha
+- **Resposta:** `CredentialStatusSchema` expõe `session_status` e `validacao_em_andamento` — nunca cookie, CPF ou senha. `reauth_pendente` sem o flag significa “precisa revalidar”, não “Playwright rodando”
 
 ---
 
@@ -145,6 +146,7 @@ Uma linha por advogado+tribunal, criada (ou atualizada) a cada chamada de `valid
 - ❌ Não importar `email_capture` dentro de `auth_esaj.py` — a captura de código é sempre injetada via callback
 - ❌ Não reaproveitar um código de e-mail anterior a `since` (o instante exato em que o MFA foi solicitado) — `email_capture` sempre filtra por data além de por remetente
 - ❌ Não tratar `POST /credentials/esaj` (resposta 200) como "credencial validada" — só `session_status == "ativo"` no polling confirma o login real (ADR-008)
+- ❌ Não tratar `session_status === "reauth_pendente"` sozinho como “Playwright rodando agora” — em development o scheduler está off e a coleta pode deixar esse status órfão; o polling só vale com `validacao_em_andamento`
 - ❌ Não persistir `access_token`/`refresh_token` renovados só em memória — `email_capture` sempre regrava `email_oauth_token_encrypted` criptografado na sessão dedicada da captura
 - ❌ Não passar a `AsyncSession` do orquestrador para `buscar_codigo_esaj` — a thread do Playwright sobrevive ao `wait_for` (ADR-009)
 - ❌ Não deixar cookie antigo no banco após falha, `reauth_pendente` ou `DELETE` de credencial/e-mail
@@ -163,3 +165,4 @@ Uma linha por advogado+tribunal, criada (ou atualizada) a cada chamada de `valid
 | 2026-08-17 | Hardening do code review: DELETE da `TribunalSession`, sessão SQLAlchemy dedicada na captura MFA (ADR-009), filtro de remetente na API antes do corpo, cookie anulado em falha/reauth, status `codigo_nao_encontrado` |
 | 2026-08-18 | Contrato das APIs internas do e-SAJ documentado em `/docs/modulos/esaj-apis.md` (insumo da Etapa 7) |
 | 2026-08-21 | Scheduler passou a reaproveitar `validar_credencial_esaj` (cron 1h + tick de reauth). Gap da ADR-008 (`reauth_pendente` órfão) fechado no próximo tick. `validacao_em_andamento` exportado para o ciclo de 10 min não chocar com o Playwright |
+| 2026-08-23 | `GET /credentials/status` passou a expor `validacao_em_andamento`. A UI só faz polling / mostra “Validando…” quando o Playwright está de fato no processo (ou na janela de graça após Revalidar) — `reauth_pendente` órfão pede Revalidar em vez de girar para sempre |

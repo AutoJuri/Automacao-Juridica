@@ -38,6 +38,10 @@ class Movimentacao(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     titulo: Mapped[str | None] = mapped_column(String(255))
     instancia: Mapped[str | None] = mapped_column(String(10))
     is_new: Mapped[bool] = mapped_column(nullable=False, server_default="true", default=True)
+    # Há `a.linkMovVincProc` no CPO. Não significa PDF nosso — o front
+    # abre o e-SAJ (URL direta ou a ficha CPO se o portal pediu senha).
+    tem_documento: Mapped[bool] = mapped_column(nullable=False, server_default="false", default=False)
+    url_documento: Mapped[str | None] = mapped_column(String(2048))
 
     processo: Mapped["Processo"] = relationship(back_populates="movimentacoes")
 

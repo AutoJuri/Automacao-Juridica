@@ -26,6 +26,12 @@ export interface CredentialStatus {
   session_status: SessionStatus | null
   /** `status=ativo` mas o cookie já passou do `expires_at` (ou sumiu). */
   sessao_expirada: boolean
+  /**
+   * Playwright deste processo está rodando agora. Distinto de
+   * `session_status === 'reauth_pendente'`, que também significa
+   * "cookie inválido, falta revalidar".
+   */
+  validacao_em_andamento: boolean
 }
 
 export interface AuthorizeUrlResponse {

@@ -4,12 +4,16 @@ sem banco real: usa um "db" fake que só registra `add`/`commit`, e uma
 atributos, como o código de produção faz antes do commit."""
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.models.job_log import JOB_STATUS_FALHA, JOB_STATUS_SUCESSO
 from app.models.tribunal import SESSION_STATUS_ATIVO, SESSION_STATUS_BLOQUEADO, TribunalSession
-from app.services.coleta_esaj import ERRO_RATE_LIMIT, _coletar_pipe
+from app.schemas.esaj_cpo_raw import CpoDetalheRaw
+from app.services.coleta_esaj import ERRO_RATE_LIMIT, _aplicar_detalhes_cpo, _coletar_pipe
 from app.services.esaj_http import EsajRateLimitError
 
 
@@ -99,3 +103,93 @@ class TestColetarPipeRateLimit:
 
         assert sessao.tentativas_falha == 0
         assert sessao.proximo_retry is None
+
+
+class _NestedOk:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeNestedDb:
+    def begin_nested(self):
+        return _NestedOk()
+
+
+class TestAplicarDetalhesCpo:
+    @pytest.mark.asyncio
+    async def test_integrity_error_nao_avanca_throttle(self, monkeypatch):
+        processo = SimpleNamespace(
+            id=uuid4(),
+            movimentacoes_synced_at=None,
+            juiz=None,
+            foro=None,
+            partes_cpo=None,
+            sem_incidentes=None,
+            sem_apensos=None,
+        )
+        detalhe = CpoDetalheRaw()
+
+        async def boom(*_args, **_kwargs):
+            raise IntegrityError("INSERT", {}, Exception("unique"))
+
+        monkeypatch.setattr(
+            "app.services.coleta_esaj.diff_e_persistir_movimentacoes", boom
+        )
+
+        agora = datetime.now(UTC)
+        novas = await _aplicar_detalhes_cpo(
+            _FakeNestedDb(), {"CD": processo}, {"CD": detalhe}, agora
+        )
+
+        assert novas == []
+        assert processo.movimentacoes_synced_at is None
+
+    @pytest.mark.asyncio
+    async def test_bloqueio_por_senha_avanca_throttle_sem_persistir(self):
+        processo = SimpleNamespace(id=uuid4(), movimentacoes_synced_at=None)
+        detalhe = CpoDetalheRaw(requer_senha_processo=True)
+        agora = datetime.now(UTC)
+
+        novas = await _aplicar_detalhes_cpo(
+            _FakeNestedDb(), {"CD": processo}, {"CD": detalhe}, agora
+        )
+
+        assert novas == []
+        assert processo.movimentacoes_synced_at == agora
+
+    @pytest.mark.asyncio
+    async def test_persistencia_ok_avanca_throttle(self, monkeypatch):
+        processo = SimpleNamespace(
+            id=uuid4(),
+            movimentacoes_synced_at=None,
+            juiz=None,
+            foro=None,
+            partes_cpo=None,
+            sem_incidentes=None,
+            sem_apensos=None,
+        )
+        detalhe = CpoDetalheRaw()
+
+        async def vazio(*_args, **_kwargs):
+            return []
+
+        monkeypatch.setattr(
+            "app.services.coleta_esaj.diff_e_persistir_movimentacoes", vazio
+        )
+        monkeypatch.setattr(
+            "app.services.coleta_esaj.diff_e_persistir_peticoes_diversas", vazio
+        )
+        monkeypatch.setattr(
+            "app.services.coleta_esaj.diff_e_persistir_audiencias_cpo", vazio
+        )
+
+        agora = datetime.now(UTC)
+        novas = await _aplicar_detalhes_cpo(
+            _FakeNestedDb(), {"CD": processo}, {"CD": detalhe}, agora
+        )
+
+        assert novas == []
+        assert processo.movimentacoes_synced_at == agora

@@ -35,6 +35,16 @@ class ProcessoListSchema(BaseModel):
     parte_passiva: PartePublicSchema | None = None
     last_synced_at: datetime | None = None
     ultima_atividade: UltimaAtividadeSchema | None = None
+    fixado: bool = False
+
+
+class ProcessoFixarSchema(BaseModel):
+    fixado: bool
+
+
+class ProcessoFixadoSchema(BaseModel):
+    id: UUID
+    fixado: bool
 
 
 class IntimacaoPublicSchema(BaseModel):
@@ -55,6 +65,41 @@ class AudienciaPublicSchema(BaseModel):
     titulo: str | None = None
     data_audiencia: datetime | None = None
     local: str | None = None
+
+
+class IntimacaoPainelSchema(BaseModel):
+    """Intimação na lista da seção Intimações Diretas — sem `id_esaj`."""
+
+    id: UUID
+    processo_id: UUID | None = None
+    nu_processo: str | None = None
+    tribunal: str | None = None
+    instancia: str | None = None
+    titulo: str | None = None
+    descricao: str | None = None
+    data_movimentacao: datetime | None = None
+    ciencia: bool = False
+    foro: str | None = None
+    vara: str | None = None
+
+
+class AudienciaPainelSchema(BaseModel):
+    """Audiência na lista da seção Pautas — sem `id_esaj`."""
+
+    id: UUID
+    processo_id: UUID | None = None
+    nu_processo: str | None = None
+    tribunal: str | None = None
+    titulo: str
+    data_audiencia: datetime | None = None
+    local: str | None = None
+    situacao: str | None = None
+    parte_ativa: PartePublicSchema | None = None
+    parte_passiva: PartePublicSchema | None = None
+    foro: str | None = None
+    vara: str | None = None
+    juiz: str | None = None
+    fonte: Literal["agenda", "cpo"] = "agenda"
 
 
 class MovimentacaoPublicSchema(BaseModel):

@@ -89,7 +89,8 @@ automacao-juridica/
 │       ├── features/
 │       │   ├── auth/
 │       │   ├── processos/
-│       │   ├── secoes/        → placeholders da navbar
+│       │   ├── elaboracao/    → minuta TipTap (ficha real; IA ainda não gera)
+│       │   ├── secoes/        → placeholders (Gerências, Drive, Tarefas…)
 │       │   ├── notificacoes/
 │       │   └── settings/
 │       ├── store/             → Zustand (auth em memória)
@@ -118,13 +119,13 @@ automacao-juridica/
 
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
-| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `b7e4c9a1d2f0`, CPO 2026-08-26) |
+| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `d4a8c2e1f9b0`, pin 2026-08-28) |
 | Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (polling `validacao_em_andamento`, 2026-08-23) |
 | Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + CPO complementar 2026-08-25) |
 | Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (Etapa 8 + hardening 2026-08-21) |
-| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (API + home + detalhe CPO; navbar de seções 2026-08-26) |
+| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (chrome Gerências + elaboração TipTap, 2026-09-03) |
 
 ---
 
@@ -145,6 +146,7 @@ automacao-juridica/
 | ADR-011 | Timezone explícito no scheduler, rate limit sem invalidar cookie, `reauth_pendente` no próximo tick | `/docs/decisions/011-scheduler-timezone-e-rate-limit.md` |
 | ADR-012 | Pipe de movimentações via HTML do CPO: seletor real (`tabelaTodasMovimentacoes`), detecção de bloqueio pela ausência da tabela, throttle por processo | `/docs/decisions/012-movimentacoes-cpo-html.md` |
 | ADR-013 | CPO enriquece a ficha (capa, partes, petições, audiências da página); JSON segue classe/assunto/polos/intimações/agenda | `/docs/decisions/013-cpo-enriquece-ficha.md` |
+| ADR-014 | Chrome em dois eixos: áreas no topo, rail operacional só em Gerências | `/docs/decisions/014-chrome-dois-eixos.md` |
 
 ---
 

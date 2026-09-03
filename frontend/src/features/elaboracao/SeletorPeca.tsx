@@ -1,5 +1,6 @@
 import { FileText } from 'lucide-react'
 import { modelosPeca, type ModeloPeca } from './elaboracao.mock'
+import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 
 interface SeletorPecaProps {
   pecaSelecionada: string
@@ -17,8 +18,11 @@ export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
 
   return (
     <div>
-      <p className="text-[9px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-2">
-        Modelo de Peça
+      <p className="text-[10px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-1">
+        Seletor de peça
+      </p>
+      <p className="text-[10px] font-semibold text-[#2563EB] tracking-[0.12em] uppercase mb-2">
+        Sugerido por IA
       </p>
       <div className="relative">
         <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
@@ -27,7 +31,8 @@ export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
         <select
           value={pecaSelecionada}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none bg-white border border-[#E5E7EB] rounded-lg pl-8 pr-8 py-2 text-[13px] text-[#111827] font-medium focus:outline-none focus:border-[#3B5BDB] focus:ring-1 focus:ring-[#3B5BDB] cursor-pointer"
+          className={`w-full appearance-none bg-white border border-[#E5E7EB] rounded-lg pl-8 pr-8 py-2 text-[13px] text-[#111827] font-medium cursor-pointer ${FOCO_CAMPO}`}
+          {...propsFocoCampo}
         >
           {grupos.map((grupo) => (
             <optgroup key={grupo} label={grupo}>

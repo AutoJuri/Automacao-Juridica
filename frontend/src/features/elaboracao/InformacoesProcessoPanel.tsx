@@ -1,71 +1,77 @@
-import { Separator } from '#/components/ui/separator'
-import { processosMockados, movimentacoesMockadas } from '#/features/processos/processos.mock'
+import type { ProcessoDetalhe } from '#/features/processos/processos.types'
+import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
+import { CAMPO_VAZIO, extrairDadosElaboracao } from './elaboracao.processo'
+import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 
 interface InformacoesProcessoPanelProps {
-  processoId: number
+  processo: ProcessoDetalhe | null
+  carregando: boolean
 }
 
-export function InformacoesProcessoPanel({ processoId }: InformacoesProcessoPanelProps) {
-  const processo = processosMockados.find((p) => p.id === processoId)
-  const movimentacoes = movimentacoesMockadas
-    .filter((m) => m.processoId === processoId)
-    .slice(0, 3)
+export function InformacoesProcessoPanel({
+  processo,
+  carregando,
+}: InformacoesProcessoPanelProps) {
+  if (carregando || !processo) {
+    return (
+      <div className="flex flex-col min-h-[160px]">
+        <p className="text-[11px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-3">
+          Informações do processo
+        </p>
+        <EstadoCarregando mensagem="Carregando dados do e-SAJ…" />
+      </div>
+    )
+  }
 
-  if (!processo) return null
+  const dados = extrairDadosElaboracao(processo)
 
   return (
     <div>
-      <p className="text-[9px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-3">
-        Informações do Processo
-      </p>
-
-      <div className="space-y-2.5">
-        <div>
-          <p className="text-[9px] text-[#9CA3AF] uppercase tracking-widest mb-0.5">Número</p>
-          <p className="font-mono text-[11px] font-semibold text-[#111827] leading-tight">
-            {processo.numero}
-          </p>
-        </div>
-
-        <div>
-          <p className="text-[9px] text-[#9CA3AF] uppercase tracking-widest mb-0.5">Autor</p>
-          <p className="text-[12px] font-medium text-[#111827]">{processo.cliente}</p>
-        </div>
-
-        <div>
-          <p className="text-[9px] text-[#9CA3AF] uppercase tracking-widest mb-0.5">Réu</p>
-          <p className="text-[12px] font-medium text-[#111827]">Banco Meridional S.A.</p>
-        </div>
-
-        <div>
-          <p className="text-[9px] text-[#9CA3AF] uppercase tracking-widest mb-0.5">Tribunal</p>
-          <p className="text-[12px] font-medium text-[#111827]">{processo.tribunal}</p>
-        </div>
-
-        <div>
-          <p className="text-[9px] text-[#9CA3AF] uppercase tracking-widest mb-0.5">Magistrado</p>
-          <p className="text-[12px] font-medium text-[#111827] leading-snug">{processo.magistrado}</p>
-        </div>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-[11px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase">
+          Informações do processo
+        </p>
+        <span className="text-[10px] font-semibold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] rounded-md px-2 py-0.5">
+          Ativo
+        </span>
       </div>
 
-      <Separator className="my-3 bg-border-active" />
+      <Campo rotulo="Nº do processo" valor={dados.cnj} />
 
-      <div>
-        <p className="text-[9px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-2">
-          Andamentos Recentes
-        </p>
-        <div className="space-y-2">
-          {movimentacoes.map((mov) => (
-            <div key={mov.id} className="flex gap-2">
-              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#3B5BDB] shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[#374151] leading-snug">{mov.nomeEtapa}</p>
-                <p className="text-[10px] text-[#9CA3AF]">{mov.data}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 gap-2 mt-2.5">
+        <Campo rotulo="Autor" valor={dados.autor} />
+        <Campo rotulo="Réu" valor={dados.reu} />
+      </div>
+
+      <div className="mt-2.5">
+        <Campo rotulo="Foro / tribunal" valor={dados.foroTribunal} />
+      </div>
+
+      <div className="mt-2.5">
+        <Campo rotulo="Valor da causa" valor={dados.valorCausa} />
       </div>
     </div>
+  )
+}
+
+function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
+  const vazio = valor === CAMPO_VAZIO || valor === 'Ainda não buscado no CPO'
+  return (
+    <label className="block min-w-0">
+      <span className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-widest">
+        {rotulo}
+      </span>
+      <input
+        readOnly
+        value={valor}
+        title="Dado coletado do e-SAJ — não é editável daqui"
+        className={[
+          'mt-1 w-full h-9 rounded-lg border border-[#E5E7EB] bg-[#F8F9FC] px-2.5 text-[13px]',
+          vazio ? 'text-[#9CA3AF] italic' : 'text-[#111827]',
+          FOCO_CAMPO,
+        ].join(' ')}
+        {...propsFocoCampo}
+      />
+    </label>
   )
 }

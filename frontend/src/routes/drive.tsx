@@ -3,13 +3,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { SecaoPlaceholderPage } from '#/features/secoes/SecaoPlaceholderPage'
 import { requireAuth } from '#/lib/route-guards'
 
-export const Route = createFileRoute('/certidoes')({
+export const Route = createFileRoute('/drive')({
   beforeLoad: requireAuth,
-  component: function CertidoesRoute() {
+  component: function DriveRoute() {
     return (
       <SecaoPlaceholderPage
-        titulo="Certidões"
-        descricao="Emissão e consulta de certidões. Em construção — esta página ainda não consulta nenhum portal."
+        titulo="Drive"
+        descricao="Arquivos e documentos do escritório. Ainda não tem conteúdo — a página existe só para a nova navegação."
       />
     )
   },

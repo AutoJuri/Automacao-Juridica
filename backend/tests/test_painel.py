@@ -11,12 +11,23 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
+
+from app.api.deps import get_current_user
+from app.db.session import get_db
+from app.main import app
+from app.models.audiencia import Audiencia
+from app.models.intimacao import Intimacao
+from app.models.processo import Processo
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.main import app
 from app.schemas.notification import NotificationPublicSchema, NotificationsMarcadasSchema
 from app.schemas.processo import (
+    AudienciaPainelSchema,
+    IntimacaoPainelSchema,
     IntimacaoPublicSchema,
     MovimentacaoPublicSchema,
     PartePublicSchema,
@@ -26,6 +37,8 @@ from app.schemas.processo import (
 )
 from app.services import painel as painel_service
 from app.services.painel import (
+    audiencia_para_painel,
+    intimacao_para_painel,
     intimacao_para_publico,
     montar_ultima_atividade,
     movimentacao_para_publico,
@@ -84,6 +97,74 @@ class TestSchemasSemIdEsaj:
         dumped = publico.model_dump()
         assert "id_esaj" not in dumped
         assert "123456SP" not in str(dumped)
+
+    def test_mapper_painel_de_intimacao_nao_expoe_id_esaj_nem_processo_de_outro(self):
+        item = SimpleNamespace(
+            id=uuid4(),
+            user_id=USER_ID,
+            processo_id=PROCESSO_ID,
+            id_esaj="cdProcesso=AAA,oab=123456SP",
+            titulo="Mero expediente",
+            descricao="texto",
+            instancia="PG",
+            data_movimentacao=None,
+            ciencia=False,
+        )
+        outro = SimpleNamespace(
+            user_id=OUTRO_ID,
+            nu_processo="segredo",
+            tribunal="esaj_tjsp",
+            instancia="PG",
+            foro="Foro",
+            vara="Vara",
+        )
+        publico = intimacao_para_painel(item, outro)
+        dumped = publico.model_dump()
+        assert "id_esaj" not in dumped
+        assert dumped["nu_processo"] is None
+        assert "123456SP" not in str(dumped)
+
+    def test_join_de_intimacao_e_audiencia_com_processo_exige_user_id_no_sql(self):
+        on_intimacao = painel_service._on_processo_do_usuario(Intimacao.processo_id, USER_ID)
+        sql_int = str(
+            select(Intimacao, Processo)
+            .outerjoin(Processo, on_intimacao)
+            .compile(dialect=postgresql.dialect())
+        )
+        on_audiencia = painel_service._on_processo_do_usuario(Audiencia.processo_id, USER_ID)
+        sql_aud = str(
+            select(Audiencia, Processo)
+            .outerjoin(Processo, on_audiencia)
+            .compile(dialect=postgresql.dialect())
+        )
+        assert "processos.user_id" in sql_int
+        assert "processos.user_id" in sql_aud
+
+    def test_mapper_painel_de_audiencia_nao_expoe_id_esaj(self):
+        publico = audiencia_para_painel(
+            item_id=uuid4(),
+            processo=SimpleNamespace(
+                id=PROCESSO_ID,
+                user_id=USER_ID,
+                nu_processo="1002561-84.2026.8.26.0100",
+                tribunal="esaj_tjsp",
+                parte_ativa={"nome": "Acme", "representada": True},
+                parte_passiva=None,
+                foro="Foro",
+                vara="Vara",
+                juiz="Juiz",
+            ),
+            user_id=USER_ID,
+            titulo="Instrução",
+            data_audiencia=datetime(2026, 8, 25, tzinfo=UTC),
+            local="Sala",
+            situacao=None,
+            fonte="agenda",
+        )
+        dumped = publico.model_dump()
+        assert "id_esaj" not in dumped
+        assert dumped["fonte"] == "agenda"
+        assert dumped["nu_processo"] == "1002561-84.2026.8.26.0100"
 
     def test_detalhe_nao_carrega_id_esaj_de_audiencia(self):
         processo = SimpleNamespace(
@@ -344,6 +425,23 @@ class TestSchemasSemIdEsaj:
         assert "foro" not in dumped
         assert "juiz" not in dumped
         assert "partes_cpo" not in dumped
+        assert dumped["fixado"] is False
+
+    def test_mapper_repassa_fixado(self):
+        processo = SimpleNamespace(
+            id=PROCESSO_ID,
+            tribunal="esaj_tjsp",
+            nu_processo="1002561-84.2026.8.26.0100",
+            de_classe=None,
+            de_assunto=None,
+            instancia=None,
+            parte_ativa=None,
+            parte_passiva=None,
+            last_synced_at=None,
+            fixado=True,
+        )
+        lista = processo_para_lista(processo, [], [])
+        assert lista.fixado is True
 
     def test_ultima_atividade_escolhe_o_evento_mais_recente(self):
         intimacao = SimpleNamespace(
@@ -473,6 +571,115 @@ class TestRotasProcessos:
         assert corpo["movimentacoes"][0]["titulo"] == "Certidão de Publicação Expedida"
         assert "descricao_hash" not in str(corpo)
         assert "processo_id" not in corpo["movimentacoes"][0]
+
+    @pytest.mark.asyncio
+    async def test_fixar_de_outro_usuario_retorna_404(self, client_factory, monkeypatch):
+        app.dependency_overrides[get_current_user] = lambda: _user()
+
+        async def fake_fixar(db, user_id, processo_id, *, fixado):
+            assert user_id == USER_ID
+            assert fixado is True
+            return None
+
+        monkeypatch.setattr(painel_service, "atualizar_fixado", fake_fixar)
+
+        async with await _client() as client:
+            resposta = await client.patch(
+                f"/processos/{PROCESSO_ID}", json={"fixado": True}
+            )
+
+        assert resposta.status_code == 404
+        assert resposta.json()["detail"] == "Processo não encontrado"
+
+    @pytest.mark.asyncio
+    async def test_fixar_do_dono_retorna_id_e_flag(self, client_factory, monkeypatch):
+        app.dependency_overrides[get_current_user] = lambda: _user()
+
+        async def fake_fixar(db, user_id, processo_id, *, fixado):
+            assert user_id == USER_ID
+            assert processo_id == PROCESSO_ID
+            assert fixado is False
+            return ProcessoListSchema(
+                id=PROCESSO_ID,
+                tribunal="esaj_tjsp",
+                nu_processo="1002561-84.2026.8.26.0100",
+                fixado=False,
+            )
+
+        monkeypatch.setattr(painel_service, "atualizar_fixado", fake_fixar)
+
+        async with await _client() as client:
+            resposta = await client.patch(
+                f"/processos/{PROCESSO_ID}", json={"fixado": False}
+            )
+
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo == {"id": str(PROCESSO_ID), "fixado": False}
+        assert "nu_processo" not in corpo
+        assert "id_esaj" not in corpo
+
+    @pytest.mark.asyncio
+    async def test_lista_intimacoes_sem_token_retorna_401(self, client_factory):
+        async with await _client() as client:
+            resposta = await client.get("/intimacoes")
+        assert resposta.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_lista_intimacoes_so_do_jwt_sem_id_esaj(self, client_factory, monkeypatch):
+        app.dependency_overrides[get_current_user] = lambda: _user()
+
+        async def fake_listar(db, user_id):
+            assert user_id == USER_ID
+            return [
+                IntimacaoPainelSchema(
+                    id=uuid4(),
+                    processo_id=PROCESSO_ID,
+                    nu_processo="1002561-84.2026.8.26.0100",
+                    tribunal="esaj_tjsp",
+                    titulo="Mero expediente",
+                    descricao="texto",
+                    ciencia=False,
+                )
+            ]
+
+        monkeypatch.setattr(painel_service, "listar_intimacoes_painel", fake_listar)
+
+        async with await _client() as client:
+            resposta = await client.get("/intimacoes")
+
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert len(corpo) == 1
+        assert "id_esaj" not in corpo[0]
+        assert "oab" not in str(corpo).lower()
+
+    @pytest.mark.asyncio
+    async def test_lista_audiencias_so_do_jwt_sem_id_esaj(self, client_factory, monkeypatch):
+        app.dependency_overrides[get_current_user] = lambda: _user()
+
+        async def fake_listar(db, user_id):
+            assert user_id == USER_ID
+            return [
+                AudienciaPainelSchema(
+                    id=uuid4(),
+                    processo_id=PROCESSO_ID,
+                    nu_processo="1002561-84.2026.8.26.0100",
+                    tribunal="esaj_tjsp",
+                    titulo="Instrução",
+                    fonte="agenda",
+                )
+            ]
+
+        monkeypatch.setattr(painel_service, "listar_audiencias_painel", fake_listar)
+
+        async with await _client() as client:
+            resposta = await client.get("/audiencias")
+
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo[0]["titulo"] == "Instrução"
+        assert "id_esaj" not in corpo[0]
 
 
 class TestRotasNotifications:

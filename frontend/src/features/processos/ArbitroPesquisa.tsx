@@ -16,7 +16,7 @@ export function ArbitroPesquisa({
   onPortalChange,
 }: ArbitroPesquisaProps) {
   return (
-    <div className="relative z-10 shrink-0 rounded-xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-sm">
+    <div className="relative z-10 shrink-0 rounded-2xl border border-[#E5E7EB] bg-white px-6 py-5 shadow-sm">
       <p className="text-[10px] font-semibold text-[#3B5BDB] tracking-[0.2em] uppercase mb-1">
         Árbitro de Pesquisa
       </p>

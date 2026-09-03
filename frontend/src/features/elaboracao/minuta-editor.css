@@ -1,0 +1,27 @@
+.minuta-editor .tiptap {
+  outline: none;
+  font-family: var(--minuta-font, 'Times New Roman', Times, serif);
+  font-size: var(--minuta-size, 12pt);
+  line-height: var(--minuta-line, 1.5);
+  color: #111827;
+}
+
+.minuta-editor .tiptap p {
+  margin: 0 0 0.75em;
+}
+
+.minuta-editor .tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.minuta-editor .tiptap strong {
+  font-weight: 700;
+}
+
+.minuta-editor.is-readonly .tiptap {
+  cursor: default;
+}
+
+.minuta-editor.is-editing .tiptap {
+  cursor: text;
+}

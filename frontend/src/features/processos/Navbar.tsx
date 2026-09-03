@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
-import { Bell, LogOut, Scale, Settings } from 'lucide-react'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import {
+  Bell,
+  Briefcase,
+  FolderOpen,
+  ListTodo,
+  LogOut,
+  PenLine,
+  Scale,
+  Settings,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { logout } from '#/features/auth/auth.api'
 import {
@@ -13,8 +23,15 @@ import { NOTIFICATIONS_QUERY_KEY } from '#/features/notificacoes/notifications.c
 import { cn } from '#/lib/utils'
 import { limparQueriesDaSessao } from '#/lib/session-queries'
 import { useAuthStore } from '#/store/auth.store'
-import { SECOES_NAV } from './nav.constants'
+import { SECOES_TOPO, secaoTopoAtiva, type IconeTopo } from './nav.constants'
 import { formatarDataHoraSP } from './processos.dates'
+
+const ICONES_TOPO: Record<IconeTopo, LucideIcon> = {
+  briefcase: Briefcase,
+  pen: PenLine,
+  folder: FolderOpen,
+  check: ListTodo,
+}
 
 export const NAVBAR_HEIGHT = 72
 
@@ -24,7 +41,7 @@ interface NavbarProps {
 
 export function Navbar({ onAbrirProcesso }: NavbarProps) {
   const navigate = useNavigate()
-  const matchRoute = useMatchRoute()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const queryClient = useQueryClient()
   const [aberto, setAberto] = useState(false)
@@ -37,9 +54,6 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
 
   const notificacoes = notificacoesQuery.data ?? []
   const naoLidas = notificacoes.filter((n) => !n.is_read).length
-  const intimacoesNaoLidas = notificacoes.filter(
-    (n) => !n.is_read && n.tipo === 'intimacao',
-  ).length
 
   const marcarUma = useMutation({
     mutationFn: marcarNotificacaoLida,
@@ -79,7 +93,7 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 lg:px-6 xl:px-8 bg-navbar border-b border-border-subtle"
+      className="fixed top-0 left-0 right-0 z-50 flex items-center gap-4 px-4 lg:px-6 xl:px-8 bg-navbar border-b border-border-subtle"
       style={{ height: NAVBAR_HEIGHT }}
     >
       <Link to="/" className="flex items-center gap-3 shrink-0 min-w-0">
@@ -97,38 +111,27 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
       </Link>
 
       <nav
-        aria-label="Seções"
-        className="flex-1 min-w-0 flex justify-center"
+        aria-label="Áreas da plataforma"
+        className="flex-1 min-w-0 self-stretch flex items-center px-2 lg:px-6"
       >
-        <div className="flex items-center gap-0.5 max-w-full overflow-x-auto rounded-full bg-[#F3F4F6] p-1 scrollbar-none">
-          {SECOES_NAV.map((item) => {
-            const ativo = Boolean(matchRoute({ to: item.to, fuzzy: false }))
-            const badge =
-              'badge' in item && item.badge === 'intimacoes' ? intimacoesNaoLidas : 0
+        <div className="flex w-full h-12 items-stretch rounded-2xl bg-[#EEF2F7] p-1">
+          {SECOES_TOPO.map((item) => {
+            const ativo = secaoTopoAtiva(item.to, pathname)
+            const Icone = ICONES_TOPO[item.icone]
             return (
               <Link
                 key={item.to}
                 to={item.to}
+                aria-current={ativo ? 'page' : undefined}
                 className={cn(
-                  'relative inline-flex items-center shrink-0 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors',
+                  'relative flex flex-1 min-w-0 items-center justify-center gap-2 rounded-xl text-[13px] lg:text-[14px] font-semibold tracking-tight transition-all',
                   ativo
-                    ? 'bg-[#2563EB] text-white px-[11px] py-[7px]'
-                    : 'text-[#4B5563] hover:text-[#111827] px-3 py-2',
+                    ? 'bg-white text-[#2563EB] shadow-sm ring-1 ring-[#2563EB]/15'
+                    : 'text-[#6B7280] hover:text-[#111827] hover:bg-white/60',
                 )}
               >
-                {item.label}
-                {badge > 0 ? (
-                  <span
-                    className={cn(
-                      'ml-1.5 inline-flex min-w-[16px] h-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none',
-                      ativo
-                        ? 'bg-white text-[#2563EB]'
-                        : 'bg-[#FBBF24] text-[#78350F]',
-                    )}
-                  >
-                    {badge > 9 ? '9+' : badge}
-                  </span>
-                ) : null}
+                <Icone className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                <span className="truncate">{item.label}</span>
               </Link>
             )
           })}

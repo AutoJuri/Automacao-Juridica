@@ -9,23 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ValidarAssinaturaRouteImport } from './routes/validar-assinatura'
+import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as PushRobosRouteImport } from './routes/push-robos'
 import { Route as PeticionamentoRouteImport } from './routes/peticionamento'
 import { Route as PautasRouteImport } from './routes/pautas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntimacoesDiretasRouteImport } from './routes/intimacoes-diretas'
+import { Route as GerenciasRouteImport } from './routes/gerencias'
+import { Route as ElaboracoesRouteImport } from './routes/elaboracoes'
+import { Route as DriveRouteImport } from './routes/drive'
 import { Route as CustasDareRouteImport } from './routes/custas-dare'
 import { Route as ConsultaPastaRouteImport } from './routes/consulta-pasta'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
-import { Route as CertidoesRouteImport } from './routes/certidoes'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ElaboracaoProcessoIdRouteImport } from './routes/elaboracao.$processoId'
 
-const ValidarAssinaturaRoute = ValidarAssinaturaRouteImport.update({
-  id: '/validar-assinatura',
-  path: '/validar-assinatura',
+const TarefasRoute = TarefasRouteImport.update({
+  id: '/tarefas',
+  path: '/tarefas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
@@ -58,6 +60,21 @@ const IntimacoesDiretasRoute = IntimacoesDiretasRouteImport.update({
   path: '/intimacoes-diretas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GerenciasRoute = GerenciasRouteImport.update({
+  id: '/gerencias',
+  path: '/gerencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ElaboracoesRoute = ElaboracoesRouteImport.update({
+  id: '/elaboracoes',
+  path: '/elaboracoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriveRoute = DriveRouteImport.update({
+  id: '/drive',
+  path: '/drive',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustasDareRoute = CustasDareRouteImport.update({
   id: '/custas-dare',
   path: '/custas-dare',
@@ -73,11 +90,6 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CertidoesRoute = CertidoesRouteImport.update({
-  id: '/certidoes',
-  path: '/certidoes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -91,121 +103,135 @@ const ElaboracaoProcessoIdRoute = ElaboracaoProcessoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/certidoes': typeof CertidoesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/custas-dare': typeof CustasDareRoute
+  '/drive': typeof DriveRoute
+  '/elaboracoes': typeof ElaboracoesRoute
+  '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
   '/login': typeof LoginRoute
   '/pautas': typeof PautasRoute
   '/peticionamento': typeof PeticionamentoRoute
   '/push-robos': typeof PushRobosRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
-  '/validar-assinatura': typeof ValidarAssinaturaRoute
+  '/tarefas': typeof TarefasRoute
   '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/certidoes': typeof CertidoesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/custas-dare': typeof CustasDareRoute
+  '/drive': typeof DriveRoute
+  '/elaboracoes': typeof ElaboracoesRoute
+  '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
   '/login': typeof LoginRoute
   '/pautas': typeof PautasRoute
   '/peticionamento': typeof PeticionamentoRoute
   '/push-robos': typeof PushRobosRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
-  '/validar-assinatura': typeof ValidarAssinaturaRoute
+  '/tarefas': typeof TarefasRoute
   '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/certidoes': typeof CertidoesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/custas-dare': typeof CustasDareRoute
+  '/drive': typeof DriveRoute
+  '/elaboracoes': typeof ElaboracoesRoute
+  '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
   '/login': typeof LoginRoute
   '/pautas': typeof PautasRoute
   '/peticionamento': typeof PeticionamentoRoute
   '/push-robos': typeof PushRobosRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
-  '/validar-assinatura': typeof ValidarAssinaturaRoute
+  '/tarefas': typeof TarefasRoute
   '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/certidoes'
     | '/configuracoes'
     | '/consulta-pasta'
     | '/custas-dare'
+    | '/drive'
+    | '/elaboracoes'
+    | '/gerencias'
     | '/intimacoes-diretas'
     | '/login'
     | '/pautas'
     | '/peticionamento'
     | '/push-robos'
     | '/redefinir-senha'
-    | '/validar-assinatura'
+    | '/tarefas'
     | '/elaboracao/$processoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/certidoes'
     | '/configuracoes'
     | '/consulta-pasta'
     | '/custas-dare'
+    | '/drive'
+    | '/elaboracoes'
+    | '/gerencias'
     | '/intimacoes-diretas'
     | '/login'
     | '/pautas'
     | '/peticionamento'
     | '/push-robos'
     | '/redefinir-senha'
-    | '/validar-assinatura'
+    | '/tarefas'
     | '/elaboracao/$processoId'
   id:
     | '__root__'
     | '/'
-    | '/certidoes'
     | '/configuracoes'
     | '/consulta-pasta'
     | '/custas-dare'
+    | '/drive'
+    | '/elaboracoes'
+    | '/gerencias'
     | '/intimacoes-diretas'
     | '/login'
     | '/pautas'
     | '/peticionamento'
     | '/push-robos'
     | '/redefinir-senha'
-    | '/validar-assinatura'
+    | '/tarefas'
     | '/elaboracao/$processoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CertidoesRoute: typeof CertidoesRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   ConsultaPastaRoute: typeof ConsultaPastaRoute
   CustasDareRoute: typeof CustasDareRoute
+  DriveRoute: typeof DriveRoute
+  ElaboracoesRoute: typeof ElaboracoesRoute
+  GerenciasRoute: typeof GerenciasRoute
   IntimacoesDiretasRoute: typeof IntimacoesDiretasRoute
   LoginRoute: typeof LoginRoute
   PautasRoute: typeof PautasRoute
   PeticionamentoRoute: typeof PeticionamentoRoute
   PushRobosRoute: typeof PushRobosRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
-  ValidarAssinaturaRoute: typeof ValidarAssinaturaRoute
+  TarefasRoute: typeof TarefasRoute
   ElaboracaoProcessoIdRoute: typeof ElaboracaoProcessoIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/validar-assinatura': {
-      id: '/validar-assinatura'
-      path: '/validar-assinatura'
-      fullPath: '/validar-assinatura'
-      preLoaderRoute: typeof ValidarAssinaturaRouteImport
+    '/tarefas': {
+      id: '/tarefas'
+      path: '/tarefas'
+      fullPath: '/tarefas'
+      preLoaderRoute: typeof TarefasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/redefinir-senha': {
@@ -250,6 +276,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntimacoesDiretasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gerencias': {
+      id: '/gerencias'
+      path: '/gerencias'
+      fullPath: '/gerencias'
+      preLoaderRoute: typeof GerenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/elaboracoes': {
+      id: '/elaboracoes'
+      path: '/elaboracoes'
+      fullPath: '/elaboracoes'
+      preLoaderRoute: typeof ElaboracoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/drive': {
+      id: '/drive'
+      path: '/drive'
+      fullPath: '/drive'
+      preLoaderRoute: typeof DriveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/custas-dare': {
       id: '/custas-dare'
       path: '/custas-dare'
@@ -271,13 +318,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/certidoes': {
-      id: '/certidoes'
-      path: '/certidoes'
-      fullPath: '/certidoes'
-      preLoaderRoute: typeof CertidoesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -297,17 +337,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CertidoesRoute: CertidoesRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   ConsultaPastaRoute: ConsultaPastaRoute,
   CustasDareRoute: CustasDareRoute,
+  DriveRoute: DriveRoute,
+  ElaboracoesRoute: ElaboracoesRoute,
+  GerenciasRoute: GerenciasRoute,
   IntimacoesDiretasRoute: IntimacoesDiretasRoute,
   LoginRoute: LoginRoute,
   PautasRoute: PautasRoute,
   PeticionamentoRoute: PeticionamentoRoute,
   PushRobosRoute: PushRobosRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
-  ValidarAssinaturaRoute: ValidarAssinaturaRoute,
+  TarefasRoute: TarefasRoute,
   ElaboracaoProcessoIdRoute: ElaboracaoProcessoIdRoute,
 }
 export const routeTree = rootRouteImport

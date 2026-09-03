@@ -9,6 +9,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { MUITAS_TENTATIVAS, mensagemDeErro } from '#/features/auth/auth.errors'
 import { FieldError, FormError } from '#/features/auth/AuthFormFeedback'
+import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
 import {
   buscarStatusCredenciais,
   removerCredencialEsaj,
@@ -144,7 +145,7 @@ export function EsajCredentialForm() {
       </p>
 
       {statusQuery.isLoading ? (
-        <p className="text-sm text-[#9CA3AF]">Carregando...</p>
+        <EstadoCarregando mensagem="Carregando..." compacto />
       ) : cadastrado ? (
         <div className="space-y-4">
           <div className="flex items-center gap-2.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3">

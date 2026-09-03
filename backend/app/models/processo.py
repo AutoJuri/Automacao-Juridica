@@ -75,6 +75,10 @@ class Processo(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # None = CPO ainda não passou por este processo; True = empty state do portal.
     sem_incidentes: Mapped[bool | None] = mapped_column()
     sem_apensos: Mapped[bool | None] = mapped_column()
+    # Preferência do advogado na lista da home — não vem do e-SAJ.
+    fixado: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default=text("false")
+    )
 
     user: Mapped["User"] = relationship(back_populates="processos")
     movimentacoes: Mapped[list["Movimentacao"]] = relationship(

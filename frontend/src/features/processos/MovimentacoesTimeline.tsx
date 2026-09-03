@@ -1,13 +1,12 @@
-import { useState } from 'react'
-import { ExternalLink, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import type { MovimentacaoPublica, MovimentacoesStatus } from './processos.types'
 import { formatarDataSP } from './processos.dates'
-import { hrefDocumentoMovimentacao } from './processos.urls'
 
 interface MovimentacoesTimelineProps {
   movimentacoes: MovimentacaoPublica[]
+  selecionadoId: string | null
+  onSelect: (id: string) => void
   status?: MovimentacoesStatus
-  urlCpo?: string | null
 }
 
 const MENSAGEM_VAZIA: Record<MovimentacoesStatus, string> = {
@@ -20,88 +19,69 @@ const MENSAGEM_VAZIA: Record<MovimentacoesStatus, string> = {
 
 export function MovimentacoesTimeline({
   movimentacoes,
+  selecionadoId,
+  onSelect,
   status = 'pendente',
-  urlCpo = null,
 }: MovimentacoesTimelineProps) {
-  const [selecionadoId, setSelecionadoId] = useState<string | null>(movimentacoes[0]?.id ?? null)
-
   return (
-    <div className="flex flex-col h-full">
-      <div className="mb-4">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="shrink-0 px-5 pt-5 pb-3">
         <p className="text-[10px] font-semibold text-[#6B7280] tracking-[0.18em] uppercase">
-          Movimentações
+          Movimentações ({movimentacoes.length})
         </p>
-        <p className="text-[11px] text-[#9CA3AF] mt-1">
-          Andamentos coletados do CPO (e-SAJ) para este processo
-        </p>
+        <p className="text-[11px] text-[#9CA3AF] mt-1">Clique para inspecionar</p>
       </div>
 
-      {movimentacoes.length === 0 ? (
-        <p className="text-[12px] text-[#9CA3AF] leading-relaxed">{MENSAGEM_VAZIA[status]}</p>
-      ) : (
-        <div className="space-y-3">
-          {movimentacoes.map((item) => {
-            const isSelected = item.id === selecionadoId
-            const detalhe = item.descricao.trim()
-            const hrefDocumento = hrefDocumentoMovimentacao(
-              item.tem_documento,
-              item.url_documento,
-              urlCpo,
-            )
-            return (
-              <article
-                key={item.id}
-                onClick={() => setSelecionadoId(item.id)}
-                className={[
-                  'w-full text-left rounded-xl px-4 py-3.5 border transition-all duration-150 cursor-pointer',
-                  isSelected
-                    ? 'border-[#8B5CF6] bg-[#FAF5FF] shadow-sm'
-                    : 'border-[#E5E7EB] bg-white hover:border-[#C7D0E8] hover:bg-[#F8F9FC]',
-                ].join(' ')}
-              >
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <span className="text-[11px] font-medium text-[#6B7280] tabular-nums">
-                    {formatarDataSP(item.data_movimentacao)}
-                  </span>
-                  {item.tem_documento ? (
-                    <span
-                      className="inline-flex items-center text-[#6B7280]"
-                      title="Há documento no e-SAJ"
-                      aria-label="Há documento no e-SAJ"
-                    >
-                      <FileText className="w-3.5 h-3.5" aria-hidden />
+      <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
+        {movimentacoes.length === 0 ? (
+          <p className="text-[12px] text-[#9CA3AF] leading-relaxed px-1">
+            {MENSAGEM_VAZIA[status]}
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {movimentacoes.map((item) => {
+              const isSelected = item.id === selecionadoId
+              const detalhe = item.descricao.trim()
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className={[
+                    'w-full text-left rounded-xl px-4 py-3.5 border transition-all duration-150 cursor-pointer',
+                    isSelected
+                      ? 'border-[#2563EB] bg-white shadow-sm ring-1 ring-[#2563EB]/15'
+                      : 'border-[#E5E7EB] bg-white hover:border-[#C7D0E8] hover:bg-[#F8F9FC]',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    <span className="text-[11px] font-medium text-[#6B7280] tabular-nums">
+                      {formatarDataSP(item.data_movimentacao)}
                     </span>
-                  ) : null}
-                </div>
-                <p className="text-[12px] font-semibold text-[#111827] leading-snug">
-                  {item.titulo?.trim() || 'Movimentação'}
-                </p>
-                {detalhe ? (
-                  <p className="text-[12px] text-[#374151] leading-relaxed whitespace-pre-wrap mt-1">
-                    {detalhe}
+                    {item.tem_documento ? (
+                      <span
+                        className="inline-flex items-center text-[#6B7280]"
+                        title="Há documento no e-SAJ"
+                        aria-label="Há documento no e-SAJ"
+                      >
+                        <FileText className="w-3.5 h-3.5" aria-hidden />
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[13px] font-semibold text-[#111827] leading-snug">
+                    {item.titulo?.trim() || 'Movimentação'}
                   </p>
-                ) : null}
-                {item.tem_documento ? (
-                  hrefDocumento ? (
-                    <a
-                      href={hrefDocumento}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(evento) => evento.stopPropagation()}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#3B5BDB] hover:underline"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" aria-hidden />
-                      Abrir documento no e-SAJ
-                    </a>
-                  ) : (
-                    <p className="mt-2 text-[11px] text-[#6B7280]">Há documento no e-SAJ</p>
-                  )
-                ) : null}
-              </article>
-            )
-          })}
-        </div>
-      )}
+                  {detalhe ? (
+                    <p className="text-[12px] text-[#6B7280] leading-relaxed mt-1 line-clamp-2">
+                      {detalhe}
+                    </p>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

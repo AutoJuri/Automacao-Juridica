@@ -36,6 +36,12 @@
   --color-accent-purple: #8B5CF6;
   --color-accent-amber: #F59E0B;
 
+  /* Tokens shadcn (Dialog, Switch, etc.) — sem isso bg-background/bg-primary ficam transparentes */
+  --color-background: #FFFFFF;
+  --color-primary: #2563EB;
+  --color-input: #D1D5DB;
+  --color-ring: #2563EB;
+
   /* Status */
   --color-status-critical: #EF4444;
   --color-status-online: #22C55E;
@@ -99,5 +105,17 @@ textarea:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--color-text-primary);
   caret-color: var(--color-text-primary);
   transition: background-color 99999s ease-in-out 0s;
+}
+
+/* Foco padronizado da Elaboração — azul dos botões, sem outline preto do SO. */
+.foco-campo {
+  outline: none;
+}
+.foco-campo:focus,
+.foco-campo:focus-visible,
+.foco-campo[data-foco] {
+  border-color: #2563EB !important;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.25) !important;
+  outline: none !important;
 }
 

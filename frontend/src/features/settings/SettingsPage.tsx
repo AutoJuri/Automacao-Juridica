@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
-import { Navbar, NAVBAR_HEIGHT } from '#/features/processos/Navbar'
+import { AppChrome } from '#/features/processos/AppChrome'
 import { FormError, FormSuccess } from '#/features/auth/AuthFormFeedback'
 import { CREDENTIALS_STATUS_QUERY_KEY } from './credentials.constants'
 import { EmailConnectionCard } from './EmailConnectionCard'
@@ -30,13 +30,7 @@ export function SettingsPage({ emailFeedback }: SettingsPageProps) {
   }, [emailFeedback])
 
   return (
-    <div className="flex flex-col h-screen bg-[#F0F2F7] overflow-hidden">
-      <Navbar />
-
-      <div
-        className="flex-1 overflow-y-auto px-5 sm:px-8 lg:px-10 xl:px-14 py-8"
-        style={{ marginTop: NAVBAR_HEIGHT }}
-      >
+    <AppChrome contentClassName="flex-1 overflow-y-auto px-5 sm:px-8 lg:px-10 xl:px-14 py-8">
         <div className="max-w-2xl mx-auto space-y-6">
           <div>
             <h1 className="text-2xl font-semibold text-[#111827]">Configurações</h1>
@@ -56,7 +50,6 @@ export function SettingsPage({ emailFeedback }: SettingsPageProps) {
           <EsajCredentialForm />
           <EmailConnectionCard />
         </div>
-      </div>
-    </div>
+    </AppChrome>
   )
 }

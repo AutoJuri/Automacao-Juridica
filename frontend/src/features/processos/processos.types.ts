@@ -27,6 +27,7 @@ export interface ProcessoLista {
   parte_passiva: PartePublica | null
   last_synced_at: string | null
   ultima_atividade: UltimaAtividade | null
+  fixado: boolean
 }
 
 export interface IntimacaoPublica {
@@ -97,4 +98,35 @@ export interface ProcessoDetalhe extends ProcessoLista {
   movimentacoes_status: MovimentacoesStatus
   sem_incidentes: boolean | null
   sem_apensos: boolean | null
+}
+
+export interface IntimacaoPainel {
+  id: string
+  processo_id: string | null
+  nu_processo: string | null
+  tribunal: string | null
+  instancia: string | null
+  titulo: string | null
+  descricao: string | null
+  data_movimentacao: string | null
+  ciencia: boolean
+  foro: string | null
+  vara: string | null
+}
+
+export interface AudienciaPainel {
+  id: string
+  processo_id: string | null
+  nu_processo: string | null
+  tribunal: string | null
+  titulo: string
+  data_audiencia: string | null
+  local: string | null
+  situacao: string | null
+  parte_ativa: PartePublica | null
+  parte_passiva: PartePublica | null
+  foro: string | null
+  vara: string | null
+  juiz: string | null
+  fonte: 'agenda' | 'cpo'
 }

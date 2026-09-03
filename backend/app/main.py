@@ -52,6 +52,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(credentials.router)
 app.include_router(processos.router)
+app.include_router(processos.router_intimacoes)
+app.include_router(processos.router_audiencias)
 app.include_router(notifications.router)
 
 

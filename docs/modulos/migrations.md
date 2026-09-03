@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-08-26
+> Última atualização: 2026-08-28
 > Camada: Infra / Backend
 
 ---
@@ -82,7 +82,7 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `b7e4c9a1d2f0`):
+Tabelas (head atual: `d4a8c2e1f9b0`):
 
 ```
 users
@@ -90,7 +90,7 @@ users
 ├── password_reset_tokens   (auth — uso único, expiração curta)
 ├── tribunal_credentials
 ├── tribunal_sessions
-├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at)
+├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at, fixado)
 │   ├── movimentacoes       (+ tem_documento, url_documento)
 │   ├── peticoes_diversas   (HTML CPO — ADR-013)
 │   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
@@ -185,3 +185,4 @@ Módulos futuros que vão depender deste:
 | 2026-08-24 | `movimentacoes.tem_documento` / `url_documento` — migration `c8f21a04b9d3` |
 | 2026-08-25 | Capa CPO em `processos` + tabelas `peticoes_diversas` e `audiencias_cpo` (ADR-013), migration `a1c0e5c0b013` |
 | 2026-08-26 | Índice parcial `(user_id, movimentacoes_synced_at) WHERE url_cpo IS NOT NULL` — migration `b7e4c9a1d2f0` |
+| 2026-08-28 | `processos.fixado` — pin na home, migration `d4a8c2e1f9b0` |

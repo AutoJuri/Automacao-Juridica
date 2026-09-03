@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { mensagemDeErro } from '#/features/auth/auth.errors'
-import { Navbar, NAVBAR_HEIGHT } from './Navbar'
+import { AppChrome } from './AppChrome'
 import { ProcessoSidebar } from './ProcessoSidebar'
 import { ProcessoDetalhe } from './ProcessoDetalhe'
 import { ArbitroPesquisa } from './ArbitroPesquisa'
@@ -74,13 +74,10 @@ export function DashboardPage({ processoInicial }: DashboardPageProps) {
   }, [processosFiltrados, processoSelecionadoId, processoInicial])
 
   return (
-    <div className="flex flex-col h-screen bg-[#F0F2F7] overflow-hidden">
-      <Navbar onAbrirProcesso={setProcessoSelecionadoId} />
-
-      <div
-        className="flex flex-1 overflow-hidden px-5 sm:px-8 lg:px-10 xl:px-14 py-5 gap-5 min-h-0"
-        style={{ marginTop: NAVBAR_HEIGHT }}
-      >
+    <AppChrome
+      onAbrirProcesso={setProcessoSelecionadoId}
+      contentClassName="flex flex-1 overflow-hidden px-5 sm:px-8 lg:px-10 xl:px-14 py-5 gap-5 min-h-0"
+    >
         <ProcessoSidebar
           processos={processosFiltrados}
           processoSelecionadoId={processoSelecionadoId}
@@ -107,7 +104,6 @@ export function DashboardPage({ processoInicial }: DashboardPageProps) {
             <ProcessoDetalhe processoId={processoSelecionadoId} />
           )}
         </div>
-      </div>
-    </div>
+    </AppChrome>
   )
 }

@@ -1,44 +1,92 @@
-import { Send, Sparkles } from 'lucide-react'
-import { Textarea } from '#/components/ui/textarea'
-import { Button } from '#/components/ui/button'
+import { Highlighter, Scale, MessageSquare, Sparkles } from 'lucide-react'
+import { Switch } from '#/components/ui/switch'
+import { Label } from '#/components/ui/label'
+import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 
 interface EditorChatBarProps {
   chatInput: string
   onChange: (v: string) => void
+  highlightAtivo: boolean
+  iconesJuris: boolean
+  onToggleHighlight: (v: boolean) => void
+  onToggleIcones: (v: boolean) => void
 }
 
-export function EditorChatBar({ chatInput, onChange }: EditorChatBarProps) {
+export function EditorChatBar({
+  chatInput,
+  onChange,
+  highlightAtivo,
+  iconesJuris,
+  onToggleHighlight,
+  onToggleIcones,
+}: EditorChatBarProps) {
   return (
-    <div className="border-t border-[#E5E7EB] bg-white px-4 py-3 shrink-0">
-      <div className="flex items-end gap-3 max-w-[780px] mx-auto">
-        <div className="flex-1 relative">
-          <Sparkles className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[#9CA3AF] pointer-events-none" />
-          <Textarea
+    <div className="border-t border-[#E5E7EB] bg-white px-4 py-3.5 shrink-0">
+      <div className="flex items-center gap-3 max-w-[960px] mx-auto">
+        <div className="relative flex-1 min-w-0">
+          <MessageSquare className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#2563EB] pointer-events-none" />
+          <input
             value={chatInput}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Instrua a IA para alterar a peça... (ex: adicione preliminar de ilegitimidade passiva)"
-            className="resize-none pl-8 pr-4 py-2 text-[13px] min-h-[40px] max-h-[100px] border-[#E5E7EB] focus:border-[#3B5BDB] focus:ring-1 focus:ring-[#3B5BDB] rounded-lg"
-            rows={1}
+            placeholder="Chat para interação com a IA (ex: 'Inclua preliminar de prescrição')..."
+            className={`w-full h-12 rounded-xl border border-[#E5E7EB] bg-[#F8F9FC] pl-10 pr-3 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] ${FOCO_CAMPO}`}
+            {...propsFocoCampo}
           />
         </div>
-
-        <Button
-          size="sm"
-          className="h-9 px-4 text-[11px] font-semibold gap-1.5 text-[#6B7280] bg-transparent border border-[#E5E7EB] hover:bg-[#F3F4F6] hover:text-[#111827] shrink-0"
-          variant="outline"
+        <button
+          type="button"
+          disabled
+          title="Geração de peça ainda não está em operação"
+          className="h-12 px-5 rounded-xl bg-[#2563EB] text-white text-[13px] font-semibold tracking-wide opacity-50 shrink-0 inline-flex items-center gap-2"
         >
-          <Send className="w-3.5 h-3.5" />
-          Enviar
-        </Button>
-
-        <Button
-          size="default"
-          className="h-9 px-6 text-[13px] font-bold gap-2 bg-[#3B5BDB] hover:bg-[#2d4cba] text-white shrink-0 tracking-wide"
-        >
-          <Sparkles className="w-4 h-4" />
-          ELABORAR
-        </Button>
+          <Sparkles className="w-4 h-4" aria-hidden />
+          Elaborar
+        </button>
       </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 max-w-[960px] mx-auto mt-3">
+        <ToggleLinha
+          id="toggle-highlight"
+          label="Modo Highlight / Grifo de Seleção"
+          icon={Highlighter}
+          checked={highlightAtivo}
+          onChange={onToggleHighlight}
+        />
+        <ToggleLinha
+          id="toggle-icones"
+          label="Ícones de Jurisprudência no Texto"
+          icon={Scale}
+          checked={iconesJuris}
+          onChange={onToggleIcones}
+        />
+        <p className="text-[11px] text-[#9CA3AF]">
+          Dica: pressione Enter para elaborar com IA — ainda não está ligada.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ToggleLinha({
+  id,
+  label,
+  icon: Icon,
+  checked,
+  onChange,
+}: {
+  id: string
+  label: string
+  icon: typeof Highlighter
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+      <Label htmlFor={id} className="flex items-center gap-2 text-[12px] text-[#4B5563] cursor-pointer">
+        <Icon className="w-4 h-4 text-[#2563EB] shrink-0" aria-hidden />
+        {label}
+      </Label>
     </div>
   )
 }

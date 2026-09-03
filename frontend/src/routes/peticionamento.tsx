@@ -9,7 +9,7 @@ export const Route = createFileRoute('/peticionamento')({
     return (
       <SecaoPlaceholderPage
         titulo="Peticionamento"
-        descricao="Espaço para protocolar petições nos portais. Ainda não está em operação — por enquanto só o acompanhamento de autos em Autos & Gabinete está ativo."
+        descricao="Espaço para protocolar petições nos portais. Ainda não está em operação — por enquanto só o acompanhamento de autos em Andamentos está ativo."
       />
     )
   },

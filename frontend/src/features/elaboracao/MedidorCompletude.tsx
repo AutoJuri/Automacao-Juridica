@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, XCircle, ChevronRight } from 'lucide-react'
-import { Progress } from '#/components/ui/progress'
+import { CheckCircle2, ChevronRight, Circle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -8,94 +7,104 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '#/components/ui/dialog'
-import { requisitosCompletude, PERCENTUAL_COMPLETUDE } from './elaboracao.mock'
+import type { ProcessoDetalhe } from '#/features/processos/processos.types'
+import { completudeDadosProcesso } from './elaboracao.processo'
 
-export function MedidorCompletude() {
+interface MedidorCompletudeProps {
+  processo: ProcessoDetalhe | null
+}
+
+export function MedidorCompletude({ processo }: MedidorCompletudeProps) {
   const [open, setOpen] = useState(false)
-
-  const atendidos = requisitosCompletude.filter((r) => r.atendido).length
-  const total = requisitosCompletude.length
-
-  const cor =
-    PERCENTUAL_COMPLETUDE >= 80
-      ? 'text-[#22C55E]'
-      : PERCENTUAL_COMPLETUDE >= 50
-        ? 'text-[#F59E0B]'
-        : 'text-[#EF4444]'
-
-  const corBarra =
-    PERCENTUAL_COMPLETUDE >= 80
-      ? '[&>div]:bg-[#22C55E]'
-      : PERCENTUAL_COMPLETUDE >= 50
-        ? '[&>div]:bg-[#F59E0B]'
-        : '[&>div]:bg-[#EF4444]'
+  const resultado = processo ? completudeDadosProcesso(processo) : null
+  const percentual = resultado?.percentual ?? 0
+  const raio = 15.9155
+  const circunferencia = 2 * Math.PI * raio
+  const preenchido = (percentual / 100) * circunferencia
 
   return (
     <div>
-      <p className="text-[9px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-2">
-        Completude da Peça
+        <p className="text-[11px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-3">
+        Qualidade processual
       </p>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <button className="w-full text-left group">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className={`text-2xl font-bold ${cor}`}>
-                {PERCENTUAL_COMPLETUDE}%
-              </span>
-              <div className="flex items-center gap-1 text-[10px] text-[#9CA3AF] group-hover:text-[#374151] transition-colors">
-                <span>{atendidos}/{total} itens</span>
-                <ChevronRight className="w-3 h-3" />
+          <button type="button" className="w-full text-left group rounded-xl bg-gradient-to-br from-[#1D4ED8] to-[#2563EB] p-4 text-white">
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 36 36" className="w-14 h-14 shrink-0" aria-hidden>
+                <circle
+                  cx="18"
+                  cy="18"
+                  r={raio}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.25)"
+                  strokeWidth="3"
+                />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r={raio}
+                  fill="none"
+                  stroke="#BBF7D0"
+                  strokeWidth="3"
+                  strokeDasharray={`${preenchido} ${circunferencia}`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 18 18)"
+                />
+                <text
+                  x="18"
+                  y="19.5"
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="8"
+                  fontWeight="700"
+                >
+                  {resultado ? `${percentual}%` : '—'}
+                </text>
+              </svg>
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold">Completude: {resultado ? `${percentual}%` : '—'}</p>
+                <p className="text-[12px] text-white/80 mt-0.5">
+                  {resultado
+                    ? percentual >= 80
+                      ? 'Peça bem fundamentada nos dados coletados'
+                      : `${resultado.atendidos}/${resultado.total} campos do e-SAJ`
+                    : 'Aguardando processo'}
+                </p>
+                <p className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-white mt-1 group-hover:underline">
+                  Expandir requisitos
+                  <ChevronRight className="w-3 h-3" />
+                </p>
               </div>
             </div>
-            <Progress
-              value={PERCENTUAL_COMPLETUDE}
-              className={`h-2 bg-[#F3F4F6] ${corBarra}`}
-            />
-            <p className="text-[10px] text-[#9CA3AF] mt-1.5 group-hover:text-[#374151] transition-colors">
-              Clique para ver os requisitos
-            </p>
           </button>
         </DialogTrigger>
 
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm bg-white border border-[#E5E7EB] shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-[14px] font-semibold text-[#111827]">
-              Requisitos da Peça
+              Dados disponíveis para a minuta
             </DialogTitle>
           </DialogHeader>
-
+          <p className="text-[12px] text-[#6B7280]">
+            Mede o que o ciclo já coletou — não a qualidade de uma peça gerada.
+          </p>
           <div className="mt-2 space-y-1.5">
-            {requisitosCompletude.map((req) => (
-              <div
-                key={req.id}
-                className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-[#F9FAFB]"
-              >
-                {req.atendido ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#22C55E] shrink-0" />
+            {(resultado?.itens ?? []).map((item) => (
+              <div key={item.id} className="flex items-center gap-2.5 py-1.5 px-2 rounded-md">
+                {item.preenchido ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#2563EB] shrink-0" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-[#D1D5DB] shrink-0" />
+                  <Circle className="w-4 h-4 text-[#D1D5DB] shrink-0" />
                 )}
                 <span
-                  className={`text-[12px] ${req.atendido ? 'text-[#374151]' : 'text-[#9CA3AF]'}`}
+                  className={`text-[12px] ${item.preenchido ? 'text-[#374151]' : 'text-[#9CA3AF]'}`}
                 >
-                  {req.descricao}
+                  {item.label}
                 </span>
               </div>
             ))}
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-[#E5E7EB]">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[#6B7280]">Pontuação geral</span>
-              <span className={`font-bold text-[14px] ${cor}`}>
-                {PERCENTUAL_COMPLETUDE}%
-              </span>
-            </div>
-            <Progress
-              value={PERCENTUAL_COMPLETUDE}
-              className={`h-2 mt-2 bg-[#F3F4F6] ${corBarra}`}
-            />
           </div>
         </DialogContent>
       </Dialog>

@@ -4,6 +4,7 @@ import { Loader2, Mail, Unplug } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { MUITAS_TENTATIVAS, mensagemDeErro } from '#/features/auth/auth.errors'
 import { FormError } from '#/features/auth/AuthFormFeedback'
+import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
 import {
   buscarStatusCredenciais,
   buscarUrlDeAutorizacaoEmail,
@@ -68,7 +69,7 @@ export function EmailConnectionCard() {
       <FormError message={erroConectar} />
 
       {statusQuery.isLoading ? (
-        <p className="text-sm text-[#9CA3AF] mt-3">Carregando...</p>
+        <EstadoCarregando mensagem="Carregando..." compacto />
       ) : !cadastrado ? (
         <p className="text-xs text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-3 py-2.5 mt-3">
           Cadastre as credenciais do e-SAJ antes de conectar o e-mail.

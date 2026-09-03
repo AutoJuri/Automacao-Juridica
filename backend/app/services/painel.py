@@ -4,6 +4,7 @@ Toda query filtra `user_id` no banco. Nenhum mapper inclui `id_esaj`.
 """
 
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import or_, select, update
@@ -19,7 +20,9 @@ from app.models.processo import Processo
 from app.schemas.notification import NotificationPublicSchema
 from app.schemas.processo import (
     AudienciaCpoPublicSchema,
+    AudienciaPainelSchema,
     AudienciaPublicSchema,
+    IntimacaoPainelSchema,
     IntimacaoPublicSchema,
     MovimentacaoPublicSchema,
     ParteCpoPublicSchema,
@@ -100,6 +103,7 @@ def processo_para_lista(
         parte_passiva=_parte_publica(processo.parte_passiva),
         last_synced_at=processo.last_synced_at,
         ultima_atividade=montar_ultima_atividade(intimacoes, audiencias),
+        fixado=bool(getattr(processo, "fixado", False)),
     )
 
 
@@ -301,7 +305,12 @@ async def listar_processos(
     ]
     epoch = datetime.min.replace(tzinfo=UTC)
     itens.sort(
-        key=lambda item: (item.ultima_atividade.data if item.ultima_atividade and item.ultima_atividade.data else epoch),
+        key=lambda item: (
+            item.fixado,
+            item.ultima_atividade.data
+            if item.ultima_atividade and item.ultima_atividade.data
+            else epoch,
+        ),
         reverse=True,
     )
     return itens
@@ -366,6 +375,137 @@ async def buscar_processo_detalhe(
     return processo_para_detalhe(
         processo, intimacoes, audiencias, movimentacoes, peticoes, audiencias_cpo
     )
+
+
+async def atualizar_fixado(
+    db: AsyncSession, user_id: UUID, processo_id: UUID, *, fixado: bool
+) -> ProcessoListSchema | None:
+    processo = await db.scalar(
+        select(Processo).where(Processo.id == processo_id, Processo.user_id == user_id)
+    )
+    if processo is None:
+        return None
+    processo.fixado = fixado
+    await db.commit()
+    await db.refresh(processo)
+    return processo_para_lista(processo, [], [])
+
+
+def intimacao_para_painel(item: Intimacao, processo: Processo | None) -> IntimacaoPainelSchema:
+    ficha = processo if processo is not None and processo.user_id == item.user_id else None
+    return IntimacaoPainelSchema(
+        id=item.id,
+        processo_id=item.processo_id if ficha is not None else None,
+        nu_processo=ficha.nu_processo if ficha is not None else None,
+        tribunal=ficha.tribunal if ficha is not None else None,
+        instancia=item.instancia or (ficha.instancia if ficha is not None else None),
+        titulo=item.titulo,
+        descricao=item.descricao,
+        data_movimentacao=item.data_movimentacao,
+        ciencia=item.ciencia,
+        foro=getattr(ficha, "foro", None) if ficha is not None else None,
+        vara=getattr(ficha, "vara", None) if ficha is not None else None,
+    )
+
+
+def audiencia_para_painel(
+    *,
+    item_id: UUID,
+    processo: Processo | None,
+    user_id: UUID,
+    titulo: str,
+    data_audiencia: datetime | None,
+    local: str | None,
+    situacao: str | None,
+    fonte: Literal["agenda", "cpo"],
+) -> AudienciaPainelSchema:
+    ficha = processo if processo is not None and processo.user_id == user_id else None
+    return AudienciaPainelSchema(
+        id=item_id,
+        processo_id=ficha.id if ficha is not None else None,
+        nu_processo=ficha.nu_processo if ficha is not None else None,
+        tribunal=ficha.tribunal if ficha is not None else None,
+        titulo=titulo,
+        data_audiencia=data_audiencia,
+        local=local,
+        situacao=situacao,
+        parte_ativa=_parte_publica(ficha.parte_ativa) if ficha is not None else None,
+        parte_passiva=_parte_publica(ficha.parte_passiva) if ficha is not None else None,
+        foro=getattr(ficha, "foro", None) if ficha is not None else None,
+        vara=getattr(ficha, "vara", None) if ficha is not None else None,
+        juiz=getattr(ficha, "juiz", None) if ficha is not None else None,
+        fonte=fonte,
+    )
+
+
+def _on_processo_do_usuario(fk_processo_id, user_id):
+    """ON do join: mesmo id **e** mesmo advogado. Sem isso o SQL puxaria
+    a ficha de outro usuário se `processo_id` apontasse para o processo dele.
+    """
+    return (fk_processo_id == Processo.id) & (Processo.user_id == user_id)
+
+
+async def listar_intimacoes_painel(
+    db: AsyncSession, user_id: UUID
+) -> list[IntimacaoPainelSchema]:
+    stmt = (
+        select(Intimacao, Processo)
+        .outerjoin(Processo, _on_processo_do_usuario(Intimacao.processo_id, user_id))
+        .where(Intimacao.user_id == user_id)
+        .order_by(Intimacao.data_movimentacao.desc())
+        .limit(LISTA_MAX)
+    )
+    linhas = list((await db.execute(stmt)).all())
+    return [intimacao_para_painel(item, processo) for item, processo in linhas]
+
+
+async def listar_audiencias_painel(
+    db: AsyncSession, user_id: UUID
+) -> list[AudienciaPainelSchema]:
+    stmt_agenda = (
+        select(Audiencia, Processo)
+        .outerjoin(Processo, _on_processo_do_usuario(Audiencia.processo_id, user_id))
+        .where(Audiencia.user_id == user_id)
+        .limit(LISTA_MAX)
+    )
+    agenda = list((await db.execute(stmt_agenda)).all())
+    saida = [
+        audiencia_para_painel(
+            item_id=item.id,
+            processo=processo,
+            user_id=user_id,
+            titulo=(item.titulo or "").strip() or "Audiência",
+            data_audiencia=item.data_audiencia,
+            local=item.local,
+            situacao=None,
+            fonte="agenda",
+        )
+        for item, processo in agenda
+    ]
+
+    stmt_cpo = (
+        select(AudienciaCpo, Processo)
+        .join(Processo, _on_processo_do_usuario(AudienciaCpo.processo_id, user_id))
+        .limit(LISTA_MAX)
+    )
+    cpo = list((await db.execute(stmt_cpo)).all())
+    saida.extend(
+        audiencia_para_painel(
+            item_id=item.id,
+            processo=processo,
+            user_id=user_id,
+            titulo=(item.titulo or "").strip() or "Audiência",
+            data_audiencia=item.data_audiencia,
+            local=None,
+            situacao=item.situacao,
+            fonte="cpo",
+        )
+        for item, processo in cpo
+    )
+
+    epoch = datetime.min.replace(tzinfo=UTC)
+    saida.sort(key=lambda item: item.data_audiencia or epoch, reverse=True)
+    return saida[:LISTA_MAX]
 
 
 async def listar_notificacoes(

@@ -1,197 +1,127 @@
-<<<<<<< HEAD
-Welcome to your new TanStack Start app! 
+# Automação Jurídica
 
-# Getting Started
+Monorepo do MVP: painel web + backend FastAPI para monitoramento automatizado de processos no e-SAJ (TJSP).
 
-To run this application:
+```
+automacao-juridica-web/
+├── frontend/     # React + TypeScript + Bun + TanStack Router + shadcn
+├── backend/      # FastAPI + UV + Uvicorn
+├── docs/         # PRD e documentação
+└── scripts/      # Lab legado de exploração e-SAJ (não é o backend do produto)
+```
+
+## Pré-requisitos
+
+- [Bun](https://bun.sh/) (frontend)
+- Python 3.12+ e [UV](https://docs.astral.sh/uv/) (backend)
+- (Opcional) Docker — para build da imagem do backend
+
+### UV no Windows / Git Bash
+
+Se `uv` não for reconhecido (`command not found`), use via Python:
 
 ```bash
+python -m pip install uv   # uma vez
+python -m uv --version
+```
+
+Os comandos abaixo usam `python -m uv`. Se o UV estiver no PATH, pode trocar por só `uv`.
+
+## Frontend
+
+```bash
+cd frontend
+cp .env.example .env   # VITE_API_URL=http://localhost:8000
 bun install
-bun --bun run dev
+bun run dev            # http://localhost:3000
 ```
 
-# Building For Production
-
-To build this application for production:
+Build de produção:
 
 ```bash
-bun --bun run build
+cd frontend
+bun run build
 ```
 
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+## Backend
 
 ```bash
-bun --bun run test
+cd backend
+cp .env.example .env
+python -m uv sync
+python -m uv run playwright install chromium   # binário do browser (só na 1ª vez)
+python -m uv run uvicorn app.main:app --reload --port 8000
 ```
 
-## Styling
+> Sem o `playwright install chromium`, a validação de credenciais do e-SAJ falha com “portal indisponível” — o Chromium headless não está no PATH até esse comando baixar o binário.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+> Os jobs do APScheduler (pipes a cada 10 min, renovação de cookie às 1h em Brasília) **não** rodam com `APP_ENV=development`. Para ligá-los localmente, defina `SCHEDULER_ENABLED=true` no `.env`. Em produção (`APP_ENV=production`) eles ligam sozinhos.
 
-### Removing Tailwind CSS
+Health check: [http://localhost:8000/health](http://localhost:8000/health) → `{ "status": "ok" }`
 
-If you prefer not to use Tailwind CSS:
+Docs interativas (dev): [http://localhost:8000/docs](http://localhost:8000/docs)
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
+Se a porta 8000 estiver ocupada (`WinError 10013`), use outra:
 
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
+```bash
+python -m uv run uvicorn app.main:app --reload --port 8001
 ```
 
-Then anywhere in your JSX you can use it like so:
+(e ajuste `VITE_API_URL` no frontend se necessário)
 
-```tsx
-<Link to="/about">About</Link>
+## Banco de Dados
+
+PostgreSQL hospedado no [Railway](https://railway.app/), com SQLAlchemy 2.0 (async/asyncpg) e migrations via Alembic.
+
+### Connection string
+
+No projeto do Railway, abra o serviço Postgres → aba **Variables** → copie `DATABASE_PUBLIC_URL` (a `DATABASE_URL` interna só funciona entre serviços dentro do Railway) e cole em `backend/.env`:
+
+```
+DATABASE_URL=postgresql://postgres:senha@monorail.proxy.rlwy.net:20000/railway
 ```
 
-This will create a link that will navigate to the `/about` route.
+Não precisa ajustar o driver: `app/core/config.py` converte `postgresql://` para `postgresql+asyncpg://` e remove `sslmode`, que o asyncpg não aceita.
 
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
+### Migrations
 
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
+```bash
+cd backend
+python -m uv run alembic upgrade head      # aplica todas as migrations
+python -m uv run alembic current           # revisão aplicada no banco
+python -m uv run alembic downgrade -1      # desfaz a última
 ```
 
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
+Depois de mudar qualquer model em `app/models/`:
 
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
+```bash
+python -m uv run alembic revision --autogenerate -m "descrição da mudança"
 ```
 
-## API Routes
+Revise o arquivo gerado em `app/db/migrations/versions/` antes de aplicar. Para inspecionar o SQL sem tocar no banco: `python -m uv run alembic upgrade head --sql`.
 
-You can create API routes by using the `server` property in your route definitions:
+### Verificar a conexão
 
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
+Com o servidor rodando: [http://localhost:8000/health/db](http://localhost:8000/health/db) → `{ "status": "ok", "database": "connected" }`
 
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
+### Docker (backend)
+
+```bash
+cd backend
+docker build -t automacao-backend .
+docker run --rm -p 8000:8000 automacao-backend
 ```
 
-## Data Fetching
+O `CMD` respeita `PORT` (Railway injeta; local o default é 8000). A imagem baixa o Chromium do Playwright no build.
 
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
+### Deploy da API no Railway
 
-For example:
+O Postgres do projeto já está no Railway. Para o serviço da **API**: Root Directory `backend`, variáveis como em `backend/.env.production.example` (nomes, sem colar o `.env` local). Passo a passo: [docs/modulos/deploy.md](docs/modulos/deploy.md).
 
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
+## Lab legado (`scripts/esaj`)
 
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
+Pasta de exploração (login Playwright, cookies, parsers cpopg). **Não** faz parte do backend de produto; o código útil será portado para `backend/app/services/` nas próximas etapas.
 
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
+## Documentação
 
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
-=======
-# Automacao-Juridica
->>>>>>> 3476c64d336cfe48d42b5cdc20eb0e7c2dd25e2d
+- [docs/PRD.md](docs/PRD.md) — produto, stack e arquitetura

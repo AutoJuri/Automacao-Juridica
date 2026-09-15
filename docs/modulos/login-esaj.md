@@ -1,0 +1,171 @@
+# Módulo: Login Automatizado no e-SAJ (Playwright)
+
+> Última atualização: 2026-09-15
+> Camada: Backend
+
+---
+
+## O que este módulo faz
+
+Faz o login real do advogado no e-SAJ (TJSP) usando Playwright: preenche CPF + senha, aguarda o duplo fator, captura o código de verificação automaticamente via Gmail/Outlook API, aquece a sessão e extrai os cookies autenticados. É disparado como validação em background logo depois do cadastro de credenciais (`POST /credentials/esaj`), manualmente (`POST /credentials/esaj/revalidar`) ou pelo scheduler (cron das 1h e tick de `reauth_pendente`/cookie expirado). Persiste o resultado em `TribunalSession` para o frontend consultar via polling. O agendamento em si vive em `/docs/modulos/scheduler.md` — este módulo só expõe `validar_credencial_esaj` e `validacao_em_andamento`.
+
+---
+
+## Arquivos principais
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `backend/app/services/auth_esaj.py` | Motor de login Playwright: `realizar_login`, `selecionar_cookies_sessao`, `LoginEsajError` |
+| `backend/app/services/email_capture.py` | Busca o código de verificação por e-mail (Gmail/Outlook): `buscar_codigo_esaj`, funções puras `eh_email_do_esaj`/`extrair_codigo_verificacao` |
+| `backend/app/services/credential_validation.py` | Orquestrador: `validar_credencial_esaj`, `validacao_em_andamento` — decripta, chama o login, persiste `TribunalSession`/`JobLog` |
+| `backend/app/services/oauth_gmail.py` / `oauth_outlook.py` | `refresh_access_token` (novo nesta etapa) além de `build_authorize_url`/`exchange_code` (Etapa 5) |
+| `backend/app/api/credentials.py` | `POST /credentials/esaj` dispara a validação; novo `POST /credentials/esaj/revalidar`; `GET /credentials/status` agora inclui `session_status` |
+| `backend/app/models/tribunal.py` | `TribunalSession` (`cookie_encrypted` agora nullable — ADR-007) |
+| `backend/app/models/job_log.py` | `JobLog` — tentativa manual `tipo=login`; scheduler `tipo=reauth` |
+| `frontend/src/features/settings/EsajCredentialForm.tsx` | Polling de `session_status`, mensagens por status, botão "Revalidar" |
+
+---
+
+## Endpoints
+
+| Método | Rota | Descrição | Auth | Rate limit |
+|---|---|---|---|---|
+| POST | `/credentials/esaj` | Salva CPF/senha; dispara validação em background **só se o e-mail já estiver conectado** | Bearer | 5/hora por IP |
+| POST | `/credentials/esaj/revalidar` | Dispara nova tentativa de login sem reenviar CPF/senha (exige e-mail conectado) | Bearer | 5/hora por IP |
+| GET | `/credentials/status` | Inclui `session_status` (join com `TribunalSession`) e `validacao_em_andamento` (Playwright deste processo rodando agora) | Bearer | — |
+
+`session_status` é um dos `SESSION_STATUSES` (`ativo`, `reauth_pendente`, `bloqueado`, `credencial_invalida`, `email_desconectado`, `portal_indisponivel`, `codigo_nao_encontrado`) ou `None` se nenhuma validação nunca foi disparada para a credencial.
+
+Fluxo de onboarding típico: salvar CPF/senha → conectar e-mail (callback OAuth dispara a validação automaticamente) → polling até `ativo` ou falha. Sem e-mail, o status fica `null` com aviso na UI; não inicia Playwright.
+
+---
+
+## Funções e hooks públicos (frontend)
+
+| Nome | Arquivo | Descrição |
+|---|---|---|
+| `revalidarCredencialEsaj` | `features/settings/credentials.api.ts` | `POST /credentials/esaj/revalidar` |
+| `MENSAGENS_SESSION_STATUS` | `features/settings/EsajCredentialForm.tsx` | Mensagem final por `session_status` de falha/sucesso |
+| `deveFazerPolling` | `features/settings/credentials.status.ts` | Polling só com Playwright rodando (`validacao_em_andamento`) ou na janela de graça após Revalidar — `reauth_pendente` órfão não gira para sempre |
+
+`EsajCredentialForm` usa `refetchInterval` do TanStack Query: 3s **somente** enquanto `deveFazerPolling` for verdadeiro (`validacao_em_andamento` ou janela de 15s após o POST que disparou o Playwright). `session_status === "reauth_pendente"` sozinho **não** é “validando” — após coleta com cookie inválido, ou restart do uvicorn, a UI mostra aviso âmbar + Revalidar. Teto de 90s para o spinner. `null` continua sendo “ainda não validou”. Com `session_status=ativo` e `sessao_expirada=true` (cookie passou das ~22h), a UI troca o banner verde por um aviso âmbar e mostra Revalidar.
+
+---
+
+## Arquitetura do fluxo
+
+```
+SPA                  POST /credentials/esaj      BackgroundTask         Playwright (e-SAJ)      Gmail/Outlook API
+ │  cpf + senha  ────────────────────────────>│                        │                        │
+ │<──── 200 (cadastrado=true, status=null) ───│  (sem e-mail: não dispara Playwright)
+ │  conectar Outlook/Gmail (OAuth)  ─────────>│ callback salva token   │                        │
+ │                                             │─ validar_credencial_esaj(user_id) ──────────────>│
+ │                                             │      upsert TribunalSession status=reauth_pendente
+ │  GET /credentials/status (poll 3s)  ───────>│                        │                        │
+ │<──── session_status=reauth_pendente ────────│                        │                        │
+ │                                             │───────────────────────>│ preenche CPF+senha,     │
+ │                                             │                        │ submit, modal MFA       │
+ │                                             │                        │───── busca e-mail (poll 3s) ──>│
+ │                                             │                        │<──── código 6 dígitos ──────────│
+ │                                             │                        │ preenche código, aquece │
+ │                                             │                        │ tarefas-adv, extrai cookies │
+ │                                             │<── cookies ────────────│                        │
+ │                                             │ TribunalSession status=ativo, cookie_encrypted   │
+ │                                             │ JobLog(tipo=login, status=sucesso)               │
+ │  GET /credentials/status (poll seguinte) ──>│                        │                        │
+ │<──── session_status=ativo ───────────────────│                        │                        │
+```
+
+O browser roda via Playwright **sync** em `asyncio.to_thread` (necessário no Windows: o event loop do uvicorn não lança subprocessos). O callback async de MFA é ponteado com `run_coroutine_threadsafe`. Toda a chamada roda sob `asyncio.wait_for(timeout=60)` no orquestrador.
+
+---
+
+## Padrões seguidos neste módulo
+
+- **Decriptação só em memória:** `credential_validation.validar_credencial_esaj` decripta `cpf_encrypted`/`senha_encrypted` em variáveis locais, nunca em atributo de classe ou cache; as variáveis são descartadas (`= None`) no `finally` ao fim da função
+- **Contexto Playwright isolado:** `auth_esaj.realizar_login` abre um contexto novo por chamada (`headless=True`, args `--no-sandbox` e `--disable-dev-shm-usage` para Docker/non-root), via API sync em thread (compatível com Windows/uvicorn), sempre fechado em `finally` — nunca reaproveitado entre advogados
+- **Chromium no path estável:** se `PLAYWRIGHT_BROWSERS_PATH` apontar para cache efêmero do Cursor (`cursor-sandbox-cache`), redireciona para `%LOCALAPPDATA%\ms-playwright`
+- **Erros mapeados, nunca crus:** `LoginEsajError.tipo` é sempre um dos `SESSION_STATUSES` já existentes; nenhuma mensagem de erro do Playwright, do e-SAJ ou de rede chega a `TribunalSession.ultimo_erro`/`JobLog.erro` — só o tipo
+- **Screenshot só em desenvolvimento:** `_salvar_screenshot_debug` verifica `settings.is_development` antes de gravar qualquer captura de tela (que pode conter CPF preenchido) em disco
+- **Callback em vez de import direto:** `auth_esaj.py` recebe `obter_codigo` como parâmetro (`Callable[[datetime], Awaitable[str]]`) em vez de importar `email_capture` — mantém o motor de login testável sem rede e sem depender do provedor de e-mail
+- **Sessão dedicada na captura MFA (ADR-009):** `buscar_codigo_esaj(user_id, since)` abre `SessionLocal` própria por iteração — nunca recebe a `AsyncSession` do orquestrador. Timeout de 60s seta `asyncio.Event` para parar o polling
+- **Filtro de remetente na API:** Gmail lista com `q=from:tjsp.jus.br after:{epoch}` antes do `format=full`; Outlook lista sem `body` e só então busca o corpo das mensagens que passaram em `eh_email_do_esaj`
+- **Cookie só com `ativo`:** falha, `reauth_pendente` e desconexão de e-mail chamam `TribunalSession.anular_cookie()` (`cookie_encrypted`/`expires_at` nulos)
+- **Refresh de token best-effort:** `email_capture._get_autenticado` tenta a chamada com o `access_token` salvo; só chama `refresh_access_token` se receber 401, e regrava `email_oauth_token_encrypted` (já criptografado) na sessão dedicada da captura
+- **Guarda de concorrência em memória:** `_VALIDACOES_EM_ANDAMENTO` (processo) evita duas validações simultâneas do mesmo `user_id`. `validacao_em_andamento(user_id)` expõe o mesmo set ao scheduler, que não dispara pipes enquanto o Playwright está no ar. Limitação conhecida da ADR-008: não protege entre múltiplos workers
+- **`JobLog` sempre gravado:** toda tentativa (sucesso ou falha) grava uma linha com `duracao_ms` e `erro` (tipo, nunca detalhe sensível). Disparo manual: `tipo=login`; cron noturno / tick de reauth: `tipo=reauth`
+- **Timeout duro de 60s:** `asyncio.wait_for` no orquestrador, conforme `security.mdc` §8
+- **Resposta:** `CredentialStatusSchema` expõe `session_status` e `validacao_em_andamento` — nunca cookie, CPF ou senha. `reauth_pendente` sem o flag significa “precisa revalidar”, não “Playwright rodando”
+
+---
+
+## Modelo de dados relacionado
+
+```python
+class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "tribunal_sessions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "tribunal"),
+        Index("ix_tribunal_sessions_status_proximo_retry", "status", "proximo_retry"),
+    )
+
+    user_id: Mapped[uuid.UUID]                       # FK users.id CASCADE
+    tribunal: Mapped[str]                            # "esaj_tjsp"
+    cookie_encrypted: Mapped[bytes | None]           # AES-256-GCM; None até 1º login bem-sucedido (ADR-007)
+    expires_at: Mapped[datetime | None]              # now() + 22h no sucesso
+    status: Mapped[str]                              # um dos SESSION_STATUSES
+    ultimo_erro: Mapped[str | None]                  # tipo do erro, nunca detalhe
+    tentativas_falha: Mapped[int]
+    proximo_retry: Mapped[datetime | None]           # backoff 5→15→60min (scheduler, ADR-011)
+    ultimo_sucesso: Mapped[datetime | None]
+```
+
+Uma linha por advogado+tribunal, criada (ou atualizada) a cada chamada de `validar_credencial_esaj`. Migration: `a46336bed1eb_torna_cookie_encrypted_nullable_em_.py`.
+
+`JobLog` (tabela `job_logs`) recebe uma linha por tentativa: `tipo="login"` no cadastro/revalidar manual, `tipo="reauth"` quando o scheduler dispara.
+
+---
+
+## Dependências de outros módulos
+
+| Módulo | Por quê depende |
+|---|---|
+| Credenciais do e-SAJ e Conexão de E-mail (Etapa 5) | Usa `TribunalCredential.cpf_encrypted`/`senha_encrypted`/`email_oauth_token_encrypted`, `encrypt_secret`/`decrypt_secret`, `mask_cpf` |
+| Autenticação da Plataforma | `CurrentUser`/`get_current_user` nos dois endpoints novos |
+| Scheduler e Ciclo Automático | Chama `validar_credencial_esaj` (cron 1h e tick de `reauth_pendente`/cookie expirado) e lê `validacao_em_andamento` para não chocar com os pipes — `/docs/modulos/scheduler.md` |
+| Pipes de coleta | Contrato em `/docs/modulos/esaj-apis.md`; decriptam `TribunalSession.cookie_encrypted` quando `status == "ativo"` e o cookie não está expirado |
+
+---
+
+## O que NÃO fazer aqui
+
+- ❌ Não decriptar CPF/senha/cookie fora do escopo de `validar_credencial_esaj` — nunca em atributo de classe, cache global, ou log
+- ❌ Não deixar `LoginEsajError`/exceções do Playwright ou de `email_capture` chegarem cruas a `TribunalSession.ultimo_erro` ou `JobLog.erro` — sempre mapear para um `SESSION_STATUSES`
+- ❌ Não compartilhar `browser`/`context` do Playwright entre chamadas de `realizar_login` — sempre um contexto novo, sempre fechado em `finally`
+- ❌ Não tirar screenshot de depuração fora de `settings.is_development`
+- ❌ Não importar `email_capture` dentro de `auth_esaj.py` — a captura de código é sempre injetada via callback
+- ❌ Não reaproveitar um código de e-mail anterior a `since` (o instante exato em que o MFA foi solicitado) — `email_capture` sempre filtra por data além de por remetente
+- ❌ Não tratar `POST /credentials/esaj` (resposta 200) como "credencial validada" — só `session_status == "ativo"` no polling confirma o login real (ADR-008)
+- ❌ Não tratar `session_status === "reauth_pendente"` sozinho como “Playwright rodando agora” — em development o scheduler está off e a coleta pode deixar esse status órfão; o polling só vale com `validacao_em_andamento`
+- ❌ Não persistir `access_token`/`refresh_token` renovados só em memória — `email_capture` sempre regrava `email_oauth_token_encrypted` criptografado na sessão dedicada da captura
+- ❌ Não passar a `AsyncSession` do orquestrador para `buscar_codigo_esaj` — a thread do Playwright sobrevive ao `wait_for` (ADR-009)
+- ❌ Não deixar cookie antigo no banco após falha, `reauth_pendente` ou `DELETE` de credencial/e-mail
+- ❌ Não mapear `CodigoNaoEncontradoError` para `portal_indisponivel` — o status é `codigo_nao_encontrado`
+- ❌ Não confiar só na query da API de e-mail para filtrar remetente/data — sempre revalidar em código (`eh_email_do_esaj`, comparação de datas)
+- ❌ Não baixar o corpo do e-mail antes de filtrar remetente na API (Gmail `q=from:`, Outlook `$select` sem `body`)
+- ❌ Não assumir o `chromium` do apt no Docker — a imagem instala o browser do Playwright em `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`
+- ❌ Não lançar Chromium no container sem `--no-sandbox` e `--disable-dev-shm-usage` (non-root + `/dev/shm` de 64MB)
+
+---
+
+## Histórico de mudanças relevantes
+
+| Data | O que mudou |
+|---|---|
+| 2026-08-13 | Etapa 6: motor de login Playwright (`auth_esaj.py`), captura de código por e-mail com polling e refresh de token (`email_capture.py`, `refresh_access_token` em `oauth_gmail.py`/`oauth_outlook.py`), orquestrador (`credential_validation.py`), disparo em `BackgroundTask` a partir de `POST /credentials/esaj`, novo `POST /credentials/esaj/revalidar`, `session_status` em `GET /credentials/status`, migration tornando `cookie_encrypted` nullable (ADR-007), validação em background + polling do frontend (ADR-008) |
+| 2026-08-17 | Correções pós-smoke: Playwright sync em thread (Windows), Chromium fora do cache sandbox, validação só com e-mail conectado, callback OAuth dispara validação, polling só em `reauth_pendente`, limpeza do cache de credenciais no logout |
+| 2026-08-17 | Hardening do code review: DELETE da `TribunalSession`, sessão SQLAlchemy dedicada na captura MFA (ADR-009), filtro de remetente na API antes do corpo, cookie anulado em falha/reauth, status `codigo_nao_encontrado` |
+| 2026-08-18 | Contrato das APIs internas do e-SAJ documentado em `/docs/modulos/esaj-apis.md` (insumo da Etapa 7) |
+| 2026-08-21 | Scheduler passou a reaproveitar `validar_credencial_esaj` (cron 1h + tick de reauth). Gap da ADR-008 (`reauth_pendente` órfão) fechado no próximo tick. `validacao_em_andamento` exportado para o ciclo de 10 min não chocar com o Playwright |
+| 2026-08-23 | `GET /credentials/status` passou a expor `validacao_em_andamento`. A UI só faz polling / mostra “Validando…” quando o Playwright está de fato no processo (ou na janela de graça após Revalidar) — `reauth_pendente` órfão pede Revalidar em vez de girar para sempre |
+| 2026-09-15 | Imagem Docker da API: `playwright install --with-deps chromium` em `/ms-playwright`; `launch` com `--no-sandbox` e `--disable-dev-shm-usage`. Ver `/docs/modulos/deploy.md` |

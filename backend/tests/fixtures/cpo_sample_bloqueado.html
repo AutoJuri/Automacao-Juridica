@@ -1,0 +1,24 @@
+<!--
+Fixture sintética do caso "sem acesso pleno" (segredo de justiça ou
+advogado sem vínculo — ver ADR-012): a tabela de movimentações não existe
+no HTML, só o popup oculto de senha do processo. Estrutura observada numa
+captura real com dados fake.
+-->
+<html>
+<head><title>Portal de Serviços e-SAJ</title></head>
+<body>
+<div class="unj-entity-header">
+  <div class="unj-entity-header__summary__barra">
+    <div id="containerDadosPrincipaisProcesso" class="container"></div>
+  </div>
+</div>
+
+<form action="/cpopg/show.do?processo.codigo=FAKE0001" id="popupSenha" style="display: none;" method="POST">
+  <table role="document">
+    <tr>
+      <td>Se for uma parte ou interessado, digite a senha do processo</td>
+    </tr>
+  </table>
+</form>
+</body>
+</html>

@@ -18,6 +18,8 @@ from app.core.rate_limit import (
     LIMITE_CADASTRO,
     LIMITE_LOGIN,
     LIMITE_RECUPERAR_SENHA,
+    LIMITE_REDEFINIR_SENHA,
+    LIMITE_REFRESH,
     limiter,
 )
 from app.core.security import (
@@ -152,6 +154,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponseSchema)
+@limiter.limit(LIMITE_REFRESH)
 async def refresh(request: Request, response: Response, db: DbSession) -> TokenResponseSchema:
     token = request.cookies.get(REFRESH_COOKIE_NAME)
     if not token:
@@ -300,7 +303,9 @@ async def recuperar_senha(
 
 
 @router.post("/redefinir-senha", response_model=MessageSchema)
+@limiter.limit(LIMITE_REDEFINIR_SENHA)
 async def redefinir_senha(
+    request: Request,
     dados: ResetPasswordSchema,
     db: DbSession,
 ) -> MessageSchema:

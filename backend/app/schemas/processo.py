@@ -146,6 +146,34 @@ class AudienciaCpoPublicSchema(BaseModel):
 MovimentacoesStatus = Literal["ok", "pendente", "indisponivel"]
 
 
+class DatajudAssuntoPublicSchema(BaseModel):
+    codigo: int | None = None
+    nome: str | None = None
+
+
+class DatajudMovimentoPublicSchema(BaseModel):
+    codigo: int | None = None
+    nome: str | None = None
+    data_hora: datetime | None = None
+
+
+class ProcessoDatajudPublicSchema(BaseModel):
+    """Complemento somente-leitura do DataJud (Etapa 9 / ADR-015) — nunca
+    sobrescreve os campos do e-SAJ, é sempre uma seção separada."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    classe_nome: str | None = None
+    assuntos: list[DatajudAssuntoPublicSchema] = Field(default_factory=list)
+    orgao_julgador: str | None = None
+    data_ajuizamento: datetime | None = None
+    grau: str | None = None
+    formato: str | None = None
+    movimentos: list[DatajudMovimentoPublicSchema] = Field(default_factory=list)
+    encontrado: bool = False
+    ultima_consulta_em: datetime | None = None
+
+
 class ProcessoDetalheSchema(ProcessoListSchema):
     url_cpo: str | None = None
     url_pasta: str | None = None
@@ -165,3 +193,4 @@ class ProcessoDetalheSchema(ProcessoListSchema):
     movimentacoes_status: MovimentacoesStatus = "pendente"
     sem_incidentes: bool | None = None
     sem_apensos: bool | None = None
+    datajud: ProcessoDatajudPublicSchema | None = None

@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # local dispararia pipes/Playwright contra o e-SAJ de verdade.
     scheduler_enabled: bool | None = None
 
+    # API pública do DataJud (CNJ) — Etapa 9 / ADR-015. Chave pública
+    # compartilhada da wiki do CNJ (`security.mdc` §12: nunca hardcoded,
+    # mesmo sendo pública — o CNJ pode trocá-la a qualquer momento). Vazio
+    # por padrão: não trava o boot, o job diário só loga e não consulta.
+    datajud_api_key: str = ""
+
     @model_validator(mode="after")
     def _rejeita_segredos_placeholder(self) -> "Settings":
         """Impede subir fora de development com os segredos de exemplo."""

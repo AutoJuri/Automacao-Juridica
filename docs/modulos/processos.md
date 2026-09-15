@@ -1,6 +1,6 @@
 # Módulo: Painel de Processos e Notificações
 
-> Última atualização: 2026-09-03
+> Última atualização: 2026-09-07
 > Camada: Backend / Frontend
 
 ---
@@ -52,7 +52,7 @@ Expõe ao advogado autenticado os processos, intimações, audiências, moviment
 | `frontend/src/features/elaboracao/GrifoSelecaoPanel.tsx` | Painel visual de trecho selecionado (sem IA) |
 | `frontend/src/features/elaboracao/elaboracao.processo.ts` | CNJ/polos/foro/valor e completude a partir da ficha real |
 | `frontend/src/features/elaboracao/elaboracao.minuta.ts` | HTML da minuta (dados reais escapados) + opções da toolbar |
-| `frontend/src/features/notificacoes/notifications.api.ts` / `notifications.constants.ts` | Lista, marcar lida e query key `['notifications']` |
+| `frontend/src/features/notificacoes/notifications.api.ts` / `notifications.constants.ts` / `notifications.query.ts` | Lista, marcar lida, query key `['notifications']` e polling do sino (60s, só aba visível) |
 
 A página `/elaboracao/$processoId` usa o UUID real. O botão Elaborar no detalhe abre essa rota. O editor (TipTap) formata o texto. O corpo jurídico **não** é gerado por IA — só o cabeçalho usa dados do e-SAJ, escapados antes de virar HTML. O painel de grifo é visual. Copiar usa a área de transferência. Peça-modelo (TXT/PDF/DOCX) e versões da minuta ficam **só neste browser** (`localStorage` para versões) — nada vai ao servidor. Word/PDF/Extrair/Elaborar e jurisprudência oficial continuam desabilitados.
 
@@ -65,7 +65,7 @@ Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: 
 | Método | Rota | Descrição | Auth |
 |---|---|---|---|
 | GET | `/processos` | Lista do advogado. Query `q` (número, classe, assunto, nome da parte ativa). Fixados primeiro | Bearer |
-| GET | `/processos/{id}` | Ficha + intimações + audiências JSON + movimentações + capa CPO + `partes_cpo` + `peticoes_diversas` + `audiencias_cpo` + flags `sem_incidentes`/`sem_apensos` + `movimentacoes_status` + `fixado`. 404 se não for dono | Bearer |
+| GET | `/processos/{id}` | Ficha + intimações + audiências JSON + movimentações + capa CPO + `partes_cpo` + `peticoes_diversas` + `audiencias_cpo` + flags `sem_incidentes`/`sem_apensos` + `movimentacoes_status` + `fixado` + `datajud` (complemento público do CNJ, ver `/docs/modulos/datajud.md`). 404 se não for dono | Bearer |
 | PATCH | `/processos/{id}` | `{ "fixado": true \| false }` — só a preferência do advogado. 404 se não for dono. Resposta `{ id, fixado }` | Bearer |
 | GET | `/intimacoes` | Intimações do advogado + CNJ/vara do processo (sem `id_esaj`) | Bearer |
 | GET | `/audiencias` | Audiências da agenda JSON + capa CPO, com polo/foro do processo (sem `id_esaj`) | Bearer |
@@ -100,7 +100,7 @@ Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: 
 | `adicionarVersao` / `lerVersoes` | `features/elaboracao/elaboracao.versoes.ts` | Histórico local da minuta (sem API) |
 | `SecaoPlaceholderPage` | `features/secoes/SecaoPlaceholderPage.tsx` | Título + descrição das seções ainda sem módulo |
 
-TanStack Query: chave `PROCESSOS_QUERY_KEY` (`['processos']` / `['processos', id]`) e `NOTIFICATIONS_QUERY_KEY` (`['notifications']`). Logout e refresh expirado usam `limparQueriesDaSessao` (credenciais + processos + notificações). Clique no sino fora da home navega para `/?processo=<uuid>`.
+TanStack Query: chave `PROCESSOS_QUERY_KEY` (`['processos']` / `['processos', id]`) e `NOTIFICATIONS_QUERY_KEY` (`['notifications']`). O sino e a rail compartilham `notificacoesListQueryOptions`: polling a cada 60s só com a aba visível (`refetchIntervalInBackground: false`) — o ciclo e-SAJ continua de 10 min; isso só atualiza o badge sem reload. Logout e refresh expirado usam `limparQueriesDaSessao` (credenciais + processos + notificações). Clique no sino fora da home navega para `/?processo=<uuid>`.
 
 ---
 
@@ -144,6 +144,10 @@ class Processo(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     foro / vara / juiz / distribuicao / controle / area / valor_acao
     partes_cpo                                  # JSONB [{papel, nome, advogados}]
     sem_incidentes / sem_apensos                # None = CPO ainda não passou
+
+class ProcessoDatajud(...):
+    # Tabela separada (1:1) — complemento público do CNJ, nunca sobrescreve
+    # os campos acima. Ver `/docs/modulos/datajud.md` (Etapa 9 / ADR-015).
 
 class Intimacao(...):
     # id_esaj no banco, NUNCA na API pública
@@ -230,3 +234,5 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 | 2026-09-02 | Rail só em Gerências e abaixo da navbar; Gerências abre Andamentos; abas do topo em faixa larga com ícone |
 | 2026-09-03 | ADR-014: chrome em dois eixos documentado no INDEX |
 | 2026-09-03 | Join intimação/audiência ↔ processo exige `user_id` no SQL |
+| 2026-09-06 | `ProcessoDetalheSchema.datajud` — complemento público somente-leitura do CNJ, seção separada na ficha (Etapa 9 / ADR-015, ver `/docs/modulos/datajud.md`) |
+| 2026-09-07 | Sino faz polling de 60s (aba visível) — badge atualiza sem recarregar a página |

@@ -6,7 +6,12 @@
  */
 
 import { api } from '#/lib/axios'
-import type { AuthorizeUrlResponse, CredentialStatus, EmailProvider } from './credentials.types'
+import type {
+  AuthorizeUrlResponse,
+  CredentialStatus,
+  EmailProvider,
+  ProviderSugerido,
+} from './credentials.types'
 
 export interface SalvarCredencialEsajInput {
   cpf: string
@@ -46,5 +51,11 @@ export async function buscarUrlDeAutorizacaoEmail(
   provider: EmailProvider,
 ): Promise<AuthorizeUrlResponse> {
   const { data } = await api.get<AuthorizeUrlResponse>(`/credentials/email/${provider}/authorize`)
+  return data
+}
+
+/** Sugestão de provedor por domínio do e-mail de login (Etapa 9). */
+export async function buscarProvedorSugerido(): Promise<ProviderSugerido> {
+  const { data } = await api.get<ProviderSugerido>('/credentials/email/provider-sugerido')
   return data
 }

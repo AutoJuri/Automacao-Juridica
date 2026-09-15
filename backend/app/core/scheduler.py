@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.services.datajud_jobs import job_datajud_diario
 from app.services.scheduler_jobs import job_ciclo_dez_minutos, job_renovacao_diaria
 
 logger = logging.getLogger(__name__)
@@ -24,9 +25,14 @@ TIMEZONE_BRASILIA = ZoneInfo("America/Sao_Paulo")
 HORA_RENOVACAO_DIARIA = 1
 MINUTO_RENOVACAO_DIARIA = 0
 MINUTOS_CICLO_PIPES = 10
+# 3h da manhã — fora da renovação de cookie (1h) e do horário comercial;
+# o DataJud tem defasagem de dias, não precisa de pressa (Etapa 9/ADR-015).
+HORA_DATAJUD_DIARIO = 3
+MINUTO_DATAJUD_DIARIO = 0
 
 JOB_ID_RENOVACAO_DIARIA = "renovacao_diaria_esaj"
 JOB_ID_CICLO_PIPES = "ciclo_pipes_esaj"
+JOB_ID_DATAJUD_DIARIO = "datajud_diario"
 
 scheduler = AsyncIOScheduler(timezone=TIMEZONE_BRASILIA)
 
@@ -60,12 +66,27 @@ def iniciar_scheduler() -> None:
         max_instances=1,
         coalesce=True,
     )
+    scheduler.add_job(
+        job_datajud_diario,
+        trigger=CronTrigger(
+            hour=HORA_DATAJUD_DIARIO,
+            minute=MINUTO_DATAJUD_DIARIO,
+            timezone=TIMEZONE_BRASILIA,
+        ),
+        id=JOB_ID_DATAJUD_DIARIO,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
     if not scheduler.running:
         scheduler.start()
     logger.info(
-        "Scheduler iniciado (renovação diária às %02d:%02d America/Sao_Paulo, ciclo de pipes a cada %dmin)",
+        "Scheduler iniciado (renovação diária às %02d:%02d, complemento DataJud às %02d:%02d "
+        "America/Sao_Paulo, ciclo de pipes a cada %dmin)",
         HORA_RENOVACAO_DIARIA,
         MINUTO_RENOVACAO_DIARIA,
+        HORA_DATAJUD_DIARIO,
+        MINUTO_DATAJUD_DIARIO,
         MINUTOS_CICLO_PIPES,
     )
 

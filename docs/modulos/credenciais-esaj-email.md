@@ -1,6 +1,6 @@
 # Módulo: Credenciais do e-SAJ e Conexão de E-mail (OAuth2)
 
-> Última atualização: 2026-08-17
+> Última atualização: 2026-09-06
 > Camada: Backend / Frontend
 
 ---
@@ -19,7 +19,8 @@ Guarda, de forma criptografada, o CPF e a senha que o advogado usa para logar no
 | `backend/app/core/security.py` | `encrypt_secret`/`decrypt_secret` (AES-256-GCM) e `create_oauth_state_token`/`decode_oauth_state_token` |
 | `backend/app/core/cpf.py` | `is_valid_cpf`, `mask_cpf`, `normalize_cpf` |
 | `backend/app/core/validators.py` | Regra de senha por bytes (`SENHA_MIN`/`SENHA_MAX`), compartilhada com `schemas/auth.py` |
-| `backend/app/schemas/credentials.py` | `EsajCredentialCreateSchema`, `CredentialStatusSchema`, `AuthorizeUrlSchema` |
+| `backend/app/schemas/credentials.py` | `EsajCredentialCreateSchema`, `CredentialStatusSchema`, `AuthorizeUrlSchema`, `ProviderSugeridoSchema` |
+| `backend/app/core/email_provider.py` | `detectar_provedor_por_dominio` — sugestão de provedor por domínio/MX (Etapa 9, ver `/docs/modulos/datajud.md`) |
 | `backend/app/services/oauth_gmail.py` | `build_authorize_url` / `exchange_code` do Gmail (httpx puro) |
 | `backend/app/services/oauth_outlook.py` | `build_authorize_url` / `exchange_code` do Microsoft Graph (httpx puro) |
 | `backend/app/services/oauth_common.py` | Exceção e timeout compartilhados pelos dois provedores |
@@ -46,6 +47,7 @@ Guarda, de forma criptografada, o CPF e a senha que o advogado usa para logar no
 | POST | `/credentials/esaj/revalidar` | Revalida login no e-SAJ sem reenviar CPF/senha | Bearer | 5/hora por IP |
 | DELETE | `/credentials/esaj` | Remove a credencial **e** a `TribunalSession` (cookies) do mesmo tribunal | Bearer | — |
 | DELETE | `/credentials/email` | Desconecta o e-mail, anula o cookie e marca `session_status=email_desconectado` | Bearer | — |
+| GET | `/credentials/email/provider-sugerido` | Sugere `gmail`/`outlook` a partir do domínio de `current_user.email` (MX record, Etapa 9) — nunca decide, só simplifica o card | Bearer | — |
 | GET | `/credentials/email/{provider}/authorize` | Gera `state` assinado e devolve a URL de consentimento | Bearer | 10/hora por IP |
 | GET | `/credentials/email/{provider}/callback` | Recebe o redirect do provedor, troca `code` por token, salva criptografado e dispara validação e-SAJ | **Pública** (chamada pelo browser, sem Bearer) | — |
 
@@ -75,8 +77,8 @@ Resposta de status (`CredentialStatusSchema`) — nunca inclui CPF, senha ou tok
 
 | Nome | Arquivo | Descrição |
 |---|---|---|
-| `buscarStatusCredenciais` / `salvarCredencialEsaj` / `removerCredencialEsaj` / `revalidarCredencialEsaj` / `desconectarEmail` / `buscarUrlDeAutorizacaoEmail` | `features/settings/credentials.api.ts` | Chamadas HTTP tipadas |
-| `CREDENTIALS_STATUS_QUERY_KEY` | `features/settings/credentials.constants.ts` | Chave de cache do TanStack Query, invalidada após salvar/remover/conectar/desconectar e no retorno do OAuth2 |
+| `buscarStatusCredenciais` / `salvarCredencialEsaj` / `removerCredencialEsaj` / `revalidarCredencialEsaj` / `desconectarEmail` / `buscarUrlDeAutorizacaoEmail` / `buscarProvedorSugerido` | `features/settings/credentials.api.ts` | Chamadas HTTP tipadas |
+| `CREDENTIALS_STATUS_QUERY_KEY` / `CREDENTIALS_PROVIDER_SUGERIDO_QUERY_KEY` | `features/settings/credentials.constants.ts` | Chaves de cache do TanStack Query |
 | `EsajCredentialForm` / `EmailConnectionCard` | `features/settings/*.tsx` | Cards independentes, cada um busca o próprio status via `useQuery` |
 
 Validação de formulário: `zod` + `react-hook-form` + `@hookform/resolvers` (UX apenas — o backend revalida com Pydantic, incluindo o checksum do CPF).
@@ -108,6 +110,19 @@ O `/callback` é navegação pura do browser — nunca chega com header `Authori
 
 ---
 
+## Sugestão de provedor por MX (Etapa 9)
+
+`EmailConnectionCard` só busca `/credentials/email/provider-sugerido` quando faz sentido (advogado já cadastrado no e-SAJ, e-mail ainda não conectado). Com sugestão, mostra um botão primário "Conectar {Gmail|Outlook}" (o detectado) + um link discreto "usar outro provedor" que revela os dois botões manuais; sem sugestão, mantém o comportamento original (os dois botões direto).
+
+`detectar_provedor_por_dominio` (`app/core/email_provider.py`):
+1. Atalho para domínios gratuitos conhecidos (`gmail.com`/`googlemail.com` → Gmail; `outlook.com`/`hotmail.com`/`live.com`/`msn.com` → Outlook) — sem consultar DNS.
+2. Domínio próprio (escritório): resolve o registro `MX` (`dnspython`, timeout 3s) e verifica se o *exchange* contém `google.com`/`googlemail.com` (Gmail Workspace) ou `outlook.com`/`protection.outlook.com` (Microsoft 365).
+3. Qualquer falha de DNS/timeout, ou provedor de e-mail que não é nem Gmail nem Outlook, devolve `None` — a UI cai no fallback manual, nunca trava o card.
+
+A resolução de MX é bloqueante (`dnspython` é síncrono); o endpoint roda em `asyncio.to_thread` pra não travar o event loop do FastAPI.
+
+---
+
 ## Padrões seguidos neste módulo
 
 - **Criptografia:** AES-256-GCM (`cryptography.hazmat.primitives.ciphers.aead.AESGCM`) — `encrypt_secret`/`decrypt_secret` em `security.py`; chave derivada de `AES_KEY` via SHA-256 (`Settings.derive_aes_key()`), nunca exigindo que o `.env` tenha exatamente 32 bytes
@@ -120,6 +135,7 @@ O `/callback` é navegação pura do browser — nunca chega com header `Authori
 - **Resposta:** `CredentialStatusSchema` / `AuthorizeUrlSchema` — nunca ORM, nunca CPF/senha/token reais
 - **Ownership:** toda query filtra por `user_id = current_user.id` (ou pelo `user_id` decodificado do `state`, no callback) — nunca aceita `user_id` do cliente
 - **Config sem segredo:** `google_client_id`/`secret`, `microsoft_client_id`/`secret` são `str = ""` por padrão; endpoints de `/authorize` respondem 503 com mensagem clara enquanto não configurados, em vez de travar o boot da aplicação
+- **Sugestão nunca decide:** `provider-sugerido` é só leitura e sem segredo (sem rate limit especial, mesmo padrão de `/status`); qualquer erro de DNS devolve `None`, nunca bloqueia a conexão manual
 
 ---
 
@@ -186,3 +202,4 @@ Módulos que já dependem deste (Etapa 6 — ver `/docs/modulos/login-esaj.md`):
 | 2026-08-13 | Etapa 6: `CredentialStatusSchema` ganhou `session_status`; detalhes completos do login real (Playwright, captura de código por e-mail, orquestrador, `POST /credentials/esaj/revalidar`) documentados em `/docs/modulos/login-esaj.md` |
 | 2026-08-17 | Callback OAuth passa a disparar validação; `POST /esaj` só valida se e-mail já conectado; endpoints de revalidar documentados na tabela |
 | 2026-08-17 | Hardening: DELETE `/esaj` apaga a sessão; DELETE `/email` devolve `email_desconectado`; rate limit no `/authorize`; `POST /esaj` invalida sessão antiga |
+| 2026-09-06 | Etapa 9: `GET /credentials/email/provider-sugerido` (detecção por MX/domínio conhecido) + botão sugerido no `EmailConnectionCard` com fallback manual |

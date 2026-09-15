@@ -38,6 +38,7 @@ function processoBase(overrides: Partial<ProcessoDetalhe> = {}): ProcessoDetalhe
     movimentacoes_status: 'ok',
     sem_incidentes: null,
     sem_apensos: null,
+    datajud: null,
     ...overrides,
   }
 }

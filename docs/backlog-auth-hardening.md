@@ -6,10 +6,6 @@
 
 ## Prioridade alta
 
-### Rate limit em `/auth/refresh` e `/auth/redefinir-senha`
-
-Hoje só `/auth/cadastro`, `/auth/login` e `/auth/recuperar-senha` têm `@limiter.limit`. `/auth/refresh` e `/auth/redefinir-senha` ficam sem limite por IP — um script pode tentar reset/refresh em loop sem fricção. Aplicar limites parecidos com os do `security.mdc` (ex.: 10–20/hora por IP) usando `app/core/rate_limit.py`.
-
 ### Equalizar timing de `recuperar-senha`
 
 O fix 5 desta rodada equalizou o timing do **login** (`verify_password_or_dummy`). `/auth/recuperar-senha` ainda retorna mais rápido quando o e-mail não existe (pula o `UPDATE` de tokens antigos + `INSERT` do novo token). Mais invasivo de corrigir sem custo de complexidade real (teria que simular trabalho de DB), e o risco é menor que no login — mensagem de resposta já é genérica. Avaliar se compensa antes de expor a um público maior.
@@ -29,10 +25,6 @@ O fix 5 desta rodada equalizou o timing do **login** (`verify_password_or_dummy`
 ### Retry/UX quando `POST /auth/logout` falha
 
 `Navbar.tsx` chama `logout()` e só então limpa o estado local. Se a request falhar (rede, 5xx), hoje não há tratamento explícito — o cookie de refresh pode sobreviver no navegador mesmo com o usuário "deslogado" na UI. Definir comportamento: limpar o estado local sempre (best-effort) e, opcionalmente, avisar o usuário que a sessão pode continuar ativa em outro lugar.
-
-### Restringir CORS `allow_methods` / `allow_headers`
-
-`backend/app/main.py` configura `allow_origins` corretamente (nunca `*` em produção), mas `allow_methods`/`allow_headers` provavelmente estão amplos (verificar). Restringir ao conjunto realmente usado pelo frontend reduz superfície de ataque sem custo funcional.
 
 ---
 
@@ -57,10 +49,6 @@ Algumas mensagens de sucesso (ex.: "Sessão encerrada") existem tanto no backend
 ### `React.lazy` nas rotas do painel
 
 `security.mdc` recomenda `React.lazy` + `Suspense` nas rotas protegidas para não expor lógica do painel no bundle a um visitante não autenticado. Ainda não aplicado nas rotas de `processos`/`elaboracao`. Baixo risco (o backend já é a fonte de verdade), mas alinhado com a diretriz do projeto.
-
-### Testes de integração do fluxo de auth
-
-Hoje só há testes unitários de `security.py` (`backend/tests/test_security.py`) e scripts de smoke manual (`backend/scripts/smoke_auth.py`, `smoke_reset.py`). Faltam testes de integração dos endpoints (`/auth/*`) cobrindo os caminhos felizes e os de erro (401, 409, 422, reuse de refresh, double-spend de reset) contra um banco de teste.
 
 ### Cadastro: 409 vs anti-enumeração
 

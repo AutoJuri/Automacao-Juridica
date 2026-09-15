@@ -15,11 +15,11 @@ import type { LucideIcon } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { logout } from '#/features/auth/auth.api'
 import {
-  listarNotificacoes,
   marcarNotificacaoLida,
   marcarTodasNotificacoesLidas,
 } from '#/features/notificacoes/notifications.api'
 import { NOTIFICATIONS_QUERY_KEY } from '#/features/notificacoes/notifications.constants'
+import { notificacoesListQueryOptions } from '#/features/notificacoes/notifications.query'
 import { cn } from '#/lib/utils'
 import { limparQueriesDaSessao } from '#/lib/session-queries'
 import { useAuthStore } from '#/store/auth.store'
@@ -47,10 +47,7 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
   const [aberto, setAberto] = useState(false)
   const painelRef = useRef<HTMLDivElement>(null)
 
-  const notificacoesQuery = useQuery({
-    queryKey: NOTIFICATIONS_QUERY_KEY,
-    queryFn: () => listarNotificacoes(false),
-  })
+  const notificacoesQuery = useQuery(notificacoesListQueryOptions)
 
   const notificacoes = notificacoesQuery.data ?? []
   const naoLidas = notificacoes.filter((n) => !n.is_read).length

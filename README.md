@@ -112,6 +112,12 @@ docker build -t automacao-backend .
 docker run --rm -p 8000:8000 automacao-backend
 ```
 
+O `CMD` respeita `PORT` (Railway injeta; local o default é 8000). A imagem baixa o Chromium do Playwright no build.
+
+### Deploy da API no Railway
+
+O Postgres do projeto já está no Railway. Para o serviço da **API**: Root Directory `backend`, variáveis como em `backend/.env.production.example` (nomes, sem colar o `.env` local). Passo a passo: [docs/modulos/deploy.md](docs/modulos/deploy.md).
+
 ## Lab legado (`scripts/esaj`)
 
 Pasta de exploração (login Playwright, cookies, parsers cpopg). **Não** faz parte do backend de produto; o código útil será portado para `backend/app/services/` nas próximas etapas.

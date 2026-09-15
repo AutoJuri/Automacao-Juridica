@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from app.models.movimentacao import Movimentacao
     from app.models.notification import Notification
     from app.models.peticao_diversa import PeticaoDiversa
+    from app.models.processo_datajud import ProcessoDatajud
     from app.models.user import User
 
 
@@ -98,6 +99,13 @@ class Processo(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="processo", passive_deletes=True
+    )
+    # 1:1 — complemento somente-leitura do DataJud (Etapa 9, ADR-015).
+    datajud: Mapped["ProcessoDatajud | None"] = relationship(
+        back_populates="processo",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )
 
     def __repr__(self) -> str:

@@ -1,4 +1,4 @@
-"""Rate limiting das rotas públicas de autenticação.
+"""Rate limiting das rotas públicas de autenticação e de cadastro de credencial.
 
 Armazenamento em memória do processo — suficiente enquanto rodamos uma única
 instância no Railway. Ao escalar horizontalmente é obrigatório trocar por um
@@ -17,6 +17,8 @@ limiter = Limiter(key_func=get_remote_address)
 LIMITE_CADASTRO = "5/hour"
 LIMITE_LOGIN = "10/hour"
 LIMITE_RECUPERAR_SENHA = "3/hour"
+LIMITE_REFRESH = "20/hour"
+LIMITE_REDEFINIR_SENHA = "10/hour"
 LIMITE_CREDENCIAL_ESAJ = "5/hour"
 LIMITE_OAUTH_AUTHORIZE = "10/hour"
 LIMITE_OAUTH_CALLBACK = "20/hour"

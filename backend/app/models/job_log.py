@@ -20,6 +20,10 @@ JOB_TIPO_PIPE_PETICOES = "pipe_peticoes"
 JOB_TIPO_PIPE_PROCESSOS = "pipe_processos"
 JOB_TIPO_PIPE_MOVIMENTACOES = "pipe_movimentacoes"
 JOB_TIPO_REAUTH = "reauth"
+# Etapa 9 (ADR-015): job diário de complemento via DataJud — fora do
+# ciclo de 10 min do e-SAJ, roda uma vez por dia por processo (não por
+# advogado).
+JOB_TIPO_DATAJUD = "datajud"
 
 JOB_TIPOS = (
     JOB_TIPO_LOGIN,
@@ -29,6 +33,7 @@ JOB_TIPOS = (
     JOB_TIPO_PIPE_PROCESSOS,
     JOB_TIPO_PIPE_MOVIMENTACOES,
     JOB_TIPO_REAUTH,
+    JOB_TIPO_DATAJUD,
 )
 
 JOB_STATUS_SUCESSO = "sucesso"
@@ -64,6 +69,7 @@ __all__ = [
     "JOB_STATUS_SKIP",
     "JOB_STATUS_SUCESSO",
     "JOB_TIPOS",
+    "JOB_TIPO_DATAJUD",
     "JOB_TIPO_LOGIN",
     "JOB_TIPO_PIPE_AUDIENCIAS",
     "JOB_TIPO_PIPE_INTIMACOES",

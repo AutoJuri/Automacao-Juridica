@@ -1,6 +1,6 @@
 # Módulo: Login Automatizado no e-SAJ (Playwright)
 
-> Última atualização: 2026-08-23
+> Última atualização: 2026-09-15
 > Camada: Backend
 
 ---
@@ -83,7 +83,7 @@ O browser roda via Playwright **sync** em `asyncio.to_thread` (necessário no Wi
 ## Padrões seguidos neste módulo
 
 - **Decriptação só em memória:** `credential_validation.validar_credencial_esaj` decripta `cpf_encrypted`/`senha_encrypted` em variáveis locais, nunca em atributo de classe ou cache; as variáveis são descartadas (`= None`) no `finally` ao fim da função
-- **Contexto Playwright isolado:** `auth_esaj.realizar_login` abre um contexto novo por chamada (`headless=True`), via API sync em thread (compatível com Windows/uvicorn), sempre fechado em `finally` — nunca reaproveitado entre advogados
+- **Contexto Playwright isolado:** `auth_esaj.realizar_login` abre um contexto novo por chamada (`headless=True`, args `--no-sandbox` e `--disable-dev-shm-usage` para Docker/non-root), via API sync em thread (compatível com Windows/uvicorn), sempre fechado em `finally` — nunca reaproveitado entre advogados
 - **Chromium no path estável:** se `PLAYWRIGHT_BROWSERS_PATH` apontar para cache efêmero do Cursor (`cursor-sandbox-cache`), redireciona para `%LOCALAPPDATA%\ms-playwright`
 - **Erros mapeados, nunca crus:** `LoginEsajError.tipo` é sempre um dos `SESSION_STATUSES` já existentes; nenhuma mensagem de erro do Playwright, do e-SAJ ou de rede chega a `TribunalSession.ultimo_erro`/`JobLog.erro` — só o tipo
 - **Screenshot só em desenvolvimento:** `_salvar_screenshot_debug` verifica `settings.is_development` antes de gravar qualquer captura de tela (que pode conter CPF preenchido) em disco
@@ -153,6 +153,8 @@ Uma linha por advogado+tribunal, criada (ou atualizada) a cada chamada de `valid
 - ❌ Não mapear `CodigoNaoEncontradoError` para `portal_indisponivel` — o status é `codigo_nao_encontrado`
 - ❌ Não confiar só na query da API de e-mail para filtrar remetente/data — sempre revalidar em código (`eh_email_do_esaj`, comparação de datas)
 - ❌ Não baixar o corpo do e-mail antes de filtrar remetente na API (Gmail `q=from:`, Outlook `$select` sem `body`)
+- ❌ Não assumir o `chromium` do apt no Docker — a imagem instala o browser do Playwright em `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`
+- ❌ Não lançar Chromium no container sem `--no-sandbox` e `--disable-dev-shm-usage` (non-root + `/dev/shm` de 64MB)
 
 ---
 
@@ -166,3 +168,4 @@ Uma linha por advogado+tribunal, criada (ou atualizada) a cada chamada de `valid
 | 2026-08-18 | Contrato das APIs internas do e-SAJ documentado em `/docs/modulos/esaj-apis.md` (insumo da Etapa 7) |
 | 2026-08-21 | Scheduler passou a reaproveitar `validar_credencial_esaj` (cron 1h + tick de reauth). Gap da ADR-008 (`reauth_pendente` órfão) fechado no próximo tick. `validacao_em_andamento` exportado para o ciclo de 10 min não chocar com o Playwright |
 | 2026-08-23 | `GET /credentials/status` passou a expor `validacao_em_andamento`. A UI só faz polling / mostra “Validando…” quando o Playwright está de fato no processo (ou na janela de graça após Revalidar) — `reauth_pendente` órfão pede Revalidar em vez de girar para sempre |
+| 2026-09-15 | Imagem Docker da API: `playwright install --with-deps chromium` em `/ms-playwright`; `launch` com `--no-sandbox` e `--disable-dev-shm-usage`. Ver `/docs/modulos/deploy.md` |

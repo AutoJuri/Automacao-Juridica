@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-08-28
+> Última atualização: 2026-09-15
 > Camada: Infra / Backend
 
 ---
@@ -24,6 +24,7 @@ Define o schema PostgreSQL do MVP (9 tabelas do PRD), a sessão async do SQLAlch
 | `backend/app/core/config.py` | `Settings.sqlalchemy_url` — normaliza URL do Railway |
 | `backend/alembic.ini` | Config Alembic (`script_location = app/db/migrations`) |
 | `backend/app/main.py` | `GET /health` e `GET /health/db` |
+| `backend/railway.toml` | Pre-deploy: `uv run alembic upgrade head` no deploy da API |
 
 ---
 
@@ -82,7 +83,7 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `d4a8c2e1f9b0`):
+Tabelas (head atual: `e5b3f7a2c916`):
 
 ```
 users
@@ -94,6 +95,7 @@ users
 │   ├── movimentacoes       (+ tem_documento, url_documento)
 │   ├── peticoes_diversas   (HTML CPO — ADR-013)
 │   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
+│   ├── processos_datajud   (1:1 — complemento DataJud, ADR-015; nunca sobrescreve `processos`)
 │   ├── intimacoes      (processo_id nullable)
 │   ├── audiencias      (processo_id nullable — agenda JSON)
 │   └── notifications   (processo_id nullable)
@@ -170,7 +172,8 @@ Módulos futuros que vão depender deste:
 - ❌ Não logar ou expor campos `*_encrypted` — a descriptografia só acontece em memória, na Etapa 3+
 - ❌ Não aplicar `alembic revision --autogenerate` em produção sem revisar o arquivo gerado
 - ❌ Não filtrar ownership em Python após buscar todos os registros — `WHERE user_id = current_user.id` no banco (quando os endpoints existirem)
-- ❌ Não commitar `backend/.env` — só o `.env.example` com placeholder
+- ❌ Não commitar `backend/.env` — só o `.env.example` (local) e o `.env.production.example` (nomes no Railway)
+- ❌ Não aplicar schema só “quando a API subir”: no Railway o Alembic roda no **pre-deploy** (`railway.toml`)
 
 ---
 
@@ -186,3 +189,5 @@ Módulos futuros que vão depender deste:
 | 2026-08-25 | Capa CPO em `processos` + tabelas `peticoes_diversas` e `audiencias_cpo` (ADR-013), migration `a1c0e5c0b013` |
 | 2026-08-26 | Índice parcial `(user_id, movimentacoes_synced_at) WHERE url_cpo IS NOT NULL` — migration `b7e4c9a1d2f0` |
 | 2026-08-28 | `processos.fixado` — pin na home, migration `d4a8c2e1f9b0` |
+| 2026-09-06 | Tabela `processos_datajud` (1:1, complemento DataJud, ADR-015), migration `e5b3f7a2c916` |
+| 2026-09-15 | Deploy Railway: `alembic upgrade head` no pre-deploy da API (`backend/railway.toml`) |

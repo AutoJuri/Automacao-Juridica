@@ -3,8 +3,7 @@ import { Link, useMatchRoute } from '@tanstack/react-router'
 import { Calendar, Inbox, Layers, Radio, Search } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import { listarNotificacoes } from '#/features/notificacoes/notifications.api'
-import { NOTIFICATIONS_QUERY_KEY } from '#/features/notificacoes/notifications.constants'
+import { notificacoesListQueryOptions } from '#/features/notificacoes/notifications.query'
 import { cn } from '#/lib/utils'
 import { NAVBAR_HEIGHT } from './Navbar'
 import {
@@ -24,10 +23,7 @@ const ICONES: Record<IconeLateral, LucideIcon> = {
 export function AppSidebar() {
   const matchRoute = useMatchRoute()
 
-  const notificacoesQuery = useQuery({
-    queryKey: NOTIFICATIONS_QUERY_KEY,
-    queryFn: () => listarNotificacoes(false),
-  })
+  const notificacoesQuery = useQuery(notificacoesListQueryOptions)
 
   const intimacoesNaoLidas = (notificacoesQuery.data ?? []).filter(
     (n) => !n.is_read && n.tipo === 'intimacao',

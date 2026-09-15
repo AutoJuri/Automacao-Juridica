@@ -1,6 +1,6 @@
 # Módulo: Autenticação da Plataforma
 
-> Última atualização: 2026-08-09
+> Última atualização: 2026-09-09
 > Camada: Backend / Frontend
 
 ---
@@ -19,8 +19,13 @@ Autentica advogados na plataforma AdvogAtiva: cadastro, login, logout, renovaç�
 | `backend/app/api/deps.py` | `get_current_user` / aliases `CurrentUser`, `DbSession` |
 | `backend/app/core/security.py` | bcrypt, JWT, geração/hash de tokens opacos |
 | `backend/app/core/rate_limit.py` | SlowAPI + limites das rotas públicas |
+| `backend/app/core/security_headers.py` | Middleware ASGI: nosniff, DENY, CSP da API, HSTS fora de development |
+| `backend/app/main.py` | CORS (origens + métodos/headers explícitos) e empilhamento dos middlewares |
 | `backend/app/schemas/auth.py` | Request/Response Pydantic |
 | `backend/app/models/refresh_token.py` | Tabela `refresh_tokens` |
+| `backend/tests/conftest.py` | `cliente_auth`: transação + rollback por teste (integração `/auth/*`) |
+| `backend/tests/test_auth.py` | Integração dos endpoints `/auth/*` (cadastro, login, refresh, logout, reset) |
+| `backend/tests/test_hardening.py` | Headers HTTP, CORS restrito, rate limit de refresh e redefinir-senha |
 | `backend/app/models/password_reset_token.py` | Tabela `password_reset_tokens` |
 | `backend/app/db/migrations/versions/38d4177c211b_*.py` | Migration das tabelas de token |
 | `frontend/src/features/auth/auth.api.ts` | Wrappers tipados dos endpoints |
@@ -44,11 +49,11 @@ Autentica advogados na plataforma AdvogAtiva: cadastro, login, logout, renovaç�
 |---|---|---|---|---|
 | POST | `/auth/cadastro` | Cria usuário, emite sessão | Não | 5/hora por IP |
 | POST | `/auth/login` | Autentica e emite sessão | Não | 10/hora por IP |
-| POST | `/auth/refresh` | Rotaciona refresh cookie → novo access | Cookie | — |
+| POST | `/auth/refresh` | Rotaciona refresh cookie → novo access | Cookie | 20/hora por IP |
 | POST | `/auth/logout` | Revoga refresh no banco e limpa cookie | Cookie (não exige Bearer) | — |
 | GET | `/auth/me` | Dados públicos do usuário | Bearer | — |
 | POST | `/auth/recuperar-senha` | Gera token de reset (resposta genérica) | Não | 3/hora por IP |
-| POST | `/auth/redefinir-senha` | Troca senha + revoga todas as sessões | Não (token no body) | — |
+| POST | `/auth/redefinir-senha` | Troca senha + revoga todas as sessões | Não (token no body) | 10/hora por IP |
 
 > Rotas protegidas usam `Depends(get_current_user)`.
 > `user_id` nunca é aceito via body ou query — sempre vem do JWT (`sub`).
@@ -116,7 +121,9 @@ Logout
 - **Resposta:** `UserPublicSchema` / `TokenResponseSchema` / `MessageSchema` — nunca ORM
 - **Enumeração de e-mails:** login e recuperar-senha devolvem mensagens que não revelam se o e-mail existe; o login também equaliza o **tempo** de resposta com `verify_password_or_dummy` (roda bcrypt mesmo sem usuário) — ver `docs/backlog-auth-hardening.md` para o mesmo ajuste em `recuperar-senha`
 - **Reset de senha:** invalida tokens anteriores do usuário; ao redefinir, revoga **todos** os refresh tokens ativos
-- **Rate limit:** SlowAPI por IP, storage em memória (uma instância); ver ADR-003 para o envio do link
+- **Rate limit:** SlowAPI por IP, storage em memória (uma instância). Cadastro 5/h, login 10/h, recuperar-senha 3/h, refresh 20/h, redefinir-senha 10/h. 429 com mensagem genérica (não revela o limite). Ver ADR-003 para o envio do link
+- **CORS:** origens só de `CORS_ORIGINS`; métodos `GET, POST, PATCH, DELETE, HEAD`; headers `Authorization, Content-Type, Accept` — nunca `*`
+- **Headers HTTP da API:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, CSP `default-src 'none'; frame-ancestors 'none'`, `Permissions-Policy` sem câmera/mic/geo. HSTS só fora de `development`
 - **Segredos:** fora de `development`, `Settings` rejeita `JWT_SECRET`/`AES_KEY` placeholder e exige `JWT_SECRET` ≥ 32 chars
 - **Guardas de rota:** TanStack Router `beforeLoad` — só UX; a API continua sendo a fonte de verdade
 - **Refresh concorrente:** uma única `Promise` compartilhada — necessário porque o backend rotaciona o cookie
@@ -180,6 +187,8 @@ Módulos futuros que vão depender deste:
 - ❌ Não confiar só na expiração do JWT no logout — sempre revogar o refresh no banco
 - ❌ Não aceitar `user_id` do cliente — sempre do `sub` do access token
 - ❌ Não enviar e-mail real ainda — ver ADR-003 (link no log do servidor)
+- ❌ Não voltar `allow_methods`/`allow_headers` do CORS para `*` — só o que a SPA usa
+- ❌ Não deixar `/auth/refresh` ou `/auth/redefinir-senha` sem `@limiter.limit`
 
 ---
 
@@ -190,3 +199,5 @@ Módulos futuros que vão depender deste:
 | 2026-08-09 | Etapa 3 (backend): endpoints de auth, bcrypt, JWT, refresh em cookie, rate limit, recuperação de senha, migration `38d4177c211b` |
 | 2026-08-09 | Etapa 4 (frontend): formulários reais (zod + RHF), interceptor com refresh deduplicado, bootstrap de sessão, guardas `requireAuth`/`requireGuest`, telas esqueci/redefinir senha, `AuthShell`; log do backend passa a emitir URL completa do reset |
 | 2026-08-09 | Correções do code review (itens 1–6): `clearAuth` após redefinir senha; log do link de reset restrito a `development` (ADR-003); `--proxy-headers` no Dockerfile para o rate limit ver o IP real por trás do proxy do Railway; rotação do refresh e uso do token de reset via `UPDATE ... RETURNING` atômico (fecha corrida de duas requisições concorrentes) + detecção de reuso de refresh (revoga todas as sessões do usuário); `verify_password_or_dummy` no login para equalizar o tempo de resposta entre e-mail existente/inexistente; validação de senha por bytes UTF-8 (não só caracteres) no Pydantic e no Zod. Achados 7+ documentados em `docs/backlog-auth-hardening.md` |
+| 2026-09-08 | Integração `/auth/*` em `tests/test_auth.py` (fixture `cliente_auth`: savepoint + rollback, sem leftover no Postgres). Cobre 201/409/422, login 401 genérico, rotação e reuso do refresh, logout, `/me`, reset sem revelar e-mail e double-spend do token. Saiu do backlog de hardening. |
+| 2026-09-09 | Etapa 13: rate limit em `/auth/refresh` (20/h) e `/auth/redefinir-senha` (10/h); CORS sem `allow_methods`/`allow_headers` `*`; middleware de headers HTTP (`security_headers.py`). Testes em `tests/test_hardening.py`. Saiu do backlog de hardening. |

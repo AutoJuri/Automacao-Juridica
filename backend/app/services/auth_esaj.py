@@ -46,6 +46,11 @@ def _corrigir_browsers_path_efemero() -> None:
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = destino
     logger.info("PLAYWRIGHT_BROWSERS_PATH redirecionado para %s", destino)
 
+# Container (Railway/Docker): Chromium recusa o sandbox como non-root e
+# /dev/shm costuma ter 64MB. Isolamento continua sendo um contexto novo
+# por advogado — estas flags só deixam o processo subir.
+CHROMIUM_LAUNCH_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
+
 LOGIN_URL = (
     "https://esaj.tjsp.jus.br/sajcas/login?"
     "service=https%3A%2F%2Fesaj.tjsp.jus.br%2Fesaj%2Fapi%2Fauth%2Fcheck#aba-cpf"
@@ -198,7 +203,7 @@ def _realizar_login_sync(
     """Fluxo Playwright síncrono — deve rodar fora do event loop do uvicorn."""
     _corrigir_browsers_path_efemero()
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        browser = playwright.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
         # Contexto novo e isolado a cada chamada — nunca compartilhado entre
         # advogados nem reaproveitado entre tentativas.
         context = browser.new_context()

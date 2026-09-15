@@ -53,3 +53,11 @@ class CredentialStatusSchema(BaseModel):
 
 class AuthorizeUrlSchema(BaseModel):
     authorize_url: str
+
+
+class ProviderSugeridoSchema(BaseModel):
+    """Sugestão de provedor (Etapa 9) a partir do domínio do e-mail de
+    login da plataforma — nunca decide sozinha, só simplifica o card de
+    conexão. `None` quando não há como sugerir com confiança."""
+
+    provider: str | None = None

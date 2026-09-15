@@ -79,6 +79,34 @@ export interface AudienciaCpoPublica {
   qt_pessoas: string | null
 }
 
+export interface DatajudAssuntoPublica {
+  codigo: number | null
+  nome: string | null
+}
+
+export interface DatajudMovimentoPublica {
+  codigo: number | null
+  nome: string | null
+  data_hora: string | null
+}
+
+/**
+ * Complemento somente-leitura do DataJud (CNJ) — Etapa 9. Nunca sobrescreve
+ * os campos que vêm do e-SAJ (`de_classe`, `de_assunto`, `foro`, `vara`...),
+ * é sempre uma seção separada. `null` = ainda não passou pelo job diário.
+ */
+export interface ProcessoDatajudPublica {
+  classe_nome: string | null
+  assuntos: DatajudAssuntoPublica[]
+  orgao_julgador: string | null
+  data_ajuizamento: string | null
+  grau: string | null
+  formato: string | null
+  movimentos: DatajudMovimentoPublica[]
+  encontrado: boolean
+  ultima_consulta_em: string | null
+}
+
 export interface ProcessoDetalhe extends ProcessoLista {
   url_cpo: string | null
   url_pasta: string | null
@@ -98,6 +126,7 @@ export interface ProcessoDetalhe extends ProcessoLista {
   movimentacoes_status: MovimentacoesStatus
   sem_incidentes: boolean | null
   sem_apensos: boolean | null
+  datajud: ProcessoDatajudPublica | null
 }
 
 export interface IntimacaoPainel {

@@ -1,13 +1,13 @@
 # Módulo: Scheduler e Ciclo Automático
 
-> Última atualização: 2026-08-21
+> Última atualização: 2026-09-06
 > Camada: Backend
 
 ---
 
 ## O que este módulo faz
 
-Integra o APScheduler ao processo FastAPI com dois jobs — renovação noturna do cookie do e-SAJ e o ciclo de pipes a cada 10 minutos — e decide, por advogado, se roda a coleta ou dispara uma reautenticação, com base no `status` de `tribunal_sessions` e no backoff (`proximo_retry`) de falhas anteriores. Em `APP_ENV=development` os jobs **não** sobem (override `SCHEDULER_ENABLED=true`).
+Integra o APScheduler ao processo FastAPI com três jobs — renovação noturna do cookie do e-SAJ, o ciclo de pipes a cada 10 minutos, e o complemento diário via DataJud (Etapa 9) — e decide, por advogado, se roda a coleta ou dispara uma reautenticação, com base no `status` de `tribunal_sessions` e no backoff (`proximo_retry`) de falhas anteriores. Em `APP_ENV=development` os jobs **não** sobem (override `SCHEDULER_ENABLED=true`).
 
 ---
 
@@ -21,6 +21,7 @@ Integra o APScheduler ao processo FastAPI com dois jobs — renovação noturna 
 | `backend/app/services/credential_validation.py` | `validar_credencial_esaj(user_id, job_tipo=...)` e `validacao_em_andamento(user_id)` — reaproveitado pelo cron, pelo ciclo de 10 min e pelo fluxo manual (`/credentials/esaj`, `/revalidar`) |
 | `backend/app/services/coleta_esaj.py` | `executar_ciclo_usuario` — pipes quando a sessão está `ativo` com cookie válido; `cookie_expirado()` e `EsajRateLimitError` (`bloqueado`) |
 | `backend/app/services/esaj_http.py` | `EsajRateLimitError` (HTTP 429) — distinto de `EsajSessaoInvalidaError`/`EsajPortalIndisponivelError` |
+| `backend/app/services/datajud_jobs.py` | `job_datajud_diario` — job de sistema (não por advogado) que complementa um lote de processos via DataJud, isolado do ciclo de 10 min (Etapa 9, ver `/docs/modulos/datajud.md`) |
 | `backend/app/main.py` | `lifespan` — inicia/para o scheduler junto do processo FastAPI |
 | `backend/app/core/config.py` | `scheduler_enabled` — default off em `development`, on fora; override via `SCHEDULER_ENABLED` |
 
@@ -32,8 +33,9 @@ Integra o APScheduler ao processo FastAPI com dois jobs — renovação noturna 
 |---|---|---|
 | `job_renovacao_diaria` | Cron, 1h da manhã (`America/Sao_Paulo`) | Renova o cookie de **todos** os advogados com credencial ativa (`TribunalCredential.is_active=True`), independente do status atual da sessão — chama `validar_credencial_esaj(user_id, job_tipo="reauth")` |
 | `job_ciclo_dez_minutos` | Interval, 10 minutos | Para cada advogado com credencial ativa: se Playwright já está rodando, skip; senão decide por sessão — pipes (`ativo` com cookie válido), reauth (`ativo` com cookie expirado, `reauth_pendente`, ou erros com backoff expirado), retoma pipes (`bloqueado` + backoff expirado), ou não faz nada (backoff pendente) |
+| `job_datajud_diario` | Cron, 3h da manhã (`America/Sao_Paulo`) | Job de **sistema** (não por advogado): seleciona um lote round-robin de processos de todos os advogados (nunca consultado primeiro, depois o mais atrasado) e complementa via DataJud — ver `/docs/modulos/datajud.md` (Etapa 9 / ADR-015) |
 
-Ambos os jobs: `id` fixo, `replace_existing=True`, `max_instances=1`, `coalesce=True` — uma execução atrasada nunca roda em paralelo com a próxima, só recupera o atraso.
+Os três jobs: `id` fixo, `replace_existing=True`, `max_instances=1`, `coalesce=True` — uma execução atrasada nunca roda em paralelo com a próxima, só recupera o atraso.
 
 ### Por que timezone explícito no cron
 
@@ -137,3 +139,4 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 |---|---|
 | 2026-08-21 | Implementação inicial: dois jobs (`job_renovacao_diaria`, `job_ciclo_dez_minutos`), decisão por advogado, `EsajRateLimitError` com backoff próprio, recuperação de `reauth_pendente` travado (ADR-008/ADR-011) |
 | 2026-08-21 | Hardening pós-review: scheduler off em development; `ativo`+cookie expirado → reauth; `reauth_pendente` retenta no tick (sem stale de 5 min); skip pipes se validação Playwright em andamento |
+| 2026-09-06 | Etapa 9: terceiro job (`job_datajud_diario`, cron 3h) — job de sistema, fora do ciclo por advogado, detalhado em `/docs/modulos/datajud.md` |

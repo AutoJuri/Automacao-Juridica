@@ -17,6 +17,7 @@ from app.models.movimentacao import Movimentacao
 from app.models.notification import Notification
 from app.models.peticao_diversa import PeticaoDiversa
 from app.models.processo import Processo
+from app.models.processo_datajud import ProcessoDatajud
 from app.schemas.notification import NotificationPublicSchema
 from app.schemas.processo import (
     AudienciaCpoPublicSchema,
@@ -28,6 +29,7 @@ from app.schemas.processo import (
     ParteCpoPublicSchema,
     PartePublicSchema,
     PeticaoDiversaPublicSchema,
+    ProcessoDatajudPublicSchema,
     ProcessoDetalheSchema,
     ProcessoListSchema,
     UltimaAtividadeSchema,
@@ -202,6 +204,14 @@ def audiencia_cpo_para_publico(item: AudienciaCpo) -> AudienciaCpoPublicSchema:
     return AudienciaCpoPublicSchema.model_validate(item)
 
 
+def datajud_para_publico(item: ProcessoDatajud | None) -> ProcessoDatajudPublicSchema | None:
+    """`None` até o job diário passar por este processo — nunca é erro,
+    é só "ainda sem complemento" (Etapa 9 / ADR-015)."""
+    if item is None:
+        return None
+    return ProcessoDatajudPublicSchema.model_validate(item)
+
+
 def processo_para_detalhe(
     processo: Processo,
     intimacoes: list[Intimacao],
@@ -209,6 +219,7 @@ def processo_para_detalhe(
     movimentacoes: list[Movimentacao] | None = None,
     peticoes: list[PeticaoDiversa] | None = None,
     audiencias_cpo: list[AudienciaCpo] | None = None,
+    datajud: ProcessoDatajud | None = None,
 ) -> ProcessoDetalheSchema:
     lista = processo_para_lista(processo, intimacoes, audiencias)
     intimacoes_ord = sorted(
@@ -242,6 +253,7 @@ def processo_para_detalhe(
         movimentacoes_status=_status_movimentacoes(processo, movs),
         sem_incidentes=getattr(processo, "sem_incidentes", None),
         sem_apensos=getattr(processo, "sem_apensos", None),
+        datajud=datajud_para_publico(datajud),
     )
 
 
@@ -372,8 +384,13 @@ async def buscar_processo_detalhe(
             )
         ).all()
     )
+    # Ownership já garantida acima (`processo` só existe se for do usuário) —
+    # o `processo_id` aqui não vem do cliente, vem do registro já validado.
+    datajud = await db.scalar(
+        select(ProcessoDatajud).where(ProcessoDatajud.processo_id == processo_id)
+    )
     return processo_para_detalhe(
-        processo, intimacoes, audiencias, movimentacoes, peticoes, audiencias_cpo
+        processo, intimacoes, audiencias, movimentacoes, peticoes, audiencias_cpo, datajud
     )
 
 

@@ -1,0 +1,20 @@
+# Config de referência da API. No Railway, NÃO confie só neste arquivo —
+# serviço novo pode ignorá-lo. Preencha SEMPRE no painel (Settings):
+#   Root Directory = backend
+#   Builder = Dockerfile
+#   Healthcheck path = /health
+#   Pre-deploy = uv run alembic upgrade head
+#   Replicas = 1
+# Depois do primeiro deploy, confira no log do pre-deploy que o Alembic rodou.
+# Ver docs/modulos/deploy.md.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+numReplicas = 1
+restartPolicyType = "ON_FAILURE"
+preDeployCommand = ["uv run alembic upgrade head"]

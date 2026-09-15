@@ -37,3 +37,12 @@ export interface CredentialStatus {
 export interface AuthorizeUrlResponse {
   authorize_url: string
 }
+
+/**
+ * Sugestão de provedor por domínio do e-mail de login (Etapa 9) — nunca
+ * decide sozinha, só simplifica o card de conexão. `null` = sem sugestão
+ * (a UI mantém a escolha manual).
+ */
+export interface ProviderSugerido {
+  provider: EmailProvider | null
+}

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Mail, Unplug } from 'lucide-react'
 
@@ -6,11 +7,15 @@ import { MUITAS_TENTATIVAS, mensagemDeErro } from '#/features/auth/auth.errors'
 import { FormError } from '#/features/auth/AuthFormFeedback'
 import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
 import {
+  buscarProvedorSugerido,
   buscarStatusCredenciais,
   buscarUrlDeAutorizacaoEmail,
   desconectarEmail,
 } from './credentials.api'
-import { CREDENTIALS_STATUS_QUERY_KEY } from './credentials.constants'
+import {
+  CREDENTIALS_PROVIDER_SUGERIDO_QUERY_KEY,
+  CREDENTIALS_STATUS_QUERY_KEY,
+} from './credentials.constants'
 import type { EmailProvider } from './credentials.types'
 
 const PROVIDER_LABEL: Record<EmailProvider, string> = {
@@ -20,10 +25,27 @@ const PROVIDER_LABEL: Record<EmailProvider, string> = {
 
 export function EmailConnectionCard() {
   const queryClient = useQueryClient()
+  const [mostrarOutroProvedor, setMostrarOutroProvedor] = useState(false)
   const statusQuery = useQuery({
     queryKey: CREDENTIALS_STATUS_QUERY_KEY,
     queryFn: buscarStatusCredenciais,
   })
+
+  const cadastrado = statusQuery.data?.cadastrado ?? false
+  const conectado = statusQuery.data?.email_conectado ?? false
+  const provider = statusQuery.data?.email_provider ?? null
+
+  // Só busca a sugestão quando faz sentido mostrá-la: advogado já
+  // cadastrado no e-SAJ e e-mail ainda não conectado. Falha na resolução
+  // de MX (backend devolve `provider: null`) só faz cair no fallback
+  // manual — nunca trava o card.
+  const sugestaoQuery = useQuery({
+    queryKey: CREDENTIALS_PROVIDER_SUGERIDO_QUERY_KEY,
+    queryFn: buscarProvedorSugerido,
+    enabled: cadastrado && !conectado,
+    staleTime: 5 * 60 * 1000,
+  })
+  const providerSugerido = sugestaoQuery.data?.provider ?? null
 
   const conectar = useMutation({
     mutationFn: buscarUrlDeAutorizacaoEmail,
@@ -48,10 +70,6 @@ export function EmailConnectionCard() {
         503: 'Conexão com este provedor ainda não está disponível.',
       })
     : null
-
-  const cadastrado = statusQuery.data?.cadastrado ?? false
-  const conectado = statusQuery.data?.email_conectado ?? false
-  const provider = statusQuery.data?.email_provider ?? null
 
   return (
     <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
@@ -96,6 +114,27 @@ export function EmailConnectionCard() {
             )}
             Desconectar
           </Button>
+        </div>
+      ) : providerSugerido && !mostrarOutroProvedor ? (
+        <div className="flex flex-col items-start gap-2 mt-3">
+          <Button
+            type="button"
+            onClick={() => conectar.mutate(providerSugerido)}
+            disabled={conectar.isPending}
+            className="h-10 gap-1.5 bg-[#3B5BDB] hover:bg-[#2d4cba] text-white font-medium text-sm disabled:opacity-70"
+          >
+            {conectar.isPending && conectar.variables === providerSugerido && (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            )}
+            Conectar {PROVIDER_LABEL[providerSugerido]}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setMostrarOutroProvedor(true)}
+            className="text-xs text-[#6B7280] hover:text-[#374151] underline underline-offset-2"
+          >
+            usar outro provedor
+          </button>
         </div>
       ) : (
         <div className="flex flex-wrap gap-3 mt-3">

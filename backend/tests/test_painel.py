@@ -38,6 +38,7 @@ from app.schemas.processo import (
 from app.services import painel as painel_service
 from app.services.painel import (
     audiencia_para_painel,
+    datajud_para_publico,
     intimacao_para_painel,
     intimacao_para_publico,
     montar_ultima_atividade,
@@ -405,6 +406,60 @@ class TestSchemasSemIdEsaj:
         assert "identidade_hash" not in dumped["audiencias_cpo"][0]
         assert dumped["audiencias_cpo"][0]["titulo"] == "Instrução"
         assert dumped["audiencias"] == []
+
+    def test_detalhe_sem_complemento_datajud_devolve_none(self):
+        processo = SimpleNamespace(
+            id=PROCESSO_ID,
+            tribunal="esaj_tjsp",
+            nu_processo="0000000-00.0000.0.00.0000",
+            de_classe=None,
+            de_assunto=None,
+            instancia=None,
+            parte_ativa=None,
+            parte_passiva=None,
+            last_synced_at=None,
+            url_cpo=None,
+            url_pasta=None,
+        )
+        detalhe = processo_para_detalhe(processo, [], [])
+        assert detalhe.datajud is None
+
+    def test_detalhe_com_complemento_datajud_expoe_secao_separada(self):
+        processo = SimpleNamespace(
+            id=PROCESSO_ID,
+            tribunal="esaj_tjsp",
+            nu_processo="1002345-67.2025.8.26.0100",
+            de_classe="Classe do e-SAJ",
+            de_assunto=None,
+            instancia=None,
+            parte_ativa=None,
+            parte_passiva=None,
+            last_synced_at=None,
+            url_cpo=None,
+            url_pasta=None,
+        )
+        datajud = SimpleNamespace(
+            classe_nome="Procedimento Comum Cível",
+            assuntos=[{"codigo": 10570, "nome": "Rescisão contratual"}],
+            orgao_julgador="1ª Vara Cível",
+            data_ajuizamento=datetime(2025, 3, 10, tzinfo=UTC),
+            grau="G1",
+            formato="Eletrônico",
+            movimentos=[{"codigo": 51, "nome": "Distribuído", "data_hora": None}],
+            encontrado=True,
+            ultima_consulta_em=datetime(2026, 9, 1, tzinfo=UTC),
+        )
+        detalhe = processo_para_detalhe(processo, [], [], datajud=datajud)
+        dumped = detalhe.model_dump()
+        # Nunca sobrescreve o que já veio do e-SAJ.
+        assert dumped["de_classe"] == "Classe do e-SAJ"
+        assert dumped["datajud"]["classe_nome"] == "Procedimento Comum Cível"
+        assert dumped["datajud"]["orgao_julgador"] == "1ª Vara Cível"
+        assert dumped["datajud"]["encontrado"] is True
+        assert dumped["datajud"]["assuntos"][0]["nome"] == "Rescisão contratual"
+
+    def test_datajud_para_publico_com_none_devolve_none(self):
+        assert datajud_para_publico(None) is None
 
     def test_lista_nao_inclui_capa_cpo(self):
         processo = SimpleNamespace(

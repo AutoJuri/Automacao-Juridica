@@ -7,6 +7,7 @@ import { AudienciaCpoLista } from './AudienciaCpoLista'
 import { AudienciaLista } from './AudienciaLista'
 import { IntimacaoTimeline } from './IntimacaoTimeline'
 import { PeticoesDiversasLista } from './PeticoesDiversasLista'
+import { ProcessoDatajudSecao } from './ProcessoDatajudSecao'
 import { atualizarFixado } from './processos.api'
 import { PROCESSOS_QUERY_KEY, processoDetalheQueryKey } from './processos.constants'
 import { formatarDataHoraSP, textoCampoCpo } from './processos.dates'
@@ -255,6 +256,20 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
               status={processo.movimentacoes_status}
             />
           </div>
+        </div>
+      </details>
+
+      <details className="mt-3 group">
+        <summary className="cursor-pointer list-none text-[11px] font-semibold text-[#6B7280] tracking-wide uppercase select-none hover:text-[#111827] [&::-webkit-details-marker]:hidden">
+          <span className="inline-flex items-center gap-2">
+            Dados públicos (DataJud)
+            <span className="text-[#9CA3AF] font-medium normal-case tracking-normal">
+              (fonte complementar, CNJ)
+            </span>
+          </span>
+        </summary>
+        <div className="mt-4 pt-4 border-t border-[#E5E7EB]">
+          <ProcessoDatajudSecao datajud={processo.datajud} />
         </div>
       </details>
     </section>

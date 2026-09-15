@@ -5,6 +5,7 @@ mascarada do CPF (`cpf_mascarado`) e um booleano de status. O mesmo vale para
 o token OAuth2 do e-mail: o frontend só sabe se está `email_conectado`.
 """
 
+import asyncio
 import json
 import logging
 from typing import Literal
@@ -17,6 +18,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.cpf import mask_cpf
+from app.core.email_provider import detectar_provedor_por_dominio
 from app.core.rate_limit import (
     LIMITE_CREDENCIAL_ESAJ,
     LIMITE_OAUTH_AUTHORIZE,
@@ -41,6 +43,7 @@ from app.schemas.credentials import (
     AuthorizeUrlSchema,
     CredentialStatusSchema,
     EsajCredentialCreateSchema,
+    ProviderSugeridoSchema,
 )
 from app.services import oauth_gmail, oauth_outlook
 from app.services.credential_validation import validacao_em_andamento, validar_credencial_esaj
@@ -282,6 +285,19 @@ async def desconectar_email(current_user: CurrentUser, db: DbSession) -> Credent
 
     logger.info("E-mail desconectado para user_id=%s", current_user.id)
     return _status_schema(credencial, sessao)
+
+
+@router.get("/email/provider-sugerido", response_model=ProviderSugeridoSchema)
+async def provedor_sugerido(current_user: CurrentUser) -> ProviderSugeridoSchema:
+    """Sugere Gmail/Outlook a partir do domínio do e-mail de login
+    (`current_user.email`) — Etapa 9 / ADR-015. Só leitura, sem segredo
+    envolvido, por isso sem rate limit especial (mesmo padrão de `/status`).
+
+    A resolução de MX é bloqueante (`dnspython`) — roda em thread separada
+    pra não travar o event loop do FastAPI.
+    """
+    provider = await asyncio.to_thread(detectar_provedor_por_dominio, current_user.email)
+    return ProviderSugeridoSchema(provider=provider)
 
 
 @router.get("/email/{provider}/authorize", response_model=AuthorizeUrlSchema)

@@ -1,0 +1,192 @@
+<!--
+Fixture sintética — estrutura de tags/classes observada numa captura real
+do CPO (ver ADR-012 / ADR-013), com números/nomes fake. Nunca commitar a
+captura real (gitignorada em scripts/esaj/results/).
+-->
+<html>
+<head><title>Portal de Serviços e-SAJ</title></head>
+<body>
+<div class="unj-entity-header">
+  <div class="unj-entity-header__summary__barra">
+    <div id="containerDadosPrincipaisProcesso" class="container">
+      <span id="numeroProcesso" class="unj-larger-1">0000000-00.2026.8.26.0100</span>
+      <span id="labelClasseProcesso" class="unj-label">Classe</span>
+      <span id="classeProcesso">Procedimento Comum Cível</span>
+      <span id="labelAssuntoProcesso" class="unj-label">Assunto</span>
+      <span id="assuntoProcesso">Contratos Bancários</span>
+      <span id="labelForoProcesso" class="unj-label">Foro</span>
+      <span id="foroProcesso">Foro Central</span>
+      <span id="labelVaraProcesso" class="unj-label">Vara</span>
+      <span id="varaProcesso">1ª Vara Cível</span>
+      <span id="labelJuizProcesso" class="unj-label">Juiz</span>
+      <span id="juizProcesso">Fulano da Silva</span>
+      <span id="labelDistribuicaoProcesso" class="unj-label">Distribuição</span>
+      <div id="dataHoraDistribuicaoProcesso">11/09/2023 às 10:18 - Livre</div>
+      <span id="labelControleProcesso" class="unj-label">Controle</span>
+      <div id="numeroControleProcesso">2023/000350</div>
+      <span id="labelAreaProcesso" class="unj-label">Área</span>
+      <div id="areaProcesso">Cível</div>
+      <span id="lavelValorAcaoProcesso" class="unj-label">Valor da ação</span>
+      <div id="valorAcaoProcesso">R$ 1.000,00</div>
+    </div>
+  </div>
+</div>
+
+<form action="/cpopg/show.do?processo.codigo=FAKE0000" id="popupSenha" style="display: none;" method="POST">
+  <table role="document">
+    <tr>
+      <td>Se for uma parte ou interessado, digite a senha do processo</td>
+    </tr>
+  </table>
+</form>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Partes do processo</h2>
+  </div>
+  <table id="tablePartesPrincipais" style="margin-left:15px; margin-top:1px;">
+    <tr class="fundoClaro">
+      <td valign="top" class="label">Reqte</td>
+      <td class="nomeParteEAdvogado">Parte Ativa Fake<br/>Advogado: Beltrano (OAB 000000/SP)</td>
+    </tr>
+  </table>
+  <table id="tableTodasPartes" style="margin-left:15px; margin-top:1px; display: none;">
+    <tr class="fundoClaro">
+      <td valign="top" class="label">Reqte</td>
+      <td class="nomeParteEAdvogado">Parte Ativa Fake<br/>Advogado: Beltrano (OAB 000000/SP)</td>
+    </tr>
+    <tr class="fundoEscuro">
+      <td valign="top" class="label">Reqdo</td>
+      <td class="nomeParteEAdvogado">Parte Passiva Fake</td>
+    </tr>
+    <tr class="fundoClaro">
+      <td valign="top" class="label">TerIntCer</td>
+      <td class="nomeParteEAdvogado">Terceiro Interessado Fake</td>
+    </tr>
+  </table>
+</div>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Movimentações</h2>
+  </div>
+  <div id="tabsMovimentacoes">
+    <table>
+      <tbody id="tabelaUltimasMovimentacoes">
+        <tr class="fundoClaro containerMovimentacao">
+          <td class="dataMovimentacao" width="120">18/08/2026</td>
+          <td width="20" aria-hidden="true"></td>
+          <td class="descricaoMovimentacao">
+            Certidão de Publicação Expedida
+            <br/>
+            <span style="font-style: italic;">Relação: 999/2026
+
+Data da Publicação: 19/08/2026</span>
+          </td>
+        </tr>
+      </tbody>
+      <tbody style="display: none;" id="tabelaTodasMovimentacoes">
+        <tr class="fundoClaro containerMovimentacao">
+          <td class="dataMovimentacao" width="120">18/08/2026</td>
+          <td width="20" aria-hidden="true"></td>
+          <td class="descricaoMovimentacao">
+            Certidão de Publicação Expedida
+            <br/>
+            <span style="font-style: italic;">Relação: 999/2026
+
+Data da Publicação: 19/08/2026</span>
+          </td>
+        </tr>
+        <tr class="fundoEscuro containerMovimentacao">
+          <td class="dataMovimentacao" width="120">17/08/2026</td>
+          <td width="20" aria-hidden="true"></td>
+          <td class="descricaoMovimentacao">
+            Petição Juntada
+          </td>
+        </tr>
+        <tr class="fundoClaro containerMovimentacao">
+          <td class="dataMovimentacao" width="120">15/08/2026</td>
+          <td width="20" aria-hidden="true"></td>
+          <td class="descricaoMovimentacao">
+            <a class="linkMovVincProc" href="#liberarAutoPorSenha" onclick="javascript:jQuery.saj.validarAberturaIntimacaoNaoRecebida(event, this, 'FAKE0000', 1, '#liberarAutoPorSenha')">
+            </a>
+            Ato Ordinatório - Intimação - DJE
+            <br/>
+            - Manifeste-se a parte autora, no prazo de 15 dias.
+          </td>
+        </tr>
+        <tr class="fundoEscuro containerMovimentacao">
+          <td class="dataMovimentacao" width="120">10/08/2026</td>
+          <td width="20" aria-hidden="true"></td>
+          <td class="descricaoMovimentacao">
+            <a class="linkMovVincProc" href="/cpopg/abrirDocumentoVinculadoMovimentacao.do?processo.codigo=FAKE0000&amp;cdDocumento=123" title="Visualizar documento em inteiro teor"></a>
+            Remetido ao DJE
+            <br/>
+            <span style="font-style: italic;">Relação: 900/2026
+
+Teor do ato: Vistos. Manifeste-se em 10 dias.
+
+Advogados(s): Fulano de Tal (OAB 000000/SP)</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Petições diversas</h2>
+  </div>
+  <table style="margin-left:15px; margin-top:1px;">
+    <tr class="label">
+      <td>Data</td>
+      <td>Tipo</td>
+    </tr>
+    <tr class="fundoClaro">
+      <td>03/10/2023</td>
+      <td>Petição Intermediária<span>Nº Protocolo: FAKE.23.00000001-0 Tipo da Petição: Petição Intermediária Data: 03/10/2023 10:00</span></td>
+    </tr>
+    <tr class="fundoEscuro">
+      <td>17/10/2023</td>
+      <td>Pedido de Habilitação</td>
+    </tr>
+  </table>
+</div>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Incidentes, ações incidentais, recursos e execuções de sentenças</h2>
+  </div>
+  <table style="margin-left:15px; margin-top:1px;">
+    <tr>
+      <td id="processoSemIncidentes">Não há incidentes, ações incidentais, recursos ou execuções de sentenças vinculados a este processo.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Apensos, Entranhados e Unificados</h2>
+  </div>
+  <table style="margin-left:15px; margin-top:1px;">
+    <tbody id="dadosApensosNaoDisponiveis">
+      <tr>
+        <td>Não há processos apensados, entranhados e unificados a este processo.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="div-conteudo container mb-90">
+  <div style="padding-top: 10px;">
+    <h2 class="subtitle tituloDoBloco">Audiências</h2>
+  </div>
+  <table style="margin-left:15px; margin-top:1px;">
+    <tr>
+      <td id="processoSemAudiencias">Não há Audiências futuras vinculadas a este processo.</td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>

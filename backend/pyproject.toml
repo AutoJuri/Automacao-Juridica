@@ -1,0 +1,44 @@
+[project]
+name = "automacao-juridica-backend"
+version = "0.1.0"
+description = "Backend FastAPI da Automação Jurídica (e-SAJ / TJSP)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "bcrypt>=4.2.0",
+    "pyjwt>=2.9.0",
+    "slowapi>=0.1.9",
+    "email-validator>=2.2.0",
+    "cryptography>=43.0.0",
+    "httpx>=0.27.0",
+    "playwright>=1.49.0",
+    # zoneinfo (stdlib) depende da base IANA do SO — no Windows (dev) e em
+    # imagens mínimas de container ela não vem instalada por padrão.
+    "tzdata>=2024.2",
+    # v3 (não v4/beta): API síncrona estável com AsyncIOScheduler, que roda
+    # dentro do próprio event loop do Uvicorn.
+    "apscheduler>=3.10,<4",
+    # Parsing do HTML do CPO (movimentações) — não tem API JSON (ADR-010 / ADR-012).
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.3.0",
+    # Resolução de MX record — detecção de provedor de e-mail (Etapa 9).
+    "dnspython>=2.6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false

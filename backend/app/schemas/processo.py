@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PartePublicSchema(BaseModel):
@@ -172,6 +172,14 @@ class ProcessoDatajudPublicSchema(BaseModel):
     movimentos: list[DatajudMovimentoPublicSchema] = Field(default_factory=list)
     encontrado: bool = False
     ultima_consulta_em: datetime | None = None
+
+    @field_validator("assuntos", "movimentos", mode="before")
+    @classmethod
+    def _jsonb_nulo_vira_lista(cls, valor: object) -> object:
+        # Job DataJud grava JSONB nulo quando não há assuntos/movimentos
+        # (encontrado=false ou lista vazia persistida como None). Sem isso
+        # GET /processos/{id} estoura 500 — default_factory não aplica em None explícito.
+        return [] if valor is None else valor
 
 
 class ProcessoDetalheSchema(ProcessoListSchema):

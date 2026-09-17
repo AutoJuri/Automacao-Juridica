@@ -461,6 +461,39 @@ class TestSchemasSemIdEsaj:
     def test_datajud_para_publico_com_none_devolve_none(self):
         assert datajud_para_publico(None) is None
 
+    def test_datajud_jsonb_nulo_nao_quebra_detalhe(self):
+        """Linha consultada sem assuntos/movimentos (None no JSONB) — o 500
+        em produção vinha de model_validate recusar None em campo list."""
+        processo = SimpleNamespace(
+            id=PROCESSO_ID,
+            tribunal="esaj_tjsp",
+            nu_processo="1002345-67.2025.8.26.0100",
+            de_classe="Classe do e-SAJ",
+            de_assunto=None,
+            instancia=None,
+            parte_ativa=None,
+            parte_passiva=None,
+            last_synced_at=None,
+            url_cpo=None,
+            url_pasta=None,
+        )
+        datajud = SimpleNamespace(
+            classe_nome=None,
+            assuntos=None,
+            orgao_julgador=None,
+            data_ajuizamento=None,
+            grau=None,
+            formato=None,
+            movimentos=None,
+            encontrado=False,
+            ultima_consulta_em=datetime(2026, 9, 16, tzinfo=UTC),
+        )
+        detalhe = processo_para_detalhe(processo, [], [], datajud=datajud)
+        dumped = detalhe.model_dump()
+        assert dumped["datajud"]["encontrado"] is False
+        assert dumped["datajud"]["assuntos"] == []
+        assert dumped["datajud"]["movimentos"] == []
+
     def test_lista_nao_inclui_capa_cpo(self):
         processo = SimpleNamespace(
             id=PROCESSO_ID,

@@ -29,3 +29,5 @@ Gerências abre Andamentos (`/`). `/gerencias` redireciona para `/`. Elaboraçõ
 - Fica mais fácil crescer Elaborações/Drive/Tarefas sem competir com o ciclo e-SAJ na mesma barra.
 - Quem entra em Elaborações perde a rail de propósito — voltar ao acompanhamento é clicar Gerências.
 - A minuta de um processo continua em `/elaboracao/$processoId`; a lista `/elaboracoes` ainda está vazia.
+
+**Atualização (2026-09-21):** Intimações saiu da rail por enquanto. O código da tela permanece; `/intimacoes-diretas` redireciona para Andamentos. O estado atual do menu está em `/docs/modulos/processos.md`.

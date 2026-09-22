@@ -451,6 +451,7 @@ def audiencia_para_painel(
         foro=getattr(ficha, "foro", None) if ficha is not None else None,
         vara=getattr(ficha, "vara", None) if ficha is not None else None,
         juiz=getattr(ficha, "juiz", None) if ficha is not None else None,
+        de_assunto=getattr(ficha, "de_assunto", None) if ficha is not None else None,
         fonte=fonte,
     )
 

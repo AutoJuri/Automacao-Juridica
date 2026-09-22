@@ -47,7 +47,7 @@ Eliminar o trabalho manual de monitoramento processual, entregando ao advogado u
 - App desktop / certificado digital A3
 - Suporte a outros tribunais além do e-SAJ (PJe, eProc, PROJUDI)
 - Notificações por e-mail ou WhatsApp
-- Geração de templates de resposta com IA
+- Geração de templates de resposta com IA (abordagem **decidida** no ADR-016; código ainda não existe)
 - Modelo de monetização / pagamentos
 - Multi-usuário / gestão de equipe dentro do escritório
 - Integração com softwares jurídicos de terceiros (ADVBox, Astrea, etc.)
@@ -57,7 +57,7 @@ Eliminar o trabalho manual de monitoramento processual, entregando ao advogado u
 ### Futuro (pós-MVP)
 - Suporte a outros sistemas judiciais (PJe, eProc, PROJUDI, TRFs)
 - Notificações por e-mail e WhatsApp
-- Geração de templates de resposta com IA baseada nas movimentações
+- Geração de templates / minuta com IA (copiloto da elaboração: sugestão de peça, estilo do modelo, fatos extras, chat/grifo, anexos; jurisprudência só o que o advogado marcar — ADR-016)
 - App mobile (iOS e Android)
 - App desktop com suporte a certificado digital A3 via PKCS#11
 - Modelo de monetização (assinatura mensal ou cobrança por processo — a definir)

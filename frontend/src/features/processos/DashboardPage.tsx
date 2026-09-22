@@ -85,7 +85,7 @@ export function DashboardPage({ processoInicial }: DashboardPageProps) {
           carregando={listaQuery.isLoading}
         />
 
-        <div className="flex flex-1 flex-col gap-4 overflow-hidden min-w-0">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto min-w-0 min-h-0">
           <ArbitroPesquisa
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}

@@ -154,6 +154,7 @@ class TestSchemasSemIdEsaj:
                 foro="Foro",
                 vara="Vara",
                 juiz="Juiz",
+                de_assunto="Fornecimento de medicamentos",
             ),
             user_id=USER_ID,
             titulo="Instrução",
@@ -166,6 +167,7 @@ class TestSchemasSemIdEsaj:
         assert "id_esaj" not in dumped
         assert dumped["fonte"] == "agenda"
         assert dumped["nu_processo"] == "1002561-84.2026.8.26.0100"
+        assert dumped["de_assunto"] == "Fornecimento de medicamentos"
 
     def test_detalhe_nao_carrega_id_esaj_de_audiencia(self):
         processo = SimpleNamespace(

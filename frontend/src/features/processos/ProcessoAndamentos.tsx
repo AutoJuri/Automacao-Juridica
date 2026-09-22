@@ -28,8 +28,11 @@ export function ProcessoAndamentos({
     movimentacoes.find((item) => item.id === selecionadoId) ?? movimentacoes[0] ?? null
 
   return (
-    <section className="flex-1 min-h-0 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-2">
-      <div className="min-h-0 h-full border-b lg:border-b-0 lg:border-r border-[#E5E7EB]">
+    <section
+      // 3rem = py-5 do dashboard (2.5rem) + pb-2 do detalhe (0.5rem). A navbar entra por --navbar-height.
+      className="shrink-0 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-2 lg:h-[calc(100vh-var(--navbar-height)-3rem)]"
+    >
+      <div className="min-h-[50vh] lg:min-h-0 lg:h-full border-b lg:border-b-0 lg:border-r border-[#E5E7EB]">
         <MovimentacoesTimeline
           movimentacoes={movimentacoes}
           selecionadoId={selecionada?.id ?? null}
@@ -37,7 +40,7 @@ export function ProcessoAndamentos({
           status={status}
         />
       </div>
-      <div className="min-h-0 h-full">
+      <div className="min-h-[50vh] lg:min-h-0 lg:h-full">
         <DetalheMovimentacao
           movimentacao={selecionada}
           urlCpo={urlCpo}

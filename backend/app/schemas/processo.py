@@ -99,6 +99,8 @@ class AudienciaPainelSchema(BaseModel):
     foro: str | None = None
     vara: str | None = None
     juiz: str | None = None
+    # Assunto do processo (`Processo.de_assunto`) — objeto do requerimento na pauta.
+    de_assunto: str | None = None
     fonte: Literal["agenda", "cpo"] = "agenda"
 
 

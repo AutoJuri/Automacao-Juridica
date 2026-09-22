@@ -8,7 +8,6 @@ export const SIDEBAR_WIDTH = 80
 export const SECOES_LATERAL = [
   { to: '/', label: 'Andamentos', icone: 'layers' },
   { to: '/consulta-pasta', label: 'Consultas', icone: 'search' },
-  { to: '/intimacoes-diretas', label: 'Intimações', icone: 'inbox', badge: 'intimacoes' },
   { to: '/pautas', label: 'Audiências', icone: 'calendar' },
   { to: '/push-robos', label: 'Push Robôs', icone: 'radio' },
 ] as const

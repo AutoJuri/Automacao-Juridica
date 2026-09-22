@@ -1,9 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link, useMatchRoute } from '@tanstack/react-router'
-import { Calendar, Inbox, Layers, Radio, Search } from 'lucide-react'
+import { Calendar, Layers, Radio, Search } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import { notificacoesListQueryOptions } from '#/features/notificacoes/notifications.query'
 import { cn } from '#/lib/utils'
 import { NAVBAR_HEIGHT } from './Navbar'
 import {
@@ -15,19 +13,12 @@ import {
 const ICONES: Record<IconeLateral, LucideIcon> = {
   layers: Layers,
   search: Search,
-  inbox: Inbox,
   calendar: Calendar,
   radio: Radio,
 }
 
 export function AppSidebar() {
   const matchRoute = useMatchRoute()
-
-  const notificacoesQuery = useQuery(notificacoesListQueryOptions)
-
-  const intimacoesNaoLidas = (notificacoesQuery.data ?? []).filter(
-    (n) => !n.is_read && n.tipo === 'intimacao',
-  ).length
 
   return (
     <aside
@@ -39,8 +30,6 @@ export function AppSidebar() {
         {SECOES_LATERAL.map((item) => {
           const ativo = Boolean(matchRoute({ to: item.to, fuzzy: false }))
           const Icone = ICONES[item.icone]
-          const badge =
-            'badge' in item && item.badge === 'intimacoes' ? intimacoesNaoLidas : 0
 
           return (
             <Link
@@ -59,15 +48,6 @@ export function AppSidebar() {
                 )}
               >
                 <Icone className="h-6 w-6" strokeWidth={1.75} />
-                {badge > 0 ? (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      'absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F59E0B] ring-2',
-                      ativo ? 'ring-[#2563EB]' : 'ring-white',
-                    )}
-                  />
-                ) : null}
               </span>
               <span
                 className={cn(
@@ -78,7 +58,6 @@ export function AppSidebar() {
                 )}
               >
                 {item.label}
-                {badge > 0 ? ` (${badge > 9 ? '9+' : badge})` : ''}
               </span>
             </Link>
           )

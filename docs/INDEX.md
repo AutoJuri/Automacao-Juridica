@@ -12,7 +12,7 @@
 - **Scraping:** Playwright (login e-SAJ, headless, Etapa 6+) + httpx (APIs internas) + BeautifulSoup4 (HTML)
 - **Banco:** PostgreSQL no Railway
 - **Criptografia:** AES-256-GCM via `cryptography` lib (Etapa 5+)
-- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015)
+- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015), LLM da elaboração via API (padrão Claude Sonnet 5, só no backend — ADR-016, ainda não implementado)
 - **Infra:** Monorepo (frontend/ + backend/), Dockerfile + `railway.toml` da API (ver `/docs/modulos/deploy.md`), Railway
 
 ---
@@ -38,6 +38,7 @@
 - Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
 - Scheduler **off** em `APP_ENV=development` (override `SCHEDULER_ENABLED=true`); em produção liga sozinho
 - DataJud: complemento somente-leitura em tabela separada (`processos_datajud`), nunca sobrescreve campos do e-SAJ; job diário isolado do ciclo de 10 min; alias de tribunal resolvido genericamente por número CNJ, não hardcode de TJSP (ADR-015)
+- IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem RAG jurídico nacional no v1; Gemini free só com texto sintético (ADR-016)
 - Rate limit (429) nos pipes vira `bloqueado` com backoff, sem invalidar o cookie — só sessão inválida/erro de login zera o cookie (ADR-011)
 - `reauth_pendente` e cookie `ativo` expirado disparam reauth no próximo tick de 10 min; duplicata de Playwright no mesmo processo é barrada por `_VALIDACOES_EM_ANDAMENTO` (fecha o gap da ADR-008)
 - Contexto Playwright **isolado por advogado** — nunca compartilhado, sempre headless em produção
@@ -91,7 +92,7 @@ automacao-juridica/
 │       ├── features/
 │       │   ├── auth/
 │       │   ├── processos/
-│       │   ├── elaboracao/    → minuta TipTap (ficha real; IA ainda não gera)
+│       │   ├── elaboracao/    → minuta TipTap (ficha real; IA: ADR-016, ainda não gera)
 │       │   ├── secoes/        → placeholders (Gerências, Drive, Tarefas…)
 │       │   ├── notificacoes/
 │       │   └── settings/
@@ -152,6 +153,7 @@ automacao-juridica/
 | ADR-013 | CPO enriquece a ficha (capa, partes, petições, audiências da página); JSON segue classe/assunto/polos/intimações/agenda | `/docs/decisions/013-cpo-enriquece-ficha.md` |
 | ADR-014 | Chrome em dois eixos: áreas no topo, rail operacional só em Gerências | `/docs/decisions/014-chrome-dois-eixos.md` |
 | ADR-015 | DataJud em tabela separada, job diário isolado, resolução de tribunal genérica por número CNJ | `/docs/decisions/015-datajud-complemento-generico.md` |
+| ADR-016 | IA da elaboração via API (copiloto da minuta; padrão Claude Sonnet 5; sem busca de jurisprudência na web no v1) | `/docs/decisions/016-ia-elaboracao-llm-api.md` |
 
 ---
 

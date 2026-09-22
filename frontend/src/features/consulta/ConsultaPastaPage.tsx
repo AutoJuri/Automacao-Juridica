@@ -310,15 +310,6 @@ function FichaConsulta({
             <Sparkles className="w-3.5 h-3.5" aria-hidden />
             Diagnóstico IA (Gemini)
           </button>
-          <button
-            type="button"
-            disabled
-            title="Peticionamento ainda não está em operação"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 text-[12px] font-semibold text-white opacity-50"
-          >
-            <FileText className="w-3.5 h-3.5" aria-hidden />
-            Peticionar
-          </button>
         </div>
       </div>
 

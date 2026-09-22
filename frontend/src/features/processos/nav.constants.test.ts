@@ -12,7 +12,6 @@ describe('SECOES_LATERAL', () => {
     expect(SECOES_LATERAL.map((item) => [item.to, item.label])).toEqual([
       ['/', 'Andamentos'],
       ['/consulta-pasta', 'Consultas'],
-      ['/intimacoes-diretas', 'Intimações'],
       ['/pautas', 'Audiências'],
       ['/push-robos', 'Push Robôs'],
     ])

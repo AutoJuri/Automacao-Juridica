@@ -16,6 +16,7 @@ export const PAUTAS_MOCK: AudienciaPainel[] = [
     foro: 'Foro Central Cível',
     vara: '12ª Vara da Fazenda Pública',
     juiz: 'Dr. Rodrigo Amaral',
+    de_assunto: 'Fornecimento de medicamentos',
     fonte: 'agenda',
   },
   {
@@ -32,6 +33,7 @@ export const PAUTAS_MOCK: AudienciaPainel[] = [
     foro: 'Subseção Judiciária de São Paulo',
     vara: '1ª Vara Federal Previdenciária',
     juiz: 'Dra. Raquel Fernandes Mortani',
+    de_assunto: 'Aposentadoria por invalidez',
     fonte: 'agenda',
   },
   {
@@ -48,6 +50,7 @@ export const PAUTAS_MOCK: AudienciaPainel[] = [
     foro: 'Tribunal de Justiça de SP',
     vara: '21ª Câmara de Direito Privado',
     juiz: 'Des. Décio Rodrigues (Relator)',
+    de_assunto: 'Revisional de contrato bancário',
     fonte: 'agenda',
   },
 ]

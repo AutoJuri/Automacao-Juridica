@@ -14,27 +14,31 @@ import { CenterPanel } from './CenterPanel'
 import { RightPanel } from './RightPanel'
 import { DocumentActions } from './DocumentToolbar'
 import { modelosPeca } from './elaboracao.mock'
-import {
-  adicionarVersao,
-  chaveVersoes,
-  lerVersoes,
-  type VersaoMinuta,
-} from './elaboracao.versoes'
+import { sanitizarHtmlMinuta } from './elaboracao.sanitize'
+import { useElaboracao, useSugestaoPeca } from './useElaboracao'
 
 interface ElaboracaoPageProps {
   processoId: string
+  /** `peca` que veio na URL (query param) quando o advogado chegou pelo
+   * card "Ação sugerida" do cabeçalho do processo — ADR-016 Fase 1. */
+  pecaSugeridaNaUrl?: string | null
 }
 
-export function ElaboracaoPage({ processoId }: ElaboracaoPageProps) {
+function pecaValida(id: string | null | undefined): id is string {
+  return Boolean(id) && modelosPeca.some((m) => m.id === id)
+}
+
+export function ElaboracaoPage({ processoId, pecaSugeridaNaUrl = null }: ElaboracaoPageProps) {
   const navigate = useNavigate()
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
-  const [pecaSelecionada, setPecaSelecionada] = useState(modelosPeca[0].id)
+  const [pecaSelecionada, setPecaSelecionada] = useState(
+    pecaValida(pecaSugeridaNaUrl) ? pecaSugeridaNaUrl : modelosPeca[0].id,
+  )
   const [editando, setEditando] = useState(false)
   const [highlightAtivo, setHighlightAtivo] = useState(true)
   const [iconesJuris, setIconesJuris] = useState(false)
   const [chatInput, setChatInput] = useState('')
-  const [versoes, setVersoes] = useState<VersaoMinuta[]>([])
   const [versaoAtivaId, setVersaoAtivaId] = useState<string | null>(null)
   const editorRef = useRef<Editor | null>(null)
   const onEditorChange = useCallback((editor: Editor | null) => {
@@ -49,34 +53,68 @@ export function ElaboracaoPage({ processoId }: ElaboracaoPageProps) {
   const pecaNome = modelosPeca.find((m) => m.id === pecaSelecionada)?.nome ?? 'Contestação'
   const processo = detalheQuery.data
 
-  useEffect(() => {
-    const bruto = localStorage.getItem(chaveVersoes(processoId, pecaSelecionada))
-    setVersoes(lerVersoes(bruto))
-    setVersaoAtivaId(null)
-  }, [processoId, pecaSelecionada])
+  const elaboracao = useElaboracao(processoId, pecaSelecionada, Boolean(processo))
 
-  const onSalvarVersao = useCallback(() => {
-    const html = editorRef.current?.getHTML()?.trim()
-    if (!html) {
+  // Mesma query (e mesma chave) que o cabeçalho do processo já buscou antes
+  // de navegar pra aqui — cache quente na maioria das vezes. Serve tanto de
+  // fallback (navegação direta/bookmark sem `peca` na URL) quanto de fonte
+  // da explicação exibida no seletor. Só é aplicada ao `pecaSelecionada`
+  // uma vez: depois que o advogado troca manualmente, a sugestão nunca mais
+  // sobrescreve o seletor (ADR-016 Fase 1).
+  const sugestaoAplicadaRef = useRef(pecaValida(pecaSugeridaNaUrl))
+  const sugestaoPecaQuery = useSugestaoPeca(processoId, Boolean(processo))
+
+  useEffect(() => {
+    if (sugestaoAplicadaRef.current) return
+    const sugerida = sugestaoPecaQuery.data?.peca
+    if (pecaValida(sugerida)) {
+      sugestaoAplicadaRef.current = true
+      setPecaSelecionada(sugerida)
+    }
+  }, [sugestaoPecaQuery.data])
+
+  function onPecaChange(id: string) {
+    sugestaoAplicadaRef.current = true // advogado assumiu o controle — não sobrescreve mais
+    setPecaSelecionada(id)
+  }
+
+  // Reaplica a versão mais recente no editor quando ela chega por uma ação
+  // de IA (Elaborar/chat/grifo) sem trocar de peça — trocar de peça já é
+  // coberto pelo reset por `chave` dentro de `useMinutaEditor`.
+  const chaveAtualRef = useRef('')
+  const versaoAplicadaRef = useRef<string | null>(null)
+  const versaoMaisRecente = elaboracao.versoesQuery.data?.[0] ?? null
+
+  useEffect(() => {
+    const chaveAtual = `${processoId}:${pecaSelecionada}`
+    if (chaveAtualRef.current !== chaveAtual) {
+      chaveAtualRef.current = chaveAtual
+      versaoAplicadaRef.current = versaoMaisRecente?.id ?? null
+      setVersaoAtivaId(versaoMaisRecente?.id ?? null)
       return
     }
-    const lista = adicionarVersao(versoes, html, new Date())
-    setVersoes(lista)
-    setVersaoAtivaId(lista[0]?.id ?? null)
-    localStorage.setItem(chaveVersoes(processoId, pecaSelecionada), JSON.stringify(lista))
-  }, [versoes, processoId, pecaSelecionada])
+    if (!versaoMaisRecente || !editorRef.current) {
+      return
+    }
+    if (versaoAplicadaRef.current === versaoMaisRecente.id) {
+      return
+    }
+    versaoAplicadaRef.current = versaoMaisRecente.id
+    editorRef.current.commands.setContent(sanitizarHtmlMinuta(versaoMaisRecente.conteudo_html))
+    setVersaoAtivaId(versaoMaisRecente.id)
+  }, [processoId, pecaSelecionada, versaoMaisRecente])
 
   const onRestaurarVersao = useCallback(
     (id: string) => {
-      const versao = versoes.find((item) => item.id === id)
+      const versao = elaboracao.versoesQuery.data?.find((item) => item.id === id)
       if (!versao || !editorRef.current) {
         return
       }
-      editorRef.current.commands.setContent(versao.html)
+      editorRef.current.commands.setContent(sanitizarHtmlMinuta(versao.conteudo_html))
+      versaoAplicadaRef.current = id
       setVersaoAtivaId(id)
-      setEditando(true)
     },
-    [versoes],
+    [elaboracao.versoesQuery.data],
   )
 
   return (
@@ -151,9 +189,22 @@ export function ElaboracaoPage({ processoId }: ElaboracaoPageProps) {
               collapsed={leftCollapsed}
               onToggle={() => setLeftCollapsed((v) => !v)}
               pecaSelecionada={pecaSelecionada}
-              onPecaChange={setPecaSelecionada}
+              onPecaChange={onPecaChange}
+              sugestaoPeca={
+                sugestaoPecaQuery.data?.peca === pecaSelecionada
+                  ? sugestaoPecaQuery.data
+                  : null
+              }
               processo={processo ?? null}
               carregando={detalheQuery.isLoading}
+              fatosExtras={elaboracao.sessaoQuery.data?.fatos_extras ?? null}
+              onSalvarFatosExtras={(texto) => elaboracao.salvarFatosExtras.mutate(texto)}
+              salvandoFatosExtras={elaboracao.salvarFatosExtras.isPending}
+              fatosExtrasDesabilitado={!elaboracao.elaboracaoId}
+              elaboracaoId={elaboracao.elaboracaoId}
+              estiloAtual={elaboracao.sessaoQuery.data?.estilo_perfil ?? null}
+              onSalvarEstilo={(texto) => elaboracao.definirEstilo.mutate(texto)}
+              salvandoEstilo={elaboracao.definirEstilo.isPending}
             />
 
             <CenterPanel
@@ -168,15 +219,16 @@ export function ElaboracaoPage({ processoId }: ElaboracaoPageProps) {
               processo={processo ?? null}
               carregando={detalheQuery.isLoading}
               onEditorChange={onEditorChange}
+              elaboracao={elaboracao}
             />
 
             <RightPanel
               collapsed={rightCollapsed}
               onToggle={() => setRightCollapsed((v) => !v)}
               processo={processo ?? null}
-              versoes={versoes}
+              versoes={elaboracao.versoesQuery.data ?? []}
               versaoAtivaId={versaoAtivaId}
-              onSalvarVersao={onSalvarVersao}
+              carregandoVersoes={elaboracao.versoesQuery.isLoading}
               onRestaurarVersao={onRestaurarVersao}
             />
           </>

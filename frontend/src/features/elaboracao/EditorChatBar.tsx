@@ -1,4 +1,4 @@
-import { Highlighter, Scale, MessageSquare, Sparkles } from 'lucide-react'
+import { Highlighter, Loader2, Scale, MessageSquare, Send, Sparkles } from 'lucide-react'
 import { Switch } from '#/components/ui/switch'
 import { Label } from '#/components/ui/label'
 import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
@@ -10,6 +10,13 @@ interface EditorChatBarProps {
   iconesJuris: boolean
   onToggleHighlight: (v: boolean) => void
   onToggleIcones: (v: boolean) => void
+  podeElaborar: boolean
+  elaborando: boolean
+  onElaborar: () => void
+  podeConversar: boolean
+  enviandoChat: boolean
+  onEnviarChat: () => void
+  erro: string | null
 }
 
 export function EditorChatBar({
@@ -19,7 +26,31 @@ export function EditorChatBar({
   iconesJuris,
   onToggleHighlight,
   onToggleIcones,
+  podeElaborar,
+  elaborando,
+  onElaborar,
+  podeConversar,
+  enviandoChat,
+  onEnviarChat,
+  erro,
 }: EditorChatBarProps) {
+  const instrucao = chatInput.trim()
+  const modoEnviar = podeConversar && instrucao.length > 0
+  const ocupado = elaborando || enviandoChat
+  const dica = modoEnviar
+    ? 'Enter ou Enviar aplica a instrução na minuta atual.'
+    : podeConversar
+      ? 'Com o campo vazio, Elaborar gera o rascunho de novo.'
+      : 'Clique em Elaborar para gerar o primeiro rascunho. O campo abre depois disso.'
+
+  function acionar() {
+    if (modoEnviar) {
+      onEnviarChat()
+      return
+    }
+    onElaborar()
+  }
+
   return (
     <div className="border-t border-[#E5E7EB] bg-white px-4 py-3.5 shrink-0">
       <div className="flex items-center gap-3 max-w-[960px] mx-auto">
@@ -28,19 +59,46 @@ export function EditorChatBar({
           <input
             value={chatInput}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Chat para interação com a IA (ex: 'Inclua preliminar de prescrição')..."
-            className={`w-full h-12 rounded-xl border border-[#E5E7EB] bg-[#F8F9FC] pl-10 pr-3 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] ${FOCO_CAMPO}`}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || e.shiftKey) {
+                return
+              }
+              e.preventDefault()
+              if (modoEnviar && !ocupado) {
+                onEnviarChat()
+              }
+            }}
+            disabled={!podeConversar || enviandoChat}
+            placeholder={
+              podeConversar
+                ? "Descreva a alteração na minuta e envie (ex.: 'Inclua preliminar de prescrição')"
+                : 'Elabore o primeiro rascunho para descrever alterações aqui'
+            }
+            className={`w-full h-12 rounded-xl border border-[#E5E7EB] bg-[#F8F9FC] pl-10 pr-3 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] disabled:opacity-60 disabled:cursor-not-allowed ${FOCO_CAMPO}`}
             {...propsFocoCampo}
           />
         </div>
         <button
           type="button"
-          disabled
-          title="Geração de peça ainda não está em operação"
-          className="h-12 px-5 rounded-xl bg-[#2563EB] text-white text-[13px] font-semibold tracking-wide opacity-50 shrink-0 inline-flex items-center gap-2"
+          disabled={modoEnviar ? ocupado : !podeElaborar || ocupado}
+          onClick={acionar}
+          title={
+            modoEnviar
+              ? 'Enviar instrução para editar a minuta'
+              : podeElaborar
+                ? 'Gerar rascunho com a IA'
+                : 'Carregando sessão de elaboração…'
+          }
+          className="h-12 px-5 rounded-xl bg-[#2563EB] text-white text-[13px] font-semibold tracking-wide shrink-0 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#1D4ED8]"
         >
-          <Sparkles className="w-4 h-4" aria-hidden />
-          Elaborar
+          {ocupado ? (
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+          ) : modoEnviar ? (
+            <Send className="w-4 h-4" aria-hidden />
+          ) : (
+            <Sparkles className="w-4 h-4" aria-hidden />
+          )}
+          {modoEnviar ? 'Enviar' : 'Elaborar'}
         </button>
       </div>
 
@@ -59,10 +117,14 @@ export function EditorChatBar({
           checked={iconesJuris}
           onChange={onToggleIcones}
         />
-        <p className="text-[11px] text-[#9CA3AF]">
-          Dica: pressione Enter para elaborar com IA — ainda não está ligada.
-        </p>
+        <p className="text-[11px] text-[#9CA3AF]">{dica}</p>
       </div>
+
+      {erro ? (
+        <p className="max-w-[960px] mx-auto mt-2 text-[12px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-md px-2.5 py-1.5">
+          {erro}
+        </p>
+      ) : null}
     </div>
   )
 }

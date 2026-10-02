@@ -6,15 +6,15 @@ import type { ProcessoDetalhe } from '#/features/processos/processos.types'
 import { MedidorCompletude } from './MedidorCompletude'
 import { JurisprudenciaPanel } from './JurisprudenciaPanel'
 import { HistoricoVersoes } from './HistoricoVersoes'
-import type { VersaoMinuta } from './elaboracao.versoes'
+import type { VersaoMinutaApi } from './elaboracao.types'
 
 interface RightPanelProps {
   collapsed: boolean
   onToggle: () => void
   processo: ProcessoDetalhe | null
-  versoes: VersaoMinuta[]
+  versoes: VersaoMinutaApi[]
   versaoAtivaId: string | null
-  onSalvarVersao: () => void
+  carregandoVersoes: boolean
   onRestaurarVersao: (id: string) => void
 }
 
@@ -24,7 +24,7 @@ export function RightPanel({
   processo,
   versoes,
   versaoAtivaId,
-  onSalvarVersao,
+  carregandoVersoes,
   onRestaurarVersao,
 }: RightPanelProps) {
   return (
@@ -65,7 +65,7 @@ export function RightPanel({
             <HistoricoVersoes
               versoes={versoes}
               versaoAtivaId={versaoAtivaId}
-              onSalvar={onSalvarVersao}
+              carregando={carregandoVersoes}
               onRestaurar={onRestaurarVersao}
             />
           </div>

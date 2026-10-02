@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     # por padrão: não trava o boot, o job diário só loga e não consulta.
     datajud_api_key: str = ""
 
+    # IA da elaboração (ADR-016) — adapter plugável, nunca chamado do
+    # frontend. `stub` é o padrão: gera/edita a minuta sem rede, para testar
+    # a canaleta completa antes de existir uma chave de provedor real.
+    # Trocar para `anthropic` ou `openrouter` é só variável de ambiente —
+    # nenhum código de chamada muda.
+    llm_provider: str = "stub"
+    llm_model: str = ""
+    anthropic_api_key: str = ""
+    # Chave da conta OpenRouter (não é por modelo). Vazia por padrão: o
+    # boot não trava; `LLM_PROVIDER=openrouter` falha na primeira chamada.
+    openrouter_api_key: str = ""
+    # Teto de tokens de saída — ADR-016 §3 (nunca travar o Uvicorn do
+    # Playwright com geração sem limite).
+    llm_max_output_tokens: int = 4000
+
     @model_validator(mode="after")
     def _rejeita_segredos_placeholder(self) -> "Settings":
         """Impede subir fora de development com os segredos de exemplo."""

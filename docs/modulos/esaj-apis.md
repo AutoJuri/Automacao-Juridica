@@ -1,6 +1,6 @@
 # Módulo: Contrato das APIs internas do e-SAJ (TJSP)
 
-> Última atualização: 2026-08-25
+> Última atualização: 2026-10-01
 > Camada: Backend / Scraping
 
 ---
@@ -223,11 +223,11 @@ Se o produto pedir um card “aguardando assinatura” depois: unique `cdProtoco
 
 HTML da página inteira, não JSON. Fetch via `esaj_http.buscar_html` (headers de navegação de página, sem `X-Requested-With`). Parseado com BeautifulSoup/lxml em `esaj_cpo_parser.parsear_cpo_html` — ver ADR-012 (movimentações) e ADR-013 (capa e demais blocos). Achados de capturas reais (`backend/scripts/capturar_cpo.py`, HTML gitignorado):
 
-- Existem **dois** `<tbody>` com as movimentações: `tabelaUltimasMovimentacoes` (só as últimas N, visível por padrão no portal) e `tabelaTodasMovimentacoes` (**todas**, com `style="display: none"` — só oculto por CSS, o HTML já vem completo, sem paginação AJAX). **O parser usa sempre o segundo.**
+- Existem **dois** `<tbody>` com as movimentações quando o histórico já vem na ficha: `tabelaUltimasMovimentacoes` (só as últimas N, visível por padrão no portal) e `tabelaTodasMovimentacoes` (**todas**, com `style="display: none"`). **O parser usa sempre o segundo.** Desde 2026-09-29, parte das fichas **não** traz nenhum dos dois: traz `#btnExibirMovimentacoes` e as linhas saem de `GET /cpopg/carregarMovimentacoesAjax.do?processo.codigo=` (XHR), paginadas por cursor opaco (`input#cursorMovimentacoesPaginado` na primeira página, `tr#trCursorMovimentacoes` nas seguintes). O pipe segue até 40 páginas. O cursor não é gravado nem logado.
 - Cada linha é um `tr.containerMovimentacao` dentro do `tbody`, com `td.dataMovimentacao` (`dd/mm/aaaa`, sem hora) e `td.descricaoMovimentacao` (texto livre: 1ª linha = título curto; linhas seguintes, quando existem, vêm de um `<span style="font-style: italic;">` com detalhe — "Relação: X", "Teor do ato: ...", "Advogados(s): ...").
 - **Documento vinculado:** `a.linkMovVincProc` (“Visualizar documento em inteiro teor”). Href real `/cpopg/abrirDocumentoVinculadoMovimentacao.do?...` vira URL `https://esaj.tjsp.jus.br/...` (`tem_documento=true`, `url_documento` preenchida). `#liberarAutoPorSenha` (pede senha dos autos / ciência) só marca `tem_documento=true` — **nunca** vira `url_documento`. `javascript:` e outros hosts são descartados.
 - **Sem problema de cabeçalho-como-linha** nas movimentações. Nas 4 capturas acessíveis da rodada inicial, todas as 662 linhas somadas tinham `data` e `descricao` preenchidos. Petições diversas e audiências CPO **têm** cabeçalho `tr.label` (1ª linha `Data` / `Tipo` etc.) — o parser descarta essa linha.
-- **O popup `#popupSenha`** ("Se for uma parte ou interessado, digite a senha do processo") está presente em **toda** página, inclusive nas acessíveis — não é sinal de bloqueio. O sinal real é a **ausência** do `tbody#tabelaTodasMovimentacoes` no HTML. Com `requer_senha_processo=True` **não** se grava capa/partes/petições/audiências CPO (ADR-013).
+- **O popup `#popupSenha`** ("Se for uma parte ou interessado, digite a senha do processo") está presente em **toda** página, inclusive nas acessíveis — não é sinal de bloqueio. O sinal de falta de acesso é a ausência **ao mesmo tempo** de `tbody#tabelaTodasMovimentacoes` e de `#btnExibirMovimentacoes`. Em 2026-10-01, fichas que continuaram vazias depois do AJAX responderam `200` em `show.do` com a moldura da página e `containerDadosPrincipaisProcesso` sem texto: nem tabela, nem botão, nem foro. É o mesmo ramo de falta de acesso — o portal não mandou o corpo do processo, e o popup de senha (presente também nas fichas cheias) não explica o vazio. Com `requer_senha_processo=True` **não** se grava capa/partes/petições/audiências CPO (ADR-013). Ficha com o botão grava capa e petições deste HTML e as movimentações do AJAX.
 - Blocos localizados pelo `h2.tituloDoBloco` (texto normalizado, sem acento) — a tabela de petições **não** tem `id` estável.
 - Campos JSON (`de_classe`, `de_assunto`, polos) **não** são sobrescritos pelo CPO.
 
@@ -238,7 +238,8 @@ HTML da página inteira, não JSON. Fetch via `esaj_http.buscar_html` (headers d
 | `td.descricaoMovimentacao` (texto completo) | `movimentacoes.descricao` | Título + detalhe, igual ao que o portal mostra |
 | `a.linkMovVincProc` com path `abrirDocumentoVinculadoMovimentacao.do` | `movimentacoes.tem_documento` + `url_documento` | Só https no host `esaj.tjsp.jus.br`; URL longa demais vira `None` (não trunca) |
 | `a.linkMovVincProc` com `#liberarAutoPorSenha` | `movimentacoes.tem_documento=true`, `url_documento=None` | Pede senha dos autos — a SPA abre a ficha CPO (`url_cpo`), nunca o hash |
-| Ausência de `tabelaTodasMovimentacoes` | `requer_senha_processo=True` | Pula o processo neste ciclo; **não** pede/guarda senha de autos |
+| Ausência de `tabelaTodasMovimentacoes` **e** de `#btnExibirMovimentacoes` | `requer_senha_processo=True` | Pula movimentações neste ciclo; **não** pede/guarda senha de autos |
+| `#btnExibirMovimentacoes` | `carregarMovimentacoesAjax.do` | Capa/petições saem do `show.do`; linhas saem do AJAX, até 40 páginas |
 | `#foroProcesso`, `#varaProcesso`, `#juizProcesso`, `#dataHoraDistribuicaoProcesso`, `#numeroControleProcesso`, `#areaProcesso`, `#valorAcaoProcesso` | `processos.foro` / `vara` / `juiz` / `distribuicao` / `controle` / `area` / `valor_acao` | Texto do portal; **não** parsear moeda. Label do valor tem typo `lavelValorAcaoProcesso` — usar o **id do valor**. Classe/assunto JSON não entram aqui |
 | `#tableTodasPartes` (`td.label` + `td.nomeParteEAdvogado`) | `processos.partes_cpo` JSONB `[{papel, nome, advogados}]` | Quando essa tabela **não vem** no HTML, usa `tablePartesPrincipais` (lista visível). Polo JSON do card não muda |
 | Tabela após `h2` “Petições diversas” | `peticoes_diversas` | Descarta `tr.label`. Unique: protocolo na linha se existir; senão hash `data\|tipo\|texto_extra` |
@@ -312,7 +313,7 @@ O parser (`esaj_cpo_parser.parsear_cpo_html`) foi rodado contra as 5 capturas re
 - **Cookie só em memória no job:** decriptar `cookie_encrypted` na hora do GET, nunca logar, nunca devolver na nossa API. `executar_ciclo_usuario` recusa sessão `ativo` com `cookie_expirado()`
 - **Diff por unique:** intimação = `id` da API em `id_esaj`; audiência = id composto `cdProcesso|dataAudiencia|titulo` (ADR-010); movimentação = `(processo_id, data_movimentacao, descricao_hash)` (ADR-012); processo = upsert
 - **Throttle por processo, não por advogado:** `pipe_movimentacoes` busca só um lote pequeno (`MOVIMENTACOES_LOTE`) por ciclo, round-robin via `Processo.movimentacoes_synced_at` — nunca todos os processos de uma vez (ADR-012)
-- **Bloqueio de CPO é ausência de dado, não texto de popup:** `tabelaTodasMovimentacoes` ausente no HTML ⇒ `requer_senha_processo=True`; nunca inferir isso do popup `#popupSenha` (presente em toda página, inclusive acessível)
+- **Bloqueio de CPO é ausência de dado, não texto de popup:** sem `tabelaTodasMovimentacoes` **e** sem `#btnExibirMovimentacoes` ⇒ `requer_senha_processo=True`; nunca inferir isso do popup `#popupSenha` (presente em toda página, inclusive acessível). Com o botão, as linhas vêm de `carregarMovimentacoesAjax.do`
 - **Timezone:** timestamps da API vêm **sem offset**. Validação 2026-08-20: o instante gravado como UTC bateu com a hora de Brasília do portal (17:00 UTC = 14:00 BRT). O painel deve **exibir** em `America/Sao_Paulo`. Não assumir mais, sem conferir, que o naive da API já é horário de Brasília (isso deslocaria +3h na UI).
 - **Exemplos neste doc:** sempre sanitizados. `scripts/esaj/results/` permanece gitignorado
 - **Escopo:** só XHR das telas do MVP + CPO da capa. Outras rotas (prazos, mensagens, PDF) = backlog quando o UI pedir o campo
@@ -418,7 +419,8 @@ Módulos que já dependem deste:
 | `cdProcesso` no ciclo | União intimação + audiência + `processos` já salvos; omitido no 200 = skip |
 | Carteira completa | Importação à parte; não bloqueia os pipes de monitoramento |
 | Movimentações — fonte | `tbody#tabelaTodasMovimentacoes` do HTML do CPO (ADR-012); nunca `tabelaUltimasMovimentacoes` |
-| Movimentações — bloqueio | Ausência da tabela no HTML ⇒ `requer_senha_processo=True`; nunca o texto do popup de senha (ADR-012) |
+| Movimentações — bloqueio | Sem a tabela **e** sem `#btnExibirMovimentacoes` ⇒ `requer_senha_processo=True`; nunca o texto do popup de senha (ADR-012) |
+| Movimentações — sob demanda | `#btnExibirMovimentacoes` ⇒ `GET /cpopg/carregarMovimentacoesAjax.do`, até 40 páginas; cursor não é gravado nem logado |
 | CPO — throttle | Lote pequeno por ciclo, round-robin via `Processo.movimentacoes_synced_at`; vale para capa/partes/petições/audiências CPO também (ADR-012, ADR-013) |
 | Capa / partes CPO | Complementam a ficha; **não** sobrescrevem classe/assunto/polos JSON (ADR-013) |
 | Audiências CPO | Tabela `audiencias_cpo`; não misturar com `audiencias` (ADR-013) |
@@ -450,3 +452,5 @@ O PRD falava "salva nova versão": no schema atual isso **já** é upsert + appe
 | 2026-08-24 | Documento vinculado: `tem_documento` / `url_documento` a partir de `a.linkMovVincProc`; `#liberarAutoPorSenha` não vira URL; backfill no diff das linhas já persistidas |
 | 2026-08-25 | CPO complementar (ADR-013): o mesmo HTML do lote de 5 preenche capa, `partes_cpo`, `peticoes_diversas`, `audiencias_cpo` e flags de incidentes/apensos; JSON segue classe/assunto/polos/intimações/agenda |
 | 2026-08-26 | Hardening CPO: `url_cpo_publica` no ETL/pipe; throttle não avança em `IntegrityError`; flags de empty state não apagam `True` |
+| 2026-09-29 | Ficha com `#btnExibirMovimentacoes` busca `carregarMovimentacoesAjax.do` (até 40 páginas). Sem a tabela e sem o botão continua `requer_senha_processo`. Processos já marcados sem nenhuma movimentação voltam para a fila |
+| 2026-10-01 | Ficha `200` com o container principal vazio (sem tabela e sem botão) permanece no ramo de falta de acesso. Não é o popup de senha |

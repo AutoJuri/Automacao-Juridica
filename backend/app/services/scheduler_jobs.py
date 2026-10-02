@@ -16,6 +16,7 @@ Cada advogado é isolado em seu próprio `try/except` (`security.mdc` §8) —
 falha em um nunca impede os demais.
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -39,6 +40,12 @@ from app.services.coleta_esaj import executar_ciclo_usuario
 from app.services.credential_validation import validacao_em_andamento, validar_credencial_esaj
 
 logger = logging.getLogger(__name__)
+
+# O ciclo interno já tem teto de 60s, e o login de 60s. Este aqui é a rede
+# de segurança: se um await não honrar o cancelamento (thread do Playwright
+# ou conexão presa no proxy do banco), o job precisa devolver o slot do
+# APScheduler. Sem isso, `max_instances=1` pula todos os ciclos seguintes.
+_TETO_ADVOGADO_SEGUNDOS = 120.0
 
 # Status de erro que, uma vez o backoff (`proximo_retry`) passado, merecem
 # uma nova tentativa de login completo (o cookie não é confiável nesses
@@ -72,6 +79,38 @@ async def _reativar_apos_bloqueio(user_id: UUID) -> None:
             await db.commit()
 
 
+def _observar_tarefa_abandonada(tarefa: asyncio.Task[None]) -> None:
+    if tarefa.cancelled():
+        return
+    exc = tarefa.exception()
+    if exc is not None:
+        logger.warning("Ciclo abandonado pelo teto terminou com %s", type(exc).__name__)
+
+
+async def _aguardar_advogado(
+    coro, *, timeout: float, user_id: UUID, rotulo: str = "Ciclo de 10 minutos"
+) -> None:
+    """Espera o trabalho de um advogado, mas devolve o job se ele passar do teto.
+
+    `shield` faz o cancelamento do teto soltar esta função na hora. A tarefa
+    interna é cancelada em seguida; se ela não morrer (thread presa), o
+    próximo tick segue para os outros advogados em vez de ficar mudo por horas.
+    """
+    tarefa = asyncio.create_task(coro)
+    try:
+        async with asyncio.timeout(timeout):
+            await asyncio.shield(tarefa)
+    except TimeoutError:
+        logger.warning(
+            "%s estourou o teto de %ss (user_id=%s)",
+            rotulo,
+            int(timeout),
+            user_id,
+        )
+        tarefa.add_done_callback(_observar_tarefa_abandonada)
+        tarefa.cancel()
+
+
 async def _processar_advogado(user_id: UUID, sessao: TribunalSession | None, agora: datetime) -> None:
     # Playwright já está anulando/trocando o cookie deste advogado (renovação
     # noturna, Revalidar, ou tick anterior). Pipes neste instante usariam um
@@ -100,8 +139,8 @@ async def _processar_advogado(user_id: UUID, sessao: TribunalSession | None, ago
         return
 
     if sessao.status == SESSION_STATUS_REAUTH_PENDENTE:
-        # Sem espera de 5 min: duplicata no mesmo processo já é barrada por
-        # `_VALIDACOES_EM_ANDAMENTO`. Depois de um restart, retentar na hora
+        # Sem espera de 5 min: duplicata no mesmo processo já é barrada pela
+        # flag de login (expira em 180s). Depois de um restart, retentar na hora
         # fecha o gap da ADR-008.
         await validar_credencial_esaj(user_id, job_tipo=JOB_TIPO_REAUTH)
         return
@@ -142,7 +181,11 @@ async def job_ciclo_dez_minutos() -> None:
     agora = datetime.now(UTC)
     for credencial, sessao in linhas:
         try:
-            await _processar_advogado(credencial.user_id, sessao, agora)
+            await _aguardar_advogado(
+                _processar_advogado(credencial.user_id, sessao, agora),
+                timeout=_TETO_ADVOGADO_SEGUNDOS,
+                user_id=credencial.user_id,
+            )
         except Exception:
             logger.exception(
                 "Ciclo de 10 minutos falhou de forma inesperada (user_id=%s)", credencial.user_id
@@ -166,7 +209,12 @@ async def job_renovacao_diaria() -> None:
     logger.info("Renovação noturna do e-SAJ iniciada (advogados=%d)", len(user_ids))
     for user_id in user_ids:
         try:
-            await validar_credencial_esaj(user_id, job_tipo=JOB_TIPO_REAUTH)
+            await _aguardar_advogado(
+                validar_credencial_esaj(user_id, job_tipo=JOB_TIPO_REAUTH),
+                timeout=_TETO_ADVOGADO_SEGUNDOS,
+                user_id=user_id,
+                rotulo="Renovação noturna",
+            )
         except Exception:
             logger.exception("Renovação noturna falhou de forma inesperada (user_id=%s)", user_id)
     logger.info("Renovação noturna do e-SAJ concluída (advogados=%d)", len(user_ids))

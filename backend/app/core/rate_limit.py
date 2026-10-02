@@ -22,6 +22,10 @@ LIMITE_REDEFINIR_SENHA = "10/hour"
 LIMITE_CREDENCIAL_ESAJ = "5/hour"
 LIMITE_OAUTH_AUTHORIZE = "10/hour"
 LIMITE_OAUTH_CALLBACK = "20/hour"
+# IA da elaboração (ADR-016) — custo real com provider de verdade, mesmo
+# que o `stub` de hoje não gaste nada. Compartilhado por gerar, editar e
+# aplicar estilo (POST /elaboracoes/{id}/estilo) — todos chamam o provider.
+LIMITE_ELABORACAO_GERAR = "30/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

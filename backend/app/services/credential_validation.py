@@ -12,6 +12,7 @@ de tempo é tratado como `portal_indisponivel`.
 import asyncio
 import json
 import logging
+import time
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -43,16 +44,25 @@ SESSAO_EXPIRA_HORAS = 22
 # (ex.: clique duplo em "Revalidar" antes da primeira tentativa terminar).
 # Não sobrevive a restart nem é compartilhado entre workers — é só uma
 # proteção best-effort dentro do processo atual.
-_VALIDACOES_EM_ANDAMENTO: set[UUID] = set()
+# Valor = time.monotonic() da entrada. O login interno é 60s e o teto do
+# job é 120s; passou de 180s, a flag não conta mais (thread órfã não
+# trava o advogado até o processo reiniciar).
+_TTL_FLAG_VALIDACAO_SEGUNDOS = 180.0
+_VALIDACOES_EM_ANDAMENTO: dict[UUID, float] = {}
 
 
-def validacao_em_andamento(user_id: UUID) -> bool:
+def validacao_em_andamento(user_id: UUID, agora: float | None = None) -> bool:
     """True enquanto `validar_credencial_esaj` está rodando para este
-    advogado neste processo. O scheduler usa isso para não disparar pipes
-    no mesmo instante em que o Playwright está anulando o cookie (choque
-    das 1h entre renovação noturna e ciclo de 10 min).
+    advogado neste processo e a entrada tem menos de 180s. O scheduler
+    usa isso para não disparar pipes no mesmo instante em que o Playwright
+    está anulando o cookie (choque das 1h entre renovação noturna e ciclo
+    de 10 min).
     """
-    return user_id in _VALIDACOES_EM_ANDAMENTO
+    inicio = _VALIDACOES_EM_ANDAMENTO.get(user_id)
+    if inicio is None:
+        return False
+    instante = agora if agora is not None else time.monotonic()
+    return instante - inicio < _TTL_FLAG_VALIDACAO_SEGUNDOS
 
 
 async def _buscar_ou_criar_sessao(db, user_id: UUID) -> TribunalSession:
@@ -112,10 +122,10 @@ async def validar_credencial_esaj(user_id: UUID, *, job_tipo: str = JOB_TIPO_LOG
     advogado via `/credentials/esaj` ou `/revalidar`, `reauth` para o cron
     noturno do scheduler) — a lógica de validação é idêntica nos dois casos.
     """
-    if user_id in _VALIDACOES_EM_ANDAMENTO:
+    if validacao_em_andamento(user_id):
         logger.info("Validação e-SAJ já em andamento para user_id=%s — disparo ignorado", user_id)
         return
-    _VALIDACOES_EM_ANDAMENTO.add(user_id)
+    _VALIDACOES_EM_ANDAMENTO[user_id] = time.monotonic()
 
     inicio = datetime.now(UTC)
     cpf: str | None = None
@@ -205,6 +215,6 @@ async def validar_credencial_esaj(user_id: UUID, *, job_tipo: str = JOB_TIPO_LOG
                         "Não foi possível marcar portal_indisponivel (user_id=%s)", user_id
                     )
     finally:
-        _VALIDACOES_EM_ANDAMENTO.discard(user_id)
+        _VALIDACOES_EM_ANDAMENTO.pop(user_id, None)
         cpf = None
         senha = None

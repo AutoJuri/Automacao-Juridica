@@ -4,6 +4,7 @@ transiente só para setar os atributos que a decisão lê, e
 `validar_credencial_esaj` / `executar_ciclo_usuario` / `_reativar_apos_bloqueio`
 mockados via monkeypatch (são as únicas funções que tocam o banco)."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -215,3 +216,25 @@ class TestJobRenovacaoDiaria:
         await job_renovacao_diaria()
 
         assert chamadas == [primeiro, segundo]
+
+
+class TestTetoDoAdvogado:
+    @pytest.mark.asyncio
+    async def test_teto_devolve_o_job_se_o_advogado_nao_retorna(self):
+        async def preso() -> None:
+            await asyncio.sleep(30)
+
+        inicio = asyncio.get_running_loop().time()
+        await scheduler_jobs._aguardar_advogado(preso(), timeout=0.05, user_id=USER_ID)
+        assert asyncio.get_running_loop().time() - inicio < 1
+
+    @pytest.mark.asyncio
+    async def test_teto_nao_interrompe_ciclo_curto(self):
+        rodou = False
+
+        async def ok() -> None:
+            nonlocal rodou
+            rodou = True
+
+        await scheduler_jobs._aguardar_advogado(ok(), timeout=1, user_id=USER_ID)
+        assert rodou

@@ -1,5 +1,6 @@
 """GET /credentials/status — `validacao_em_andamento` distinto de `reauth_pendente`."""
 
+import time
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -31,15 +32,29 @@ class TestStatusSchemaValidacaoEmAndamento:
         assert schema.session_status == SESSION_STATUS_REAUTH_PENDENTE
         assert schema.validacao_em_andamento is False
 
-    def test_reflete_o_set_em_memoria(self, monkeypatch):
+    def test_reflete_a_flag_em_memoria(self, monkeypatch):
         user_id = uuid4()
         monkeypatch.setattr(
-            credential_validation, "_VALIDACOES_EM_ANDAMENTO", {user_id}
+            credential_validation,
+            "_VALIDACOES_EM_ANDAMENTO",
+            {user_id: time.monotonic()},
         )
 
         schema = _status_schema(_credencial(user_id), _sessao())
 
         assert schema.validacao_em_andamento is True
+
+    def test_entrada_mais_velha_que_180s_nao_conta(self, monkeypatch):
+        user_id = uuid4()
+        monkeypatch.setattr(
+            credential_validation,
+            "_VALIDACOES_EM_ANDAMENTO",
+            {user_id: time.monotonic() - 181},
+        )
+
+        assert credential_validation.validacao_em_andamento(user_id) is False
+        schema = _status_schema(_credencial(user_id), _sessao())
+        assert schema.validacao_em_andamento is False
 
     def test_sem_credencial_nao_expoe_validacao(self):
         schema = _status_schema(None)

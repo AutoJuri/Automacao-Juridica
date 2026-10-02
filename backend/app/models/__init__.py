@@ -7,6 +7,7 @@ Alembic roda o autogenerate.
 from app.db.base import Base
 from app.models.audiencia import Audiencia
 from app.models.audiencia_cpo import AudienciaCpo
+from app.models.elaboracao import Elaboracao, ElaboracaoVersao
 from app.models.intimacao import Intimacao
 from app.models.job_log import JobLog
 from app.models.movimentacao import Movimentacao
@@ -23,6 +24,8 @@ __all__ = [
     "Audiencia",
     "AudienciaCpo",
     "Base",
+    "Elaboracao",
+    "ElaboracaoVersao",
     "Intimacao",
     "JobLog",
     "Movimentacao",

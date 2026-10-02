@@ -180,7 +180,9 @@ async def buscar_json(
     return dados
 
 
-async def buscar_html(client: httpx.AsyncClient, url: str, *, referer: str) -> str:
+async def buscar_html(
+    client: httpx.AsyncClient, url: str, *, referer: str, ajax: bool = False
+) -> str:
     """GET de uma página HTML de `cpopg` (não JSON) — usado pelo pipe de
     movimentações e pelo script de captura de fixture (`scripts/capturar_cpo.py`).
 
@@ -188,8 +190,12 @@ async def buscar_html(client: httpx.AsyncClient, url: str, *, referer: str) -> s
     `buscar_json` (sessão inválida / rate limit / falha de portal); nunca loga
     o corpo da resposta.
     """
+    headers = _headers_html(referer)
+    if ajax:
+        # Mesmo header do XHR do botão "Exibir movimentações".
+        headers["X-Requested-With"] = "XMLHttpRequest"
     try:
-        response = await client.get(url, headers=_headers_html(referer))
+        response = await client.get(url, headers=headers)
     except httpx.TimeoutException as exc:
         raise EsajPortalIndisponivelError("timeout") from exc
     except httpx.HTTPError as exc:

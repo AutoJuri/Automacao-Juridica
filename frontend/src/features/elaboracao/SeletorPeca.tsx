@@ -1,10 +1,13 @@
-import { FileText } from 'lucide-react'
+import { FileText, Sparkles } from 'lucide-react'
 import { modelosPeca, type ModeloPeca } from './elaboracao.mock'
+import type { SugestaoPeca } from './elaboracao.types'
 import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 
 interface SeletorPecaProps {
   pecaSelecionada: string
   onChange: (id: string) => void
+  /** `null`/`peca=null` = sem sugestão para o processo (ADR-016 Fase 1). */
+  sugestao?: SugestaoPeca | null
 }
 
 const grupos = [...new Set(modelosPeca.map((m) => m.grupo))]
@@ -13,17 +16,21 @@ function getPecaById(id: string): ModeloPeca | undefined {
   return modelosPeca.find((m) => m.id === id)
 }
 
-export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
+export function SeletorPeca({ pecaSelecionada, onChange, sugestao = null }: SeletorPecaProps) {
   const peca = getPecaById(pecaSelecionada)
+  const temSugestao = Boolean(sugestao?.peca && sugestao.peca === pecaSelecionada)
 
   return (
     <div>
       <p className="text-[10px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-1">
         Seletor de peça
       </p>
-      <p className="text-[10px] font-semibold text-[#2563EB] tracking-[0.12em] uppercase mb-2">
-        Sugerido por IA
-      </p>
+      {temSugestao ? (
+        <p className="mb-2 flex items-center gap-1 text-[10px] font-semibold text-[#2563EB] tracking-[0.12em] uppercase">
+          <Sparkles className="w-3 h-3" aria-hidden />
+          Sugerido por IA
+        </p>
+      ) : null}
       <div className="relative">
         <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
           <FileText className="w-3.5 h-3.5 text-[#9CA3AF]" />
@@ -52,9 +59,11 @@ export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
           </svg>
         </div>
       </div>
-      {peca && (
+      {temSugestao && sugestao?.explicacao ? (
+        <p className="mt-1 text-[10px] text-[#6B7280] leading-snug">{sugestao.explicacao}</p>
+      ) : peca ? (
         <p className="mt-1 text-[10px] text-[#9CA3AF]">{peca.grupo}</p>
-      )}
+      ) : null}
     </div>
   )
 }

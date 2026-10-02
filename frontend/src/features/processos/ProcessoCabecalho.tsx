@@ -217,7 +217,10 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
             size="sm"
             className="h-9 px-3 bg-[#2563EB] text-white text-[12px] font-semibold rounded-lg"
           >
-            <Link to="/elaboracao/$processoId" params={{ processoId: processo.id }}>
+            <Link
+              to="/elaboracao/$processoId"
+              params={{ processoId: processo.id }}
+            >
               <WandSparkles className="w-3.5 h-3.5" aria-hidden />
               Elaborar
             </Link>

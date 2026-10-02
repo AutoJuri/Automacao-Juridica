@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FileText, UploadCloud, X } from 'lucide-react'
+import { FileText, Sparkles, UploadCloud, X } from 'lucide-react'
 import { extensaoArquivo, FOCO_CAMPO, propsFocoCampo, validarArquivoModelo } from './elaboracao.ui'
 
 interface ArquivoModelo {
@@ -7,12 +7,30 @@ interface ArquivoModelo {
   tamanho: number
 }
 
-export function SeletorPecaEspecifica() {
+interface SeletorPecaEspecificaProps {
+  elaboracaoId: string | null
+  /** JSON (string) do perfil já aplicado nesta sessão — `null` se nenhum. */
+  estiloAtual: string | null
+  onSalvarEstilo: (texto: string) => void
+  salvandoEstilo: boolean
+  /** Sem sessão de elaboração ainda (ficha carregando) — não há onde salvar. */
+  desabilitado?: boolean
+}
+
+export function SeletorPecaEspecifica({
+  elaboracaoId,
+  estiloAtual,
+  onSalvarEstilo,
+  salvandoEstilo,
+  desabilitado = false,
+}: SeletorPecaEspecificaProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [arquivo, setArquivo] = useState<ArquivoModelo | null>(null)
   const [texto, setTexto] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState(false)
+  // PDF/DOCX ainda não têm extração — só o TXT/colar alimentam a IA (Fase 3).
+  const podeAplicarEstilo = Boolean(elaboracaoId) && !desabilitado && texto.trim().length > 0
 
   function aplicarArquivo(file: File) {
     const recusa = validarArquivoModelo(file)
@@ -40,9 +58,19 @@ export function SeletorPecaEspecifica() {
         Peça modelo específica
       </p>
       <p className="text-[12px] text-[#6B7280] leading-snug mb-3">
-        O arquivo e o texto ficam só neste browser, para você consultar o estilo.
-        Nada é enviado ao servidor — a IA ainda não assimila o modelo.
+        TXT ou texto colado: você revisa abaixo e, se quiser, envia à IA para
+        extrair o estilo desta elaboração. PDF/DOCX ficam só anexados aqui —
+        ainda sem extração de texto.
       </p>
+
+      {estiloAtual ? (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2">
+          <Sparkles className="w-3.5 h-3.5 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
+          <p className="text-[12px] text-[#1D4ED8] leading-snug">
+            Estilo desta sessão já aplicado a partir de um modelo enviado.
+          </p>
+        </div>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -124,6 +152,21 @@ export function SeletorPecaEspecifica() {
         className={`mt-3 w-full resize-none rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] ${FOCO_CAMPO}`}
         {...propsFocoCampo}
       />
+
+      <button
+        type="button"
+        disabled={!podeAplicarEstilo || salvandoEstilo}
+        onClick={() => onSalvarEstilo(texto.trim())}
+        title={
+          elaboracaoId
+            ? 'Envia este texto à IA para extrair o estilo desta elaboração'
+            : 'Carregando sessão de elaboração…'
+        }
+        className="mt-2 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] text-[12px] font-semibold text-white hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Sparkles className="w-3.5 h-3.5" aria-hidden />
+        {salvandoEstilo ? 'Aplicando…' : 'Aplicar estilo'}
+      </button>
     </div>
   )
 }

@@ -8,12 +8,14 @@
 
 import { api } from '#/lib/axios'
 import type { AuthUser } from '#/store/auth.store'
+import type { CargoPerfil } from './auth.cargo'
 import type { MessageResponse, TokenResponse } from './auth.types'
 
 export interface CadastroInput {
   name: string
   email: string
   password: string
+  cargo: CargoPerfil
 }
 
 export interface LoginInput {

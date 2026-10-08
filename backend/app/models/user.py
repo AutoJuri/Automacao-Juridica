@@ -19,12 +19,20 @@ if TYPE_CHECKING:
     from app.models.tribunal import TribunalCredential, TribunalSession
 
 
+CARGO_ADVOGADO = "advogado"
+CARGO_ASSISTENTE = "assistente"
+CARGO_ESTAGIARIO = "estagiario"
+CARGOS = (CARGO_ADVOGADO, CARGO_ASSISTENTE, CARGO_ESTAGIARIO)
+
+
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Perfil da conta. Não autoriza nada: o papel no escritório vive em organization_members.
+    cargo: Mapped[str | None] = mapped_column(String(20))
 
     credentials: Mapped[list["TribunalCredential"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True

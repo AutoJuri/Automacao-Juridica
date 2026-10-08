@@ -121,7 +121,12 @@ async def cadastrar(
             detail="E-mail já cadastrado",
         )
 
-    user = User(name=dados.name.strip(), email=email, password_hash=hash_password(dados.password))
+    user = User(
+        name=dados.name.strip(),
+        email=email,
+        password_hash=hash_password(dados.password),
+        cargo=dados.cargo,
+    )
     db.add(user)
     try:
         await db.flush()

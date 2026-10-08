@@ -2,8 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
-import { AppChrome } from '#/features/processos/AppChrome'
+import { rotuloCargo } from '#/features/auth/auth.cargo'
 import { FormError, FormSuccess } from '#/features/auth/AuthFormFeedback'
+import { AppChrome } from '#/features/processos/AppChrome'
+import { useAuthStore } from '#/store/auth.store'
 import { CREDENTIALS_STATUS_QUERY_KEY } from './credentials.constants'
 import { EmailConnectionCard } from './EmailConnectionCard'
 import { EsajCredentialForm } from './EsajCredentialForm'
@@ -16,6 +18,7 @@ interface SettingsPageProps {
 export function SettingsPage({ emailFeedback }: SettingsPageProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const usuario = useAuthStore((s) => s.user)
 
   useEffect(() => {
     if (!emailFeedback) {
@@ -39,6 +42,17 @@ export function SettingsPage({ emailFeedback }: SettingsPageProps) {
               dos seus processos.
             </p>
           </div>
+
+          {usuario ? (
+            <section className="rounded-xl border border-[#E5E7EB] bg-white p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#6B7280]">Perfil</p>
+              <p className="mt-2 text-base font-semibold text-[#111827]">{usuario.name}</p>
+              <p className="text-sm text-[#6B7280]">{usuario.email}</p>
+              <p className="mt-3 text-sm text-[#111827]">
+                Cargo: <span className="font-medium">{rotuloCargo(usuario.cargo)}</span>
+              </p>
+            </section>
+          ) : null}
 
           {emailFeedback === 'conectado' && (
             <FormSuccess message="E-mail conectado com sucesso." />

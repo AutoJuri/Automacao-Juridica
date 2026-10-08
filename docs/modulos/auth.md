@@ -1,6 +1,6 @@
 # Módulo: Autenticação da Plataforma
 
-> Última atualização: 2026-09-09
+> Última atualização: 2026-10-07
 > Camada: Backend / Frontend
 
 ---
@@ -47,7 +47,7 @@ Autentica advogados na plataforma AdvogAtiva: cadastro, login, logout, renovaç�
 
 | Método | Rota | Descrição | Auth | Rate limit |
 |---|---|---|---|---|
-| POST | `/auth/cadastro` | Cria usuário, emite sessão | Não | 5/hora por IP |
+| POST | `/auth/cadastro` | Cria usuário com cargo de perfil (`advogado`, `assistente` ou `estagiario`) e emite sessão | Não | 5/hora por IP |
 | POST | `/auth/login` | Autentica e emite sessão | Não | 10/hora por IP |
 | POST | `/auth/refresh` | Rotaciona refresh cookie → novo access | Cookie | 20/hora por IP |
 | POST | `/auth/logout` | Revoga refresh no banco e limpa cookie | Cookie (não exige Bearer) | — |
@@ -118,7 +118,8 @@ Logout
 - **Refresh:** token opaco aleatório; no banco só o SHA-256 (`token_hash`); rotação a cada `/auth/refresh` via `UPDATE ... WHERE revoked_at IS NULL RETURNING` atômico (evita duas requisições concorrentes emitirem duas sessões do mesmo cookie); reuso de um token já revogado revoga todas as sessões ativas do usuário
 - **Cookie:** `HttpOnly` + `SameSite=Strict` + `Secure` (exceto development) + `Path=/auth`
 - **Access no cliente:** só Zustand em memória — nunca `localStorage` / `sessionStorage`
-- **Resposta:** `UserPublicSchema` / `TokenResponseSchema` / `MessageSchema` — nunca ORM
+- **Resposta:** `UserPublicSchema` / `TokenResponseSchema` / `MessageSchema` — nunca ORM. `cargo` sai no usuário público; contas anteriores à coluna podem vir com `null`
+- **Cargo:** perfil escolhido no cadastro. Não entra no JWT e não substitui o papel em `organization_members` (ADR-020)
 - **Enumeração de e-mails:** login e recuperar-senha devolvem mensagens que não revelam se o e-mail existe; o login também equaliza o **tempo** de resposta com `verify_password_or_dummy` (roda bcrypt mesmo sem usuário) — ver `docs/backlog-auth-hardening.md` para o mesmo ajuste em `recuperar-senha`
 - **Reset de senha:** invalida tokens anteriores do usuário; ao redefinir, revoga **todos** os refresh tokens ativos
 - **Rate limit:** SlowAPI por IP, storage em memória (uma instância). Cadastro 5/h, login 10/h, recuperar-senha 3/h, refresh 20/h, redefinir-senha 10/h. 429 com mensagem genérica (não revela o limite). Ver ADR-003 para o envio do link
@@ -186,6 +187,7 @@ Módulos futuros que vão depender deste:
 - ❌ Não usar dois mecanismos de guarda (componente `ProtectedRoute` + `beforeLoad`) — só `route-guards.ts`
 - ❌ Não confiar só na expiração do JWT no logout — sempre revogar o refresh no banco
 - ❌ Não aceitar `user_id` do cliente — sempre do `sub` do access token
+- ❌ Não colocar `cargo` no JWT nem usá-lo para autorizar rota, processo ou tarefa
 - ❌ Não enviar e-mail real ainda — ver ADR-003 (link no log do servidor)
 - ❌ Não voltar `allow_methods`/`allow_headers` do CORS para `*` — só o que a SPA usa
 - ❌ Não deixar `/auth/refresh` ou `/auth/redefinir-senha` sem `@limiter.limit`
@@ -201,3 +203,4 @@ Módulos futuros que vão depender deste:
 | 2026-08-09 | Correções do code review (itens 1–6): `clearAuth` após redefinir senha; log do link de reset restrito a `development` (ADR-003); `--proxy-headers` no Dockerfile para o rate limit ver o IP real por trás do proxy do Railway; rotação do refresh e uso do token de reset via `UPDATE ... RETURNING` atômico (fecha corrida de duas requisições concorrentes) + detecção de reuso de refresh (revoga todas as sessões do usuário); `verify_password_or_dummy` no login para equalizar o tempo de resposta entre e-mail existente/inexistente; validação de senha por bytes UTF-8 (não só caracteres) no Pydantic e no Zod. Achados 7+ documentados em `docs/backlog-auth-hardening.md` |
 | 2026-09-08 | Integração `/auth/*` em `tests/test_auth.py` (fixture `cliente_auth`: savepoint + rollback, sem leftover no Postgres). Cobre 201/409/422, login 401 genérico, rotação e reuso do refresh, logout, `/me`, reset sem revelar e-mail e double-spend do token. Saiu do backlog de hardening. |
 | 2026-09-09 | Etapa 13: rate limit em `/auth/refresh` (20/h) e `/auth/redefinir-senha` (10/h); CORS sem `allow_methods`/`allow_headers` `*`; middleware de headers HTTP (`security_headers.py`). Testes em `tests/test_hardening.py`. Saiu do backlog de hardening. |
+| 2026-10-07 | Cadastro exige cargo de perfil (`users.cargo`). Conta antiga fica com `null` |

@@ -10,7 +10,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, credentials, notifications, processos
+from app.api import auth, credentials, notifications, organizations, processos, tasks
 from app.core.config import get_settings
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.core.scheduler import iniciar_scheduler, parar_scheduler
@@ -66,6 +66,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(organizations.router)
+app.include_router(tasks.router)
+app.include_router(tasks.router_org)
 app.include_router(credentials.router)
 app.include_router(processos.router)
 app.include_router(processos.router_intimacoes)

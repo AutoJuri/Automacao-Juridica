@@ -23,8 +23,10 @@ import { notificacoesListQueryOptions } from '#/features/notificacoes/notificati
 import { cn } from '#/lib/utils'
 import { limparQueriesDaSessao } from '#/lib/session-queries'
 import { useAuthStore } from '#/store/auth.store'
-import { SECOES_TOPO, secaoTopoAtiva, type IconeTopo } from './nav.constants'
+import { useOrgStore } from '#/store/org.store'
+import { OrgSwitcher } from '#/features/organizations/OrgSwitcher'
 import { formatarDataHoraSP } from './processos.dates'
+import { SECOES_TOPO, secaoTopoAtiva, type IconeTopo } from './nav.constants'
 
 const ICONES_TOPO: Record<IconeTopo, LucideIcon> = {
   briefcase: Briefcase,
@@ -43,6 +45,7 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const setOrganizacaoAtiva = useOrgStore((s) => s.setActiveOrganizationId)
   const queryClient = useQueryClient()
   const [aberto, setAberto] = useState(false)
   const painelRef = useRef<HTMLDivElement>(null)
@@ -136,6 +139,7 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
       </nav>
 
       <div className="flex items-center gap-2 shrink-0">
+        <OrgSwitcher />
         <div className="relative" ref={painelRef}>
           <Button
             type="button"
@@ -180,7 +184,12 @@ export function Navbar({ onAbrirProcesso }: NavbarProps) {
                         if (!item.is_read) {
                           marcarUma.mutate(item.id)
                         }
-                        if (item.processo_id) {
+                        if (item.tipo === 'convite_org') {
+                          void navigate({ to: '/convites' })
+                        } else if (item.tipo === 'task_atribuida' || item.tipo === 'task_concluida') {
+                          setOrganizacaoAtiva(item.organization_id)
+                          void navigate({ to: '/tarefas' })
+                        } else if (item.processo_id) {
                           if (onAbrirProcesso) {
                             onAbrirProcesso(item.processo_id)
                           } else {

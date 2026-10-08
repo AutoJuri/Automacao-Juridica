@@ -9,17 +9,19 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { useAuthStore } from '#/store/auth.store'
+import { tokenDoDestino } from '#/features/organizations/organizations.redirect'
 import { login } from './auth.api'
 import { MUITAS_TENTATIVAS, mensagemDeErro } from './auth.errors'
 import { loginSchema, type LoginFormValues } from './auth.schemas'
 import { FieldError, FormError } from './AuthFormFeedback'
 
 interface LoginFormProps {
+  redirectTo?: string | null
   onSwitchToRegister: () => void
   onForgotPassword: () => void
 }
 
-export function LoginForm({ onSwitchToRegister, onForgotPassword }: LoginFormProps) {
+export function LoginForm({ redirectTo = null, onSwitchToRegister, onForgotPassword }: LoginFormProps) {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
   const [showPassword, setShowPassword] = useState(false)
@@ -34,6 +36,10 @@ export function LoginForm({ onSwitchToRegister, onForgotPassword }: LoginFormPro
     mutationFn: login,
     onSuccess: ({ access_token, user }) => {
       setAuth(access_token, user)
+      if (redirectTo) {
+        navigate({ to: '/convite/$token', params: { token: tokenDoDestino(redirectTo) } })
+        return
+      }
       navigate({ to: '/' })
     },
   })

@@ -8,6 +8,7 @@
 import { z } from 'zod'
 
 import { cabeEmBytesDoBcrypt, SENHA_MAX, SENHA_MIN } from '#/lib/password-validation'
+import { CARGOS } from './auth.cargo'
 
 const email = z
   .string()
@@ -35,6 +36,9 @@ export const registerSchema = z
       .min(2, 'Informe seu nome completo')
       .max(255, 'Nome muito longo'),
     email,
+    cargo: z.string().refine((valor) => (CARGOS as readonly string[]).includes(valor), {
+      message: 'Escolha seu cargo',
+    }),
     password: novaSenha,
     confirm: z.string().min(1, 'Confirme sua senha'),
   })

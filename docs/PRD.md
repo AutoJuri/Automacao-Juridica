@@ -1,67 +1,76 @@
 # PRD — Automação Jurídica
 > Documento vivo — atualizar conforme o projeto evolui.
-> Versão 0.2 | Status: Em desenvolvimento
+> Versão 0.3 | Status: Em desenvolvimento
 
 ---
 
 ## 1. Resumo do Produto
 
-**Automação Jurídica** é uma plataforma web que automatiza o monitoramento de processos judiciais para advogados autônomos e pequenos escritórios. O sistema acessa os portais dos tribunais (inicialmente e-SAJ/TJSP) usando as credenciais do próprio advogado, coleta atualizações dos processos de forma automática e notifica o usuário dentro do app quando há novas movimentações. Futuramente, também gerará templates de resposta com auxílio de IA.
+**Automação Jurídica** é uma plataforma web que automatiza o monitoramento de processos judiciais para advogados autônomos e escritórios jurídicos. O sistema acessa os portais dos tribunais (inicialmente e-SAJ/TJSP) usando as credenciais do próprio advogado, coleta atualizações dos processos de forma automática e notifica o usuário quando há novas movimentações. A plataforma também suporta **organizações** — escritórios com múltiplos membros, papéis hierárquicos e gestão colaborativa de processos e tarefas via **Kanban**.
 
-**Público-alvo inicial:** Advogados autônomos e pequenos escritórios jurídicos.
+**Público-alvo:** Advogados autônomos e escritórios jurídicos de pequeno e médio porte.
 
 ---
 
 ## 2. Problema e Objetivo
 
 ### Problema
-Advogados perdem tempo considerável acessando manualmente portais de tribunais (como o e-SAJ) todos os dias para verificar se houve atualização nos processos de seus clientes. Esse processo é repetitivo, manual e propenso a erros de acompanhamento.
+Advogados perdem tempo considerável acessando manualmente portais de tribunais todos os dias para verificar atualizações em processos. Em escritórios com equipe, o problema se multiplica: não há visibilidade centralizada, delegação de tarefas é feita por WhatsApp ou planilha, e o controle de prazos depende de memória individual.
 
 ### Objetivo
-Eliminar o trabalho manual de monitoramento processual, entregando ao advogado um painel centralizado onde ele visualiza todos os seus processos e recebe alertas automáticos quando há novas movimentações — sem precisar acessar o portal do tribunal.
+Eliminar o trabalho manual de monitoramento processual e centralizar a gestão operacional do escritório em uma única plataforma — com monitoramento automatizado, notificações em tempo real e gestão de tarefas colaborativa.
 
 ### Resultado esperado (sucesso)
 - Advogado não precisa mais entrar no e-SAJ diariamente para checar processos
-- Todas as atualizações são consolidadas em um único lugar
+- Escritórios conseguem gerenciar processos e tarefas da equipe em um único lugar
 - Redução significativa do tempo gasto em tarefas operacionais de acompanhamento
+- Owner e Admin têm visibilidade total do escritório sem depender de relatórios manuais
 
 ---
 
 ## 3. Escopo
 
 ### MVP (primeira entrega)
-- Cadastro e login do advogado na plataforma
-- Cadastro das credenciais do advogado no e-SAJ (armazenamento seguro com AES-256)
+- Cadastro e login individual na plataforma
+- Criação e gestão de organizações (escritórios)
+- Convite e gestão de membros com 4 papéis hierárquicos (Owner, Admin, Advogado, Assistente)
+- Cadastro de credenciais do e-SAJ por usuário individual ou compartilhadas na organização (AES-256)
 - Conexão OAuth2 com Gmail ou Outlook para captura automática do código de verificação
 - Login automatizado no e-SAJ via Playwright (CPF + senha + código do email)
 - Importação automática de todos os processos vinculados ao advogado no e-SAJ
 - Monitoramento periódico automático a cada 10 minutos via PIPES (intimações, audiências, petições, processos)
 - Reautenticação automática diária às 1h da manhã para renovar o cookie de sessão
 - Complemento de dados via API pública do DataJud (CNJ)
-- Painel web listando todos os processos e seus status
-- Notificação in-app quando há nova movimentação em algum processo
-- Visualização do histórico de movimentações de cada processo
+- Visibilidade de processos por papel: Owner/Admin veem tudo, Advogado/Assistente só os seus
+- Painel web de processos com listagem e detalhe de movimentações
+- Notificação in-app quando há nova movimentação
+- Kanban de tasks com colunas configuráveis
+- Tasks independentes ou vinculadas a processos
+- Atribuição de tasks entre membros da organização
 
 ### Fora do escopo (não fazer agora)
 - App mobile
 - App desktop / certificado digital A3
 - Suporte a outros tribunais além do e-SAJ (PJe, eProc, PROJUDI)
 - Notificações por e-mail ou WhatsApp
-- Geração de templates de resposta com IA (abordagem **decidida** no ADR-016; código ainda não existe)
+- Geração de templates de resposta com IA
 - Modelo de monetização / pagamentos
-- Multi-usuário / gestão de equipe dentro do escritório
 - Integração com softwares jurídicos de terceiros (ADVBox, Astrea, etc.)
 - Download e armazenamento de PDFs da pasta digital
 - Migração de APScheduler para Celery
+- Relatórios e dashboards gerenciais por organização
+- Comentários e threads dentro de tasks
 
 ### Futuro (pós-MVP)
-- Suporte a outros sistemas judiciais (PJe, eProc, PROJUDI, TRFs)
+- Suporte a outros sistemas judiciais (PJe, eProc, PROJUDI, TRFs) via JUDIT API
 - Notificações por e-mail e WhatsApp
-- Geração de templates / minuta com IA (copiloto da elaboração: sugestão de peça, estilo do modelo, fatos extras, chat/grifo, anexos; jurisprudência só o que o advogado marcar — ADR-016)
+- Geração de templates / minuta com IA (copiloto de elaboração de peças)
 - App mobile (iOS e Android)
 - App desktop com suporte a certificado digital A3 via PKCS#11
-- Modelo de monetização (assinatura mensal ou cobrança por processo — a definir)
-- Dashboard com métricas e relatórios para o escritório
+- Modelo de monetização (assinatura por organização ou por usuário — a definir)
+- Dashboard gerencial por organização (processos, prazos, produtividade da equipe)
+- Comentários e threads em tasks
+- Relatórios de produtividade por membro
 - Migração do orquestrador para Celery + Redis conforme escala
 - Download e visualização de PDFs da pasta digital
 
@@ -69,46 +78,125 @@ Eliminar o trabalho manual de monitoramento processual, entregando ao advogado u
 
 ## 4. Personas, Jornadas e Fluxos
 
-### Persona principal
+### Personas
+
 **João, advogado autônomo**
 - Atua em vara cível, tem entre 30 e 80 processos ativos simultâneos
-- Acessa o e-SAJ diariamente para checar novidades, processo por processo
-- Usa computador (Windows/Mac) no escritório
-- Não tem equipe — faz tudo sozinho
-- Dor principal: tempo gasto em tarefas repetitivas que poderiam ser automatizadas
+- Usa a plataforma sozinho, sem organização
+- Dor principal: tempo gasto em monitoramento manual no e-SAJ
 
-### Caminho feliz (fluxo crítico do MVP)
+**Marina, sócia-fundadora do escritório**
+- Gerencia 5 advogados e 2 assistentes
+- Precisa de visibilidade total dos processos e tarefas da equipe
+- Cria a organização, convida membros, define papéis
+- Papel: **Owner**
+
+**Carlos, advogado sênior do escritório**
+- Responsável por uma carteira de processos dentro do escritório
+- Pode gerenciar tasks da equipe, mas não mexe em configurações da organização
+- Papel: **Admin**
+
+**Ana, advogada júnior**
+- Executa tarefas delegadas, acompanha seus próprios processos
+- Não vê processos de outros membros, só os seus
+- Papel: **Advogado**
+
+**Pedro, assistente jurídico**
+- Apoia os advogados com tasks operacionais
+- Acesso mais restrito — só vê e executa o que foi atribuído a ele
+- Papel: **Assistente**
+
+### Caminho feliz — Advogado autônomo
 
 ```
-1. João acessa a plataforma e cria sua conta (e-mail + senha)
-2. João entra em "Configurações" e cadastra suas credenciais do e-SAJ (CPF + senha)
-3. João conecta sua conta de email (Gmail ou Outlook) via OAuth2
-4. O sistema faz login automatizado no e-SAJ com Playwright:
-   → Preenche CPF + senha
-   → e-SAJ envia código para o email de João
-   → Sistema captura o código via Gmail/Outlook API automaticamente
-   → Completa o login e salva o cookie de sessão (válido ~24h)
-5. O sistema importa automaticamente todos os processos da carteira de João
-6. João vê o painel com todos os seus processos listados
-7. A cada 10 minutos, os PIPES rodam e verificam atualizações usando o cookie salvo
-8. Às 1h da manhã, o sistema renova o cookie automaticamente (novo login)
-9. Quando há nova movimentação, João recebe notificação in-app
-10. João clica na notificação e vê o detalhe da movimentação do processo
+1. João cria conta com e-mail + senha
+2. João cadastra credenciais do e-SAJ (CPF + senha) + conecta Gmail/Outlook
+3. Sistema faz login automatizado no e-SAJ e importa todos os processos
+4. João vê painel com todos os processos listados
+5. A cada 10min, pipes verificam atualizações automaticamente
+6. João recebe notificação in-app quando há nova movimentação
+7. João cria tasks para si mesmo no Kanban
+```
+
+### Caminho feliz — Escritório com equipe
+
+```
+1. Marina cria conta e cria uma organização ("Escritório Silva & Associados")
+2. Marina convida Carlos (Admin), Ana (Advogado) e Pedro (Assistente) por e-mail
+3. Cada membro aceita o convite e entra com suas próprias credenciais da plataforma
+4. Ana cadastra suas credenciais do e-SAJ (credenciais individuais)
+5. Marina cadastra credenciais compartilhadas do e-SAJ do escritório (opcional)
+6. Sistema importa processos de cada membro com suas credenciais
+7. Marina e Carlos veem todos os processos da organização no painel
+8. Ana e Pedro veem apenas os processos vinculados a elas
+9. Carlos cria uma task "Protocolar petição" vinculada ao processo X e atribui para Ana
+10. Ana vê a task no Kanban, move para "Em andamento" e depois para "Concluído"
+11. Carlos recebe notificação de que a task foi concluída
 ```
 
 ---
 
-## 5. Funcionalidades (Priorizada)
+## 5. Papéis e Permissões
+
+### Hierarquia de papéis
+
+| Papel | Descrição |
+|---|---|
+| **Owner** | Criador da organização. Acesso total e irrestrito. Único que pode excluir a organização ou transferir ownership. |
+| **Admin** | Gerente operacional. Pode gerenciar membros (exceto Owner), ver todos os processos, criar e atribuir tasks. Não pode excluir a organização. |
+| **Advogado** | Membro padrão. Vê e gerencia apenas seus próprios processos. Pode criar e atribuir tasks para qualquer membro. |
+| **Assistente** | Membro operacional. Acesso mais restrito — vê apenas os processos e tasks atribuídos a ele. Pode criar tasks. |
+
+### Matriz de permissões
+
+| Ação | Owner | Admin | Advogado | Assistente |
+|---|---|---|---|---|
+| Criar organização | ✅ | ❌ | ❌ | ❌ |
+| Excluir organização | ✅ | ❌ | ❌ | ❌ |
+| Transferir ownership | ✅ | ❌ | ❌ | ❌ |
+| Convidar membros | ✅ | ✅ | ❌ | ❌ |
+| Remover membros | ✅ | ✅ (exceto Owner) | ❌ | ❌ |
+| Alterar papel de membro | ✅ | ✅ (exceto Owner) | ❌ | ❌ |
+| Ver todos os processos da org | ✅ | ✅ | ❌ | ❌ |
+| Ver apenas processos próprios | ✅ | ✅ | ✅ | ✅ |
+| Cadastrar credenciais e-SAJ (próprias) | ✅ | ✅ | ✅ | ❌ |
+| Cadastrar credenciais e-SAJ (org compartilhada) | ✅ | ✅ | ❌ | ❌ |
+| Criar task | ✅ | ✅ | ✅ | ✅ |
+| Atribuir task para qualquer membro | ✅ | ✅ | ✅ | ✅ |
+| Mover task no Kanban (própria ou atribuída) | ✅ | ✅ | ✅ | ✅ |
+| Mover task no Kanban (qualquer) | ✅ | ✅ | ❌ | ❌ |
+| Excluir task | ✅ | ✅ | ✅ (própria) | ✅ (própria) |
+| Configurações da organização | ✅ | ✅ | ❌ | ❌ |
+
+---
+
+## 6. Funcionalidades (Priorizada)
 
 ### P0 — Essencial para o MVP funcionar
 
+**Auth e Usuários**
 - **[AUTH]** Cadastro de conta com e-mail e senha
 - **[AUTH]** Login / logout com JWT (access token + refresh token)
-- **[CREDENTIALS]** Cadastro seguro das credenciais do e-SAJ (AES-256)
+- **[AUTH]** Recuperação de senha por e-mail
+
+**Organizações**
+- **[ORG]** Criar organização com nome e slug único
+- **[ORG]** Convidar membros por e-mail com papel definido
+- **[ORG]** Aceitar/recusar convite de organização
+- **[ORG]** Alterar papel de membro (Owner e Admin)
+- **[ORG]** Remover membro da organização
+- **[ORG]** Um usuário pode pertencer a múltiplas organizações
+- **[ORG]** Contexto de organização ativo (troca de org no header)
+
+**Credenciais e e-SAJ**
+- **[CREDENTIALS]** Cadastro de credenciais individuais do e-SAJ (AES-256)
+- **[CREDENTIALS]** Cadastro de credenciais compartilhadas da organização (AES-256 — só Owner/Admin)
 - **[CREDENTIALS]** Conexão OAuth2 com Gmail e Outlook para captura do código
 - **[CREDENTIALS]** Validação das credenciais (teste de login ao salvar)
+
+**Scraping**
 - **[SCRAPING]** Login automatizado no e-SAJ via Playwright + captura de código por email
-- **[SCRAPING]** Reautenticação diária às 1h da manhã por advogado
+- **[SCRAPING]** Reautenticação diária às 1h da manhã por credencial ativa
 - **[SCRAPING]** PIPE A — coleta de intimações a cada 10 min
 - **[SCRAPING]** PIPE B — coleta de audiências a cada 10 min
 - **[SCRAPING]** PIPE C — coleta de petições a cada 10 min
@@ -116,52 +204,114 @@ Eliminar o trabalho manual de monitoramento processual, entregando ao advogado u
 - **[SCRAPING]** ETL — transformação e normalização dos dados coletados
 - **[SCRAPING]** Lógica de diff — compara novo dado com o salvo, notifica se diferente
 - **[DATAJUD]** Complemento de dados via API pública do DataJud (CNJ)
-- **[PROCESSOS]** Painel com listagem de todos os processos (número, status, última atualização)
-- **[PROCESSOS]** Tela de detalhe do processo com histórico de movimentações
+
+**Processos**
+- **[PROCESSOS]** Painel com listagem de processos (respeitando visibilidade por papel)
+- **[PROCESSOS]** Tela de detalhe com histórico de movimentações
 - **[NOTIFICAÇÃO]** Notificação in-app quando há nova movimentação
+
+**Tasks / Kanban**
+- **[TASKS]** Board Kanban com colunas padrão: A Fazer, Em Andamento, Concluído
+- **[TASKS]** Criar task com título, descrição, prazo e responsável
+- **[TASKS]** Vincular task a um processo (opcional)
+- **[TASKS]** Atribuir task para qualquer membro da organização
+- **[TASKS]** Mover task entre colunas (drag and drop)
+- **[TASKS]** Notificação in-app ao ser atribuído a uma task
+- **[TASKS]** Notificação in-app ao task atribuída ser concluída (para o criador)
 
 ### P1 — Importante, mas não bloqueia o MVP
 
-- **[PROCESSOS]** Filtros e busca na listagem (por número, status, data)
+- **[PROCESSOS]** Filtros e busca na listagem (por número, status, data, responsável)
 - **[PROCESSOS]** Indicador visual de processos com atualizações não lidas
 - **[SCRAPING]** Re-sincronização manual (botão "Atualizar agora")
-- **[AUTH]** Recuperação de senha por e-mail
 - **[RESILIÊNCIA]** Tratamento de cookie expirado com reautenticação automática imediata
 - **[RESILIÊNCIA]** Backoff exponencial em caso de rate limiting do e-SAJ
+- **[TASKS]** Filtros no Kanban (por responsável, por processo vinculado, por prazo)
+- **[TASKS]** Prazo vencido com destaque visual na task
+- **[ORG]** Página de membros da organização com papéis listados
 
 ### P2 — Desejável, entra se houver tempo
 
 - **[PROCESSOS]** Ordenação da listagem por diferentes critérios
-- **[UX]** Onboarding guiado para novos usuários
-- **[UX]** Estado vazio com instrução clara quando não há processos ainda
-- **[OBS]** Dashboard interno de saúde dos jobs (quantos rodaram, falharam, etc.)
+- **[UX]** Onboarding guiado para novos usuários e criação de organização
+- **[UX]** Estado vazio com instrução clara quando não há processos ou tasks
+- **[OBS]** Dashboard interno de saúde dos jobs
+- **[TASKS]** Colunas do Kanban customizáveis por organização
+- **[TASKS]** Prioridade da task (baixa, média, alta, urgente)
 
 ---
 
-## 6. Requisitos e Regras de Negócio
+## 7. Requisitos e Regras de Negócio
+
+### Organizações
+
+**Criação:**
+- Qualquer usuário autenticado pode criar uma organização
+- Ao criar, o usuário automaticamente se torna Owner
+- Slug da organização é único no sistema (ex: `silva-associados`)
+- Um usuário pode ser membro de múltiplas organizações simultaneamente
+
+**Convites:**
+- Owner e Admin enviam convite por e-mail com papel definido
+- Convite tem validade de 7 dias — após isso, expira e precisa ser reenviado
+- Se o e-mail não tiver conta na plataforma: link para criar conta + aceitar convite
+- Se já tiver conta: notificação in-app + e-mail com link de aceite
+- Convite pendente pode ser cancelado por Owner ou Admin antes do aceite
+
+**Troca de contexto:**
+- Header da plataforma exibe a organização ativa com seletor de troca
+- Contexto de organização determina: processos visíveis, Kanban exibido, membros disponíveis
+
+### Credenciais do e-SAJ — modelo híbrido
+
+```
+Credenciais individuais (user_id preenchido, organization_id null):
+  → Qualquer papel com permissão pode cadastrar as próprias
+  → Processos importados ficam vinculados ao user_id
+
+Credenciais compartilhadas da organização (organization_id preenchido, user_id null):
+  → Só Owner e Admin podem cadastrar
+  → Processos importados ficam vinculados ao organization_id
+  → Visibilidade dos processos segue a matriz de papéis da org
+```
+
+### Visibilidade de processos por papel
+
+```
+Owner / Admin:
+  → Todos os processos vinculados a qualquer user_id da organização
+  → Todos os processos vinculados ao organization_id (credenciais compartilhadas)
+
+Advogado / Assistente:
+  → Apenas processos vinculados ao próprio user_id
+  → Não veem processos de outros membros nem da org compartilhada
+
+Usuário autônomo (sem organização):
+  → Apenas seus próprios processos (user_id)
+```
 
 ### Fluxo de autenticação no e-SAJ
 
 ```
-Advogado cadastra CPF + senha + conecta email (OAuth2)
+Usuário cadastra CPF + senha + conecta email (OAuth2)
                     ↓
-Sistema executa Playwright:
+Sistema executa Playwright por credencial:
   1. Acessa esaj.tjsp.jus.br
   2. Preenche CPF e senha
-  3. e-SAJ envia código para o email do advogado
+  3. e-SAJ envia código para o email do usuário
   4. Gmail API / Microsoft Graph API captura o código automaticamente
   5. Playwright digita o código
   6. Sistema extrai e salva o cookie (JSESSIONID + CASTGC) criptografado no banco
                     ↓
 Cookie válido por ~24h → pipes usam o cookie salvo
                     ↓
-Às 1h da manhã → scheduler renova o cookie para cada advogado
+Às 1h da manhã → scheduler renova o cookie para cada credencial ativa
 ```
 
 ### Ciclo de coleta (PIPES)
 
 ```
-A cada 10 minutos, para cada advogado ativo:
+A cada 10 minutos, para cada credencial ativa:
   1. Verifica se o cookie está válido (expires_at - 2h de margem)
   2. Se inválido → agenda reautenticação imediata → pula esse ciclo
   3. Se válido → executa os 4 pipes em paralelo:
@@ -175,63 +325,37 @@ A cada 10 minutos, para cada advogado ativo:
   7. Se igual → descarta silenciosamente
 ```
 
-### Tratamento de erros por tipo
+### Regras de Tasks
+
+- Task sempre tem: título (obrigatório), responsável (obrigatório), coluna (obrigatório)
+- Task pode ter: descrição, prazo, processo vinculado — todos opcionais
+- Task de usuário autônomo (sem org): existe no contexto pessoal, organization_id null
+- Task vinculada a processo: herda visibilidade do processo (quem não vê o processo não vê a task)
+- Ao mover para "Concluído": notifica o criador (se diferente do responsável)
+- Ao ser atribuído: notifica o responsável imediatamente
+- Prazo vencido: flag `is_overdue = true`, destaque visual no card do Kanban
+- Job diário às 0h30 atualiza `is_overdue` em todas as tasks com `due_date < now()` e `completed_at = null`
+
+### Tratamento de erros por tipo (scraping)
 
 | Tipo de erro | Resposta do sistema |
 |---|---|
 | 401/403 — cookie expirado | Reautentica imediatamente, retoma na próxima janela |
 | 429 — rate limiting | Backoff exponencial: 5min → 15min → 60min → pula o ciclo |
-| 5xx / timeout — portal fora do ar | Loga, pula todos os advogados, retoma no próximo ciclo |
-| Credencial inválida (senha trocada) | Para tentativas, notifica advogado para atualizar credenciais |
-| Email OAuth2 expirado | Notifica advogado para reconectar o email |
+| 5xx / timeout — portal fora do ar | Loga, pula todas as credenciais, retoma no próximo ciclo |
+| Credencial inválida (senha trocada) | Para tentativas, notifica usuário para atualizar credenciais |
+| Email OAuth2 expirado | Notifica usuário para reconectar o email |
 
-### Regra do cookie
-
-```python
-# Salva com margem de segurança de 2h
-expires_at = datetime.now() + timedelta(hours=22)  # cookie dura ~24h
-
-# Antes de cada pipe, verifica
-if cookie.expires_at < datetime.now():
-    trigger_reauth(advogado_id)
-    return
-```
-
-### Notificações in-app
-- Badge/contador no ícone de notificações
-- Lista de notificações com data/hora e descrição da movimentação
-- Marcar como lida ao clicar
-- Marcar todas como lidas
-- Apenas notifica quando há diferença real — nunca duplica
-
-### Status do advogado (campo na tabela `tribunal_sessions`)
+### Status da credencial (tabela `tribunal_sessions`)
 
 | Status | Significado |
 |---|---|
 | `ativo` | Cookie válido, pipes rodando normalmente |
 | `reauth_pendente` | Cookie expirou, reautenticação em andamento |
 | `bloqueado` | Rate limit ativo, aguardando backoff |
-| `credencial_invalida` | Advogado trocou senha no e-SAJ, ação necessária |
-| `email_desconectado` | OAuth2 do email expirou, reconexão necessária |
+| `credencial_invalida` | Usuário trocou senha no e-SAJ — ação necessária |
+| `email_desconectado` | OAuth2 do email expirou — reconexão necessária |
 | `portal_indisponivel` | e-SAJ fora do ar, aguardando normalização |
-
----
-
-## 7. Critérios de Aceite
-
-| Funcionalidade | Critério |
-|---|---|
-| Cadastro | Usuário cria conta e acessa o app em menos de 2 minutos |
-| Credenciais e-SAJ | Sistema valida, salva criptografado e inicia importação automaticamente |
-| Conexão de email | Advogado conecta Gmail ou Outlook via OAuth2 em menos de 1 minuto |
-| Login automatizado | Sistema completa login no e-SAJ (CPF + senha + código) sem intervenção humana |
-| Importação | Todos os processos do advogado aparecem no painel após importação inicial |
-| Monitoramento | Nova movimentação gera notificação in-app em até 1 ciclo de 10 minutos |
-| Renovação de cookie | Sistema renova o cookie às 1h sem intervenção do advogado |
-| Notificação | Exibe número do processo e descrição da movimentação |
-| Detalhe do processo | Histórico completo de movimentações em ordem cronológica |
-| Erro de credencial | Sistema exibe mensagem clara e para tentativas até o advogado atualizar |
-| Resiliência | Falha em 1 advogado não impacta coleta dos demais |
 
 ---
 
@@ -243,249 +367,86 @@ if cookie.expires_at < datetime.now():
 - **Componentes UI:** shadcn/ui
 - **Roteamento:** TanStack Router
 - **Requisições/Cache:** TanStack Query + Axios
-- **Estado global:** Zustand
+- **Estado global:** Zustand (auth + organização ativa em memória)
+- **Drag and drop (Kanban):** a definir — dnd-kit ou @hello-pangea/dnd
 - **Plataforma:** Web (responsivo, desktop-first)
+- **Gerenciador de pacotes:** Bun
 
 ### Backend
 - **Linguagem:** Python 3.12
-- **Gerenciador de pacotes:** UV (substitui pip + virtualenv + pip-tools — equivalente ao Bun para Python)
-- **Framework:** FastAPI
-- **Servidor ASGI:** Uvicorn
-- **Autenticação:** JWT (access token curto ~15min + refresh token ~7 dias via cookie HttpOnly)
-- **Orquestrador de jobs:** APScheduler (roda dentro do FastAPI — migrar para Celery conforme escala)
-- **Scraping / automação:** Playwright (login no e-SAJ) + httpx (chamadas às APIs internas)
-- **Parsing HTML:** BeautifulSoup4 + lxml (para páginas sem API JSON, ex: detalhes do processo)
+- **Gerenciador de pacotes:** UV
+- **Framework:** FastAPI + Uvicorn
+- **ORM:** SQLAlchemy 2.0 async + Alembic (migrations)
+- **Autenticação:** JWT (access token 15min em memória + refresh token 7 dias em cookie HttpOnly)
+- **Orquestrador de jobs:** APScheduler (dentro do FastAPI)
+- **Scraping / automação:** Playwright (login e-SAJ) + httpx (APIs internas)
+- **Parsing HTML:** BeautifulSoup4 + lxml
+- **Criptografia:** AES-256 via `cryptography` lib
+- **Permissões:** módulo `core/permissions.py` centraliza toda a lógica de papéis
 
 ### Integrações de terceiros
 - **Gmail API** (Google Cloud) — captura automática do código de verificação do e-SAJ
 - **Microsoft Graph API** (Azure Portal) — idem para usuários Outlook/Hotmail
-- **DataJud API** (CNJ) — complemento de dados processuais, gratuito, cobre todos os tribunais
-- **e-SAJ (TJSP)** — via Playwright para login + httpx para APIs internas descobertas:
+- **DataJud API** (CNJ) — complemento de dados processuais, gratuito, 91 tribunais
+- **e-SAJ (TJSP)** — Playwright para login + httpx para APIs internas:
   - `GET /tarefas-adv/api/intimacoes`
   - `GET /tarefas-adv/api/audiencias`
   - `GET /tarefas-adv/api/peticoes`
   - `GET /tarefas-adv/api/processos?cdsProcesso=...`
   - `GET /cpopg/show.do?processo.codigo=...` (HTML — BeautifulSoup)
-  - `GET /pastadigital/getPDF.do?...` (PDF — futuro)
 
 ### Infra/Deploy
-- **Plataforma:** Railway (frontend + backend + banco na mesma plataforma)
-- **Repositório:** Monorepo simples — `frontend/` e `backend/` no mesmo repositório Git, sem ferramenta de orquestração (Turborepo não se aplica — stack híbrida JS + Python)
-- **Containerização:** Dockerfile — garante ambiente idêntico entre dev e prod, e resolve dependências de sistema do Playwright (Chromium) no Railway
-- **Ambientes:** dev (local via Docker) → prod (Railway via Dockerfile)
+- **Repositório:** Monorepo simples (`frontend/` + `backend/` no mesmo repositório Git)
+- **Plataforma:** Railway (frontend + backend + banco)
+- **Containerização:** Dockerfile no `backend/` (resolve dependências do Playwright/Chromium)
+- **Ambientes:** dev (local) → prod (Railway)
 - **Variáveis de ambiente:** gerenciadas pelo Railway (nunca hardcoded)
 - **Banco de dados:** PostgreSQL via Railway (plugin nativo)
-- **Staging:** fora do escopo do MVP
 
 ### Estrutura do Monorepo
 
 ```
 automacao-juridica/
-├── frontend/                        # React + TypeScript + Bun
-│   ├── package.json
-│   ├── bun.lockb
-│   ├── vite.config.ts
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
+├── frontend/                          → React + Bun
 │   └── src/
-│       ├── assets/
-│       ├── components/
-│       │   └── ui/                  # componentes shadcn/ui
 │       ├── features/
-│       │   ├── auth/                # login, registro, recuperação de senha
-│       │   └── processos/           # painel, detalhe, notificações
-│       ├── hooks/
-│       ├── lib/
-│       │   ├── axios.ts             # instância configurada do axios
-│       │   └── utils.ts             # cn() e utilitários
-│       ├── pages/
-│       ├── routes/                  # TanStack Router
-│       ├── store/                   # Zustand stores
-│       └── types/                   # types e interfaces globais
+│       │   ├── auth/
+│       │   ├── organizations/         → criação, membros, convites, troca de contexto
+│       │   ├── processos/
+│       │   ├── tasks/                 → Kanban, criação, atribuição
+│       │   ├── notificacoes/
+│       │   └── settings/
+│       ├── store/                     → Zustand (auth + org ativa)
+│       └── routes/                    → TanStack Router
 │
-├── backend/                         # FastAPI + Python + UV
-│   ├── pyproject.toml
-│   ├── uv.lock
+├── backend/                           → FastAPI + UV
 │   ├── Dockerfile
-│   ├── .env.example
 │   └── app/
-│       ├── main.py                  # entrypoint FastAPI + APScheduler
 │       ├── api/
-│       │   ├── auth.py              # rotas de autenticação
-│       │   ├── processos.py         # rotas de processos
-│       │   ├── credentials.py       # rotas de credenciais e OAuth2
-│       │   └── notifications.py     # rotas de notificações
+│       │   ├── auth.py
+│       │   ├── organizations.py       → CRUD org, membros, convites
+│       │   ├── processos.py
+│       │   ├── tasks.py               → CRUD tasks, Kanban
+│       │   ├── credentials.py
+│       │   └── notifications.py
 │       ├── services/
-│       │   ├── auth_esaj.py         # login automatizado (Playwright)
-│       │   ├── email_capture.py     # Gmail API + Microsoft Graph API
-│       │   ├── datajud.py           # integração DataJud CNJ
+│       │   ├── auth_esaj.py
+│       │   ├── email_capture.py
+│       │   ├── datajud.py
 │       │   └── pipes/
-│       │       ├── pipe_intimacoes.py
-│       │       ├── pipe_audiencias.py
-│       │       ├── pipe_peticoes.py
-│       │       └── pipe_processos.py
-│       ├── etl/
-│       │   ├── etl.py               # transformação e normalização
-│       │   └── diff.py              # comparação e geração de notificações
-│       ├── models/                  # SQLAlchemy models
-│       ├── schemas/                 # Pydantic schemas (request/response)
+│       ├── models/
+│       ├── schemas/
 │       ├── core/
-│       │   ├── security.py          # JWT, bcrypt, AES-256
-│       │   ├── scheduler.py         # APScheduler — jobs e horários
-│       │   └── config.py            # variáveis de ambiente
+│       │   ├── security.py            → JWT, bcrypt, AES-256
+│       │   ├── permissions.py         → lógica centralizada de papéis e permissões
+│       │   └── scheduler.py
 │       └── db/
-│           ├── session.py           # conexão async PostgreSQL
-│           └── migrations/          # Alembic migrations
+│           └── migrations/
 │
-├── .gitignore
-└── README.md
-
----
-
-## 9. Banco de Dados
-
-**Banco:** PostgreSQL via Railway  
-**ORM:** SQLAlchemy 2.0 (async) + Alembic (migrations)
-
-### Entidades e campos
-
-**users**
-```
-id              UUID PK
-email           VARCHAR UNIQUE NOT NULL
-password_hash   VARCHAR NOT NULL          -- bcrypt, mínimo 12 rounds
-name            VARCHAR NOT NULL
-created_at      TIMESTAMP WITH TIME ZONE
-updated_at      TIMESTAMP WITH TIME ZONE
-```
-
-**tribunal_credentials**
-```
-id              UUID PK
-user_id         UUID FK → users
-tribunal        VARCHAR NOT NULL          -- ex: "esaj_tjsp"
-cpf_encrypted   BYTEA NOT NULL            -- AES-256
-senha_encrypted BYTEA NOT NULL            -- AES-256
-email_provider  VARCHAR                   -- "gmail" | "outlook"
-email_oauth_token_encrypted  BYTEA        -- token OAuth2 do email, AES-256
-last_validated_at  TIMESTAMP WITH TIME ZONE
-is_active       BOOLEAN DEFAULT TRUE
-created_at      TIMESTAMP WITH TIME ZONE
-```
-
-**tribunal_sessions**
-```
-id              UUID PK
-user_id         UUID FK → users
-tribunal        VARCHAR NOT NULL
-cookie_encrypted  BYTEA NOT NULL          -- JSESSIONID + CASTGC, AES-256
-expires_at      TIMESTAMP WITH TIME ZONE  -- now() + 22h (margem de segurança)
-status          VARCHAR NOT NULL          -- ativo | reauth_pendente | bloqueado | credencial_invalida | email_desconectado | portal_indisponivel
-ultimo_erro     TEXT
-tentativas_falha  INTEGER DEFAULT 0
-proximo_retry   TIMESTAMP WITH TIME ZONE
-ultimo_sucesso  TIMESTAMP WITH TIME ZONE
-created_at      TIMESTAMP WITH TIME ZONE
-updated_at      TIMESTAMP WITH TIME ZONE
-```
-
-**processos**
-```
-id              UUID PK
-user_id         UUID FK → users
-tribunal        VARCHAR NOT NULL
-cd_processo     VARCHAR NOT NULL          -- código interno do e-SAJ
-nu_processo     VARCHAR                   -- número CNJ formatado
-de_classe       VARCHAR                   -- classe processual
-de_assunto      VARCHAR                   -- assunto
-instancia       VARCHAR                   -- PG, SG, etc.
-parte_ativa     JSONB                     -- {nome, nomeSocial, representada}
-parte_passiva   JSONB                     -- {nome, representada}
-url_cpo         VARCHAR                   -- link para página do processo
-url_pasta       VARCHAR                   -- link para pasta digital
-status          VARCHAR
-last_synced_at  TIMESTAMP WITH TIME ZONE
-created_at      TIMESTAMP WITH TIME ZONE
-updated_at      TIMESTAMP WITH TIME ZONE
-
-UNIQUE (user_id, cd_processo)
-```
-
-**movimentacoes**
-```
-id              UUID PK
-processo_id     UUID FK → processos
-data_movimentacao  TIMESTAMP WITH TIME ZONE
-descricao       TEXT NOT NULL
-titulo          VARCHAR                   -- ex: "Outras Decisões"
-instancia       VARCHAR
-is_new          BOOLEAN DEFAULT TRUE      -- flag para notificação
-created_at      TIMESTAMP WITH TIME ZONE
-
-UNIQUE (processo_id, data_movimentacao, descricao)  -- evita duplicatas
-```
-
-**intimacoes**
-```
-id              UUID PK
-user_id         UUID FK → users
-processo_id     UUID FK → processos (nullable)
-id_esaj         VARCHAR UNIQUE NOT NULL   -- id composto vindo da API do e-SAJ
-titulo          VARCHAR
-descricao       TEXT
-instancia       VARCHAR
-data_movimentacao  TIMESTAMP WITH TIME ZONE
-ciencia         BOOLEAN DEFAULT FALSE     -- se o advogado já deu ciência no e-SAJ
-is_new          BOOLEAN DEFAULT TRUE
-created_at      TIMESTAMP WITH TIME ZONE
-```
-
-**audiencias**
-```
-id              UUID PK
-user_id         UUID FK → users
-processo_id     UUID FK → processos (nullable)
-id_esaj         VARCHAR UNIQUE NOT NULL
-titulo          VARCHAR
-data_audiencia  TIMESTAMP WITH TIME ZONE
-local           VARCHAR
-is_new          BOOLEAN DEFAULT TRUE
-created_at      TIMESTAMP WITH TIME ZONE
-```
-
-**notifications**
-```
-id              UUID PK
-user_id         UUID FK → users
-processo_id     UUID FK → processos (nullable)
-tipo            VARCHAR NOT NULL          -- "movimentacao" | "intimacao" | "audiencia" | "sistema"
-titulo          VARCHAR NOT NULL
-message         TEXT NOT NULL
-is_read         BOOLEAN DEFAULT FALSE
-created_at      TIMESTAMP WITH TIME ZONE
-```
-
-**job_logs**
-```
-id              UUID PK
-user_id         UUID FK → users (nullable — logs de sistema não têm user)
-tipo            VARCHAR NOT NULL          -- "login" | "pipe_intimacoes" | "pipe_audiencias" | "pipe_peticoes" | "pipe_processos" | "reauth"
-status          VARCHAR NOT NULL          -- "sucesso" | "falha" | "skip"
-erro            TEXT                      -- detalhes do erro se houver
-duracao_ms      INTEGER
-created_at      TIMESTAMP WITH TIME ZONE
-```
-
-### Relacionamentos
-
-```
-users 1→N tribunal_credentials
-users 1→N tribunal_sessions
-users 1→N processos
-users 1→N notifications
-processos 1→N movimentacoes
-processos 1→N intimacoes
-processos 1→N audiencias
+└── docs/
+    ├── INDEX.md
+    ├── modulos/
+    └── decisions/
 ```
 
 ### Estrutura do Dockerfile (backend)
@@ -493,39 +454,259 @@ processos 1→N audiencias
 ```dockerfile
 FROM python:3.12-slim
 
-# UV — gerenciador de pacotes
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Dependências de sistema do Playwright (Chromium)
 RUN apt-get update && apt-get install -y \
     chromium chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Instala dependências Python via UV (lockfile garante reprodutibilidade)
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
 COPY . .
+
+RUN useradd -m appuser
+USER appuser
 
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ---
 
-## 10. Arquitetura de Scraping
+## 9. Banco de Dados
 
-> A estrutura de pastas completa está na seção 8 (Monorepo).
+**Banco:** PostgreSQL via Railway
+**ORM:** SQLAlchemy 2.0 async + Alembic
+
+### Entidades e campos
+
+**users**
+```
+id                  UUID PK
+email               VARCHAR UNIQUE NOT NULL
+password_hash       VARCHAR NOT NULL          -- bcrypt 12 rounds
+name                VARCHAR NOT NULL
+created_at          TIMESTAMP WITH TIME ZONE
+updated_at          TIMESTAMP WITH TIME ZONE
+```
+
+**organizations**
+```
+id                  UUID PK
+name                VARCHAR NOT NULL
+slug                VARCHAR UNIQUE NOT NULL   -- ex: "silva-associados"
+created_by          UUID FK → users
+created_at          TIMESTAMP WITH TIME ZONE
+updated_at          TIMESTAMP WITH TIME ZONE
+```
+
+**organization_members**
+```
+id                  UUID PK
+organization_id     UUID FK → organizations
+user_id             UUID FK → users
+role                VARCHAR NOT NULL          -- "owner" | "admin" | "advogado" | "assistente"
+invited_by          UUID FK → users
+joined_at           TIMESTAMP WITH TIME ZONE
+created_at          TIMESTAMP WITH TIME ZONE
+
+UNIQUE (organization_id, user_id)
+```
+
+**organization_invites**
+```
+id                  UUID PK
+organization_id     UUID FK → organizations
+email               VARCHAR NOT NULL          -- email do convidado
+role                VARCHAR NOT NULL          -- papel que será atribuído ao aceitar
+invited_by          UUID FK → users
+token               VARCHAR UNIQUE NOT NULL   -- UUID do link de convite
+expires_at          TIMESTAMP WITH TIME ZONE  -- validade de 7 dias
+accepted_at         TIMESTAMP WITH TIME ZONE  -- null se pendente
+created_at          TIMESTAMP WITH TIME ZONE
+```
+
+**tribunal_credentials**
+```
+id                  UUID PK
+user_id             UUID FK → users (nullable — null se credencial da org)
+organization_id     UUID FK → organizations (nullable — null se individual)
+tribunal            VARCHAR NOT NULL           -- "esaj_tjsp"
+cpf_encrypted       BYTEA NOT NULL             -- AES-256
+senha_encrypted     BYTEA NOT NULL             -- AES-256
+email_provider      VARCHAR                    -- "gmail" | "outlook"
+email_oauth_token_encrypted  BYTEA             -- AES-256
+last_validated_at   TIMESTAMP WITH TIME ZONE
+is_active           BOOLEAN DEFAULT TRUE
+created_at          TIMESTAMP WITH TIME ZONE
+
+CHECK (user_id IS NOT NULL OR organization_id IS NOT NULL)
+```
+
+**tribunal_sessions**
+```
+id                  UUID PK
+credential_id       UUID FK → tribunal_credentials
+cookie_encrypted    BYTEA NOT NULL             -- JSESSIONID + CASTGC, AES-256
+expires_at          TIMESTAMP WITH TIME ZONE   -- now() + 22h
+status              VARCHAR NOT NULL           -- ver seção 7
+ultimo_erro         TEXT
+tentativas_falha    INTEGER DEFAULT 0
+proximo_retry       TIMESTAMP WITH TIME ZONE
+ultimo_sucesso      TIMESTAMP WITH TIME ZONE
+created_at          TIMESTAMP WITH TIME ZONE
+updated_at          TIMESTAMP WITH TIME ZONE
+```
+
+**processos**
+```
+id                  UUID PK
+user_id             UUID FK → users (nullable — null se da org)
+organization_id     UUID FK → organizations (nullable — null se individual)
+tribunal            VARCHAR NOT NULL
+cd_processo         VARCHAR NOT NULL
+nu_processo         VARCHAR
+de_classe           VARCHAR
+de_assunto          VARCHAR
+instancia           VARCHAR
+parte_ativa         JSONB
+parte_passiva       JSONB
+url_cpo             VARCHAR
+url_pasta           VARCHAR
+status              VARCHAR
+last_synced_at      TIMESTAMP WITH TIME ZONE
+created_at          TIMESTAMP WITH TIME ZONE
+updated_at          TIMESTAMP WITH TIME ZONE
+
+UNIQUE (cd_processo, user_id, organization_id)
+CHECK (user_id IS NOT NULL OR organization_id IS NOT NULL)
+```
+
+**movimentacoes**
+```
+id                  UUID PK
+processo_id         UUID FK → processos
+data_movimentacao   TIMESTAMP WITH TIME ZONE
+descricao           TEXT NOT NULL
+titulo              VARCHAR
+instancia           VARCHAR
+is_new              BOOLEAN DEFAULT TRUE
+created_at          TIMESTAMP WITH TIME ZONE
+
+UNIQUE (processo_id, data_movimentacao, descricao)
+```
+
+**intimacoes**
+```
+id                  UUID PK
+user_id             UUID FK → users
+organization_id     UUID FK → organizations (nullable)
+processo_id         UUID FK → processos (nullable)
+id_esaj             VARCHAR UNIQUE NOT NULL
+titulo              VARCHAR
+descricao           TEXT
+instancia           VARCHAR
+data_movimentacao   TIMESTAMP WITH TIME ZONE
+ciencia             BOOLEAN DEFAULT FALSE
+is_new              BOOLEAN DEFAULT TRUE
+created_at          TIMESTAMP WITH TIME ZONE
+```
+
+**audiencias**
+```
+id                  UUID PK
+user_id             UUID FK → users
+organization_id     UUID FK → organizations (nullable)
+processo_id         UUID FK → processos (nullable)
+id_esaj             VARCHAR UNIQUE NOT NULL
+titulo              VARCHAR
+data_audiencia      TIMESTAMP WITH TIME ZONE
+local               VARCHAR
+is_new              BOOLEAN DEFAULT TRUE
+created_at          TIMESTAMP WITH TIME ZONE
+```
+
+**tasks**
+```
+id                  UUID PK
+organization_id     UUID FK → organizations (nullable — null se task pessoal)
+created_by          UUID FK → users NOT NULL
+processo_id         UUID FK → processos (nullable)
+assigned_to         UUID FK → users (nullable)
+title               VARCHAR NOT NULL
+description         TEXT
+column              VARCHAR NOT NULL            -- "todo" | "in_progress" | "done"
+priority            VARCHAR DEFAULT 'medium'    -- "low" | "medium" | "high" | "urgent" (P2)
+due_date            TIMESTAMP WITH TIME ZONE
+is_overdue          BOOLEAN DEFAULT FALSE
+completed_at        TIMESTAMP WITH TIME ZONE
+created_at          TIMESTAMP WITH TIME ZONE
+updated_at          TIMESTAMP WITH TIME ZONE
+```
+
+**notifications**
+```
+id                  UUID PK
+user_id             UUID FK → users
+organization_id     UUID FK → organizations (nullable)
+processo_id         UUID FK → processos (nullable)
+task_id             UUID FK → tasks (nullable)
+tipo                VARCHAR NOT NULL            -- "movimentacao" | "intimacao" | "audiencia" | "task_atribuida" | "task_concluida" | "convite_org" | "sistema"
+titulo              VARCHAR NOT NULL
+message             TEXT NOT NULL
+is_read             BOOLEAN DEFAULT FALSE
+created_at          TIMESTAMP WITH TIME ZONE
+```
+
+**job_logs**
+```
+id                  UUID PK
+credential_id       UUID FK → tribunal_credentials (nullable)
+tipo                VARCHAR NOT NULL            -- "login" | "pipe_intimacoes" | "pipe_audiencias" | "pipe_peticoes" | "pipe_processos" | "reauth"
+status              VARCHAR NOT NULL            -- "sucesso" | "falha" | "skip"
+erro                TEXT
+duracao_ms          INTEGER
+created_at          TIMESTAMP WITH TIME ZONE
+```
+
+### Relacionamentos
+
+```
+users 1→N organization_members
+organizations 1→N organization_members
+organizations 1→N organization_invites
+users 1→N tribunal_credentials (individuais)
+organizations 1→N tribunal_credentials (compartilhadas)
+tribunal_credentials 1→1 tribunal_sessions
+users 1→N processos (individuais)
+organizations 1→N processos (da org)
+processos 1→N movimentacoes
+processos 1→N intimacoes
+processos 1→N audiencias
+users 1→N tasks (created_by)
+users 1→N tasks (assigned_to)
+organizations 1→N tasks
+processos 1→N tasks
+users 1→N notifications
+```
+
+---
+
+## 10. Arquitetura de Scraping
 
 ### Scheduler — jobs e horários
 
 ```python
-# Roda às 1h da manhã — renova cookies de todos os advogados ativos
+# Roda às 1h — renova cookies de todas as credenciais ativas
 scheduler.add_job(renovar_todos_cookies, 'cron', hour=1, minute=0)
 
-# Roda a cada 10 minutos — executa pipes de todos os advogados ativos
+# Roda a cada 10 minutos — executa pipes de todas as credenciais ativas
 scheduler.add_job(executar_todos_pipes, 'interval', minutes=10)
+
+# Roda às 0h30 — atualiza flag is_overdue nas tasks vencidas
+scheduler.add_job(atualizar_tasks_vencidas, 'cron', hour=0, minute=30)
 ```
 
 ### Fluxo do ETL
@@ -535,82 +716,82 @@ Dado bruto da API do e-SAJ (JSON)
         ↓
 ETL normaliza → formato interno padrão
         ↓
-Diff compara com banco:
-  → hash do conteúdo atual vs hash do novo dado
+Diff compara com banco (hash do conteúdo):
   → se igual: descarta
-  → se diferente: salva nova versão + cria notification
+  → se diferente: salva nova versão
+        ↓
+Notificação gerada respeitando contexto:
+  → credencial individual → notifica o user_id dono
+  → credencial da org → notifica Owner + Admin + user vinculado ao processo
 ```
 
 ---
 
 ## 11. UX/UI e Identidade Visual
 
-- **Objetivo de estilo:** Light theme com navbar dark — painel principal limpo e branco, sidebar clara, header escuro como âncora visual. Profissional e denso em informação, adequado ao contexto jurídico.
+- **Objetivo de estilo:** Light theme com navbar dark — painel principal limpo e branco, sidebar clara, header escuro como âncora visual. Profissional e denso em informação.
 - **Tom:** Confiança, controle, eficiência operacional
 - **Componentes base:** shadcn/ui
 - **O que evitar:** Dark theme total, design excessivamente colorido, gamificação
-
-### Tema Geral
-Light theme com navbar dark — a seção principal é clara/branca, apenas o header superior é escuro.
 
 ### Paleta de Cores
 
 | Token | Hex | Uso |
 |---|---|---|
-| `bg-navbar` | `#0D0F14` | Header/navbar superior (único elemento dark) |
-| `bg-base` | `#F0F2F7` | Background geral da aplicação (off-white) |
+| `bg-navbar` | `#0D0F14` | Header/navbar superior |
+| `bg-base` | `#F0F2F7` | Background geral (off-white) |
 | `bg-sidebar` | `#F5F6FA` | Sidebar esquerda |
 | `bg-surface` | `#FFFFFF` | Cards, painéis, painel principal |
 | `bg-surface-hover` | `#F8F9FC` | Hover em cards |
-| `border-subtle` | `#E5E7EB` | Bordas sutis dos cards e divisores |
+| `border-subtle` | `#E5E7EB` | Bordas sutis |
 | `border-active` | `#C7D0E8` | Borda de card ativo/selecionado |
-| `text-primary` | `#111827` | Texto principal (dark sobre fundo claro) |
-| `text-muted` | `#6B7280` | Labels, textos secundários, metadados |
+| `text-primary` | `#111827` | Texto principal |
+| `text-muted` | `#6B7280` | Labels e textos secundários |
 | `text-navbar` | `#FFFFFF` | Texto dentro da navbar dark |
 | `accent-blue` | `#3B5BDB` | Badge TJSP, links, ações primárias |
 | `accent-orange` | `#F97316` | Badge TRF3 e outros tribunais |
 | `accent-purple` | `#8B5CF6` | Tags de tipo processual |
-| `accent-amber` | `#F59E0B` | Prazo médio, botões de ação secundária |
-| `status-critical` | `#EF4444` | Prazo crítico, alertas urgentes |
-| `status-online` | `#22C55E` | Indicador de serviço ativo/online |
+| `accent-amber` | `#F59E0B` | Prazo médio, ações secundárias |
+| `status-critical` | `#EF4444` | Prazo crítico, alertas, task vencida |
+| `status-online` | `#22C55E` | Indicador de serviço ativo |
 
 ### Layout e Estrutura
-- **Sidebar lateral esquerda:** Lista de processos em acompanhamento (fixados pelo advogado)
-- **Painel principal:** Detalhe do processo selecionado
-- **Header fixo:** Nome do produto + status do serviço
-- Cards de processo: tribunal (badge colorido), número, cliente, prazo, última movimentação
-- Detalhe do processo: etapas judiciais em timeline + gabinete de documentos lado a lado
+- **Navbar:** Nome do produto + seletor de organização ativa + notificações + perfil
+- **Sidebar lateral:** Navegação principal (Processos, Kanban, Membros, Configurações)
+- **Painel principal:** Conteúdo da seção ativa
+- **Kanban:** Board com colunas em scroll horizontal, cards com drag and drop
 
 ---
 
 ## 12. Qualidade, Segurança e Operação
 
 ### Segurança
-- Credenciais do e-SAJ (CPF, senha, cookie, token OAuth2) armazenadas com AES-256 via `cryptography` lib — chave em variável de ambiente (`ENCRYPTION_KEY`), nunca no código
-- Senhas da plataforma hasheadas com bcrypt (mínimo 12 rounds)
-- JWT: access token de 15 minutos em memória (Zustand), refresh token de 7 dias em cookie HttpOnly + Secure
-- `user_id` sempre extraído do token JWT no backend — nunca aceito do body/query
-- Rate limiting nas rotas de autenticação
-- Schemas de resposta Pydantic explícitos — nunca retornar model ORM diretamente
-- Validação de ownership: `resource.user_id == current_user.id` antes de qualquer retorno
+- Credenciais do e-SAJ, cookies e tokens OAuth2 armazenados com AES-256 — chave em `ENCRYPTION_KEY`
+- Senhas hasheadas com bcrypt (mínimo 12 rounds)
+- JWT: access token 15min em memória (Zustand), refresh token 7 dias em cookie HttpOnly + Secure
+- `user_id` sempre extraído do JWT — nunca aceito do body/query
+- Toda lógica de papel e permissão centralizada em `core/permissions.py`
+- Visibilidade de processos e tasks validada no banco (WHERE clause) — nunca filtrada em Python
+- Token de convite é UUID único, expira em 7 dias e é invalidado após uso
 - Logs nunca contêm credenciais, cookies ou tokens
+- CORS restrito à origem do frontend em produção
 - HTTPS obrigatório em produção
-- Variáveis sensíveis apenas em variáveis de ambiente do Railway
 
 ### Requisitos não-funcionais
 - Listagem de processos carrega em menos de 2 segundos
-- Falha em 1 advogado não impacta coleta dos demais
-- Jobs de scraping com timeout máximo de 60 segundos por advogado
+- Board Kanban carrega em menos de 1 segundo
+- Falha em 1 credencial não impacta coleta das demais
+- Jobs de scraping com timeout máximo de 60 segundos por credencial
 
-### Observabilidade (tabela `job_logs`)
-- Log de cada execução de pipe: tipo, status, duração, erro
+### Observabilidade
+- Log de cada execução de pipe: tipo, status, duração, erro (tabela `job_logs`)
 - Log de cada login/reautenticação
-- Alerta interno se taxa de falha > 20% dos advogados em um ciclo
+- Alerta interno se taxa de falha > 20% das credenciais em um ciclo
 
 ### Estratégia de testes
-- **Unitários:** funções de ETL/diff, parsing HTML (BeautifulSoup), criptografia
-- **Integração:** fluxo de autenticação JWT, rotas protegidas, ownership
-- **E2E:** fluxo crítico completo (cadastro → credenciais → login e-SAJ → ver processos → notificação)
+- **Unitários:** ETL/diff, parsing HTML, criptografia, lógica de permissões por papel
+- **Integração:** autenticação JWT, rotas protegidas, ownership, visibilidade por papel
+- **E2E:** fluxo crítico (cadastro → org → credenciais → login e-SAJ → processos → task → notificação)
 
 ---
 
@@ -618,9 +799,11 @@ Light theme com navbar dark — a seção principal é clara/branca, apenas o he
 
 | Decisão | Opções | Prazo para decidir |
 |---|---|---|
-| Modelo de monetização | Assinatura mensal, por processo, freemium | Pré-lançamento |
-| Tipografia | DM Sans + DM Serif Display ou outra | Antes de implementar o frontend |
-| Migração Celery | Quando o APScheduler não aguentar a carga | Conforme escala |
+| Modelo de monetização | Por organização, por usuário, freemium | Pré-lançamento |
+| Tipografia | DM Sans + DM Serif Display ou outra | Antes do frontend |
+| Lib de drag and drop (Kanban) | dnd-kit vs @hello-pangea/dnd | Antes de implementar tasks |
+| Migração Celery | Quando APScheduler não aguentar | Conforme escala |
+| Colunas Kanban customizáveis | MVP com fixas ou já customizável | Antes de implementar tasks (P2) |
 
 ### Decisões já tomadas
 
@@ -630,17 +813,23 @@ Light theme com navbar dark — a seção principal é clara/branca, apenas o he
 | ORM | SQLAlchemy 2.0 async + Alembic |
 | Framework backend | FastAPI + Uvicorn |
 | Gerenciador de pacotes Python | UV |
-| Containerização | Dockerfile (deploy no Railway + Playwright no prod) |
-| Estrutura do repositório | Monorepo simples (frontend/ + backend/ no mesmo repo Git) |
+| Gerenciador de pacotes frontend | Bun |
+| Containerização | Dockerfile (Railway + Playwright) |
+| Estrutura do repositório | Monorepo simples (frontend/ + backend/) |
 | Orquestrador de jobs (MVP) | APScheduler (dentro do FastAPI) |
 | Criptografia de credenciais | AES-256 via `cryptography` lib |
-| Captura de código e-SAJ | Gmail API (Google) + Microsoft Graph API (Outlook) |
+| Captura de código e-SAJ | Gmail API + Microsoft Graph API (Outlook) |
 | Scraping login | Playwright (login) + httpx (APIs internas) |
 | Parsing HTML | BeautifulSoup4 + lxml |
 | Complemento de dados | DataJud API pública (CNJ) — gratuito |
 | Deploy / infra | Railway (backend + banco + frontend) |
 | Design system | Light theme com navbar dark — paleta definida na seção 11 |
 | Frequência de sincronização | A cada 10 minutos (pipes) + renovação às 1h (login) |
+| Papéis da organização | 4 níveis: Owner, Admin, Advogado, Assistente |
+| Credenciais e-SAJ | Modelo híbrido: individuais + compartilhadas por organização |
+| Visibilidade de processos | Owner/Admin veem tudo — Advogado/Assistente só os seus |
+| Tasks | Independentes ou vinculadas a processo, ambos os modelos |
+| Atribuição de tasks | Qualquer membro pode criar e atribuir para qualquer outro |
 
 ---
 

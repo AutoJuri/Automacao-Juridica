@@ -4,17 +4,23 @@ Nenhum schema de resposta expõe `password_hash` ou qualquer campo `*_encrypted`
 """
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.validators import SENHA_MAX, SENHA_MIN, valida_bytes_da_senha
 
+CargoPerfil = Literal["advogado", "assistente", "estagiario"]
+
 
 class UserCreateSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=2, max_length=255)
     email: EmailStr = Field(max_length=255)
     password: str = Field(min_length=SENHA_MIN, max_length=SENHA_MAX)
+    cargo: CargoPerfil
 
     @field_validator("password")
     @classmethod
@@ -33,6 +39,7 @@ class UserPublicSchema(BaseModel):
     id: UUID
     name: str
     email: EmailStr
+    cargo: CargoPerfil | None
     created_at: datetime
 
 

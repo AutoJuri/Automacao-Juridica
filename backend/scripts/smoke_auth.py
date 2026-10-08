@@ -62,7 +62,9 @@ def main() -> None:
     senha = "SenhaForte123!"
 
     status, body = chamar(
-        "POST", "/auth/cadastro", {"name": "Smoke", "email": email, "password": senha}
+        "POST",
+        "/auth/cadastro",
+        {"name": "Smoke", "email": email, "password": senha, "cargo": "advogado"},
     )
     verificar("cadastro retorna 201", status == 201)
     verificar("cadastro devolve access_token", bool(body.get("access_token")))
@@ -73,7 +75,9 @@ def main() -> None:
     access_token = body.get("access_token", "")
 
     status, _ = chamar(
-        "POST", "/auth/cadastro", {"name": "Smoke", "email": email, "password": senha}
+        "POST",
+        "/auth/cadastro",
+        {"name": "Smoke", "email": email, "password": senha, "cargo": "advogado"},
     )
     verificar("cadastro duplicado retorna 409", status == 409)
 

@@ -22,7 +22,9 @@ def preparar() -> None:
     email = f"reset-{uuid4().hex[:12]}@example.com"
 
     status, _ = chamar(
-        "POST", "/auth/cadastro", {"name": "Reset", "email": email, "password": SENHA_INICIAL}
+        "POST",
+        "/auth/cadastro",
+        {"name": "Reset", "email": email, "password": SENHA_INICIAL, "cargo": "advogado"},
     )
     verificar("cadastro retorna 201", status == 201)
 

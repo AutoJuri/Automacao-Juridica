@@ -11,11 +11,13 @@ from app.models.intimacao import Intimacao
 from app.models.job_log import JobLog
 from app.models.movimentacao import Movimentacao
 from app.models.notification import Notification
+from app.models.organization import Organization, OrganizationInvite, OrganizationMember
 from app.models.password_reset_token import PasswordResetToken
 from app.models.peticao_diversa import PeticaoDiversa
 from app.models.processo import Processo
 from app.models.processo_datajud import ProcessoDatajud
 from app.models.refresh_token import RefreshToken
+from app.models.task import KanbanBoard, KanbanColumn, Task
 from app.models.tribunal import TribunalCredential, TribunalSession
 from app.models.user import User
 
@@ -25,13 +27,19 @@ __all__ = [
     "Base",
     "Intimacao",
     "JobLog",
+    "KanbanBoard",
+    "KanbanColumn",
     "Movimentacao",
     "Notification",
+    "Organization",
+    "OrganizationInvite",
+    "OrganizationMember",
     "PasswordResetToken",
     "PeticaoDiversa",
     "Processo",
     "ProcessoDatajud",
     "RefreshToken",
+    "Task",
     "TribunalCredential",
     "TribunalSession",
     "User",

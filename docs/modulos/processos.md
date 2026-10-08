@@ -1,6 +1,6 @@
 # Módulo: Painel de Processos e Notificações
 
-> Última atualização: 2026-09-21
+> Última atualização: 2026-10-06
 > Camada: Backend / Frontend
 
 ---
@@ -54,7 +54,7 @@ Expõe ao advogado autenticado os processos, intimações, audiências, moviment
 | `frontend/src/features/elaboracao/elaboracao.minuta.ts` | HTML da minuta (dados reais escapados) + opções da toolbar |
 | `frontend/src/features/notificacoes/notifications.api.ts` / `notifications.constants.ts` / `notifications.query.ts` | Lista, marcar lida, query key `['notifications']` e polling do sino (60s, só aba visível) |
 
-A página `/elaboracao/$processoId` usa o UUID real. O botão Elaborar no detalhe abre essa rota. O editor (TipTap) formata o texto. O corpo jurídico **ainda não** é gerado por IA — só o cabeçalho usa dados do e-SAJ, escapados antes de virar HTML. O painel de grifo é visual. Copiar usa a área de transferência. Peça-modelo (TXT/PDF/DOCX) e versões da minuta ficam **só neste browser** (`localStorage` para versões) — nada vai ao servidor. Word/PDF/Extrair/Elaborar e jurisprudência oficial continuam desabilitados. Quando a IA ligar, o recorte é o **ADR-016** (LLM só no backend, chat+grifo, sem busca de julgado na web no v1).
+A página `/elaboracao/$processoId` usa o UUID real. O botão Elaborar no detalhe abre essa rota. O editor (TipTap) formata o texto. O corpo jurídico **ainda não** é gerado por IA — só o cabeçalho usa dados do e-SAJ, escapados antes de virar HTML. O painel de grifo é visual. Copiar usa a área de transferência. Peça-modelo (TXT/PDF/DOCX) e versões da minuta ficam **só neste browser** (`localStorage` para versões) — nada vai ao servidor. Word/PDF/Extrair/Elaborar e jurisprudência oficial continuam desabilitados. Quando a IA ligar, o recorte é o **ADR-016** (LLM só no backend, chat+grifo, sem busca de julgado na web no v1) e o pacote da minuta é o **ADR-019** (sem treino: instrução, esqueleto do tipo, capa, documento alvo, fatos do advogado, estilo só se houver upload).
 
 Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: Gerências (abre `/`), Elaborações, Drive e Tarefas. A rail esquerda só existe dentro de Gerências (`/`, `/consulta-pasta`, `/pautas`, `/push-robos`) e começa abaixo da navbar. **Intimações** saiu do menu: a página continua em `features/intimacoes/IntimacoesDiretasPage.tsx` e `/intimacoes-diretas` redireciona para Andamentos. `/gerencias` redireciona para Andamentos. Elaborações, Drive e Tarefas são placeholders (sem rail). Peticionamento, Custas DARE, Certidões e Validar Assinatura saíram do menu; `/peticionamento` e `/custas-dare` ainda existem como placeholder. `/elaboracao/$processoId` continua sendo a minuta de um processo — não confundir com `/elaboracoes`.
 
@@ -196,6 +196,7 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 - ❌ Não inventar texto jurídico da minuta com CNJ real — só cabeçalho/ficha vêm do e-SAJ
 - ❌ Não passar nome/CNJ do e-SAJ para o TipTap sem `escaparHtml`
 - ❌ Não tratar o painel de grifo / Elaborar como IA operacional (até existir o módulo do ADR-016)
+- ❌ Não fine-tunar, treinar nem montar RAG nacional para a minuta — o pacote é o ADR-019
 - ❌ Não tratar jurisprudência ilustrativa da elaboração como dado oficial
 - ❌ Não chamar LLM no frontend nem colocar chave em `VITE_*` (ADR-016)
 - ❌ Não enviar arquivo da peça-modelo ao backend — fica no browser (muda quando o ADR-016 for implementado)
@@ -240,3 +241,4 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 | 2026-09-07 | Sino faz polling de 60s (aba visível) — badge atualiza sem recarregar a página |
 | 2026-09-18 | ADR-016: decisão da IA da elaboração (ainda sem endpoint) |
 | 2026-09-21 | Intimações fora do menu (página guardada, rota redireciona); Consultas sem Peticionar; pauta mostra assunto; Andamentos com área de movimentações alta e scroll |
+| 2026-10-06 | ADR-019: pacote da minuta sem treino (ainda sem endpoint) |

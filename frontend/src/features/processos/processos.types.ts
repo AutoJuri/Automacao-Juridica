@@ -157,5 +157,7 @@ export interface AudienciaPainel {
   foro: string | null
   vara: string | null
   juiz: string | null
+  /** Assunto do processo (`de_assunto`) — objeto do requerimento. */
+  de_assunto: string | null
   fonte: 'agenda' | 'cpo'
 }

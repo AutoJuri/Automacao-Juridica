@@ -74,11 +74,17 @@ class AudienciaCpoRaw(BaseModel):
 class CpoDetalheRaw(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    # True quando o parser não encontra a tabela de movimentações no HTML
-    # (processo em segredo de justiça ou sem vínculo pleno do advogado —
-    # ver ADR-012). Nunca preenchido a partir de senha/autos — só reflete
-    # a ausência do bloco de dados no HTML.
+    # True quando a ficha não trouxe a tabela de movimentações nem o botão
+    # que as carrega sob demanda (segredo de justiça ou sem vínculo pleno —
+    # ver ADR-012). Nunca preenchido a partir de senha/autos.
     requer_senha_processo: bool = False
+    # A ficha tem `#btnExibirMovimentacoes`: as linhas vêm de
+    # `carregarMovimentacoesAjax.do`, não deste HTML. O pipe completa
+    # antes de persistir. Não sai na API.
+    movimentacoes_sob_demanda: bool = False
+    # Cursor opaco da paginação keyset, quando a primeira página já veio
+    # no HTML. Só vive na memória do ciclo — não é persistido nem logado.
+    cursor_movimentacoes: str | None = None
     movimentacoes: list[MovimentacaoRaw] = []
     capa: CapaCpoRaw | None = None
     partes: list[ParteCpoRaw] = []

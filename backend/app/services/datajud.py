@@ -1,25 +1,32 @@
-"""Cliente da API pública do DataJud (CNJ) — complemento somente-leitura
-dos processos já rastreados (hoje via e-SAJ). Etapa 9 / ver `docs/modulos/
-datajud.md` e ADR-015.
+"""Cliente da API pública do DataJud (CNJ).
 
-Nunca é fonte de descoberta de processos: só aceita um número CNJ já
+Duas leituras, a mesma API:
+
+- o job diário complementa um processo que a plataforma já rastreia;
+- a consulta da tela busca um número CNJ que não está na carteira e
+  devolve a ficha pública, sem gravar nada.
+
+Nunca descobre processo por nome ou OAB: a API pública não expõe partes
+nem advogados (Portaria CNJ 160/2020). Só aceita um número CNJ já
 conhecido e consulta o índice do tribunal correspondente
-(`app.core.cnj.resolver_alias_datajud`). A API pública do DataJud não
-expõe partes nem advogados/OAB (Portaria CNJ 160/2020) — não tem como
-"puxar a carteira" de um advogado por aqui.
+(`app.core.cnj.resolver_alias_datajud`).
 
-Timeout de 10s por requisição (`security.mdc` §12) e falha sempre
-isolada: qualquer erro de rede, HTTP ou parsing devolve `None` — nunca
-propaga, porque o job diário não pode cair por causa de um processo só.
+O job diário espera no máximo 10s. A consulta da tela espera até 30s
+para ler a resposta, porque a busca pública do CNJ costuma passar de 10s.
+Falha sempre isolada: qualquer erro de rede, HTTP ou parsing devolve
+`None` — nunca propaga, porque o job diário não pode cair por causa de
+um processo só.
 Log nunca inclui o payload da resposta, só o tipo do problema.
 """
 
 import logging
+from dataclasses import dataclass
+from typing import Literal
 
 import httpx
 from pydantic import ValidationError
 
-from app.core.cnj import resolver_alias_datajud
+from app.core.cnj import extrair_segmento_tribunal, resolver_alias_datajud
 from app.core.config import get_settings
 from app.schemas.datajud_raw import DatajudProcessoRaw
 
@@ -27,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 DATAJUD_BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 TIMEOUT_REQUISICAO_SEGUNDOS = 10.0
+# A busca avulsa da tela. O job diário continua nos 10s acima.
+TIMEOUT_CONSULTA_PUBLICA_SEGUNDOS = 30.0
 
 
 def _apenas_digitos(numero_cnj: str) -> str:
@@ -81,3 +90,71 @@ async def consultar_processo(
     except ValidationError:
         logger.info("Item do DataJud omitido na validação (tribunal=%s)", alias)
         return None
+
+
+SituacaoExibicao = Literal[
+    "encontrado",
+    "ausente",
+    "indisponivel",
+    "tribunal_nao_suportado",
+    "sem_chave",
+    "numero_invalido",
+]
+
+
+@dataclass(frozen=True)
+class ExibicaoDatajud:
+    """Resultado de uma consulta avulsa. Não grava no banco."""
+
+    situacao: SituacaoExibicao
+    tribunal: str | None
+    processo: DatajudProcessoRaw | None
+
+
+async def consultar_exibicao(client: httpx.AsyncClient, numero_cnj: str) -> ExibicaoDatajud:
+    """Consulta um CNJ para mostrar na tela, sem persistir.
+
+    Separa "não está na base" de "a API não respondeu", o que
+    `consultar_processo` junta em `None` de propósito para o job diário.
+    """
+    settings = get_settings()
+    if not settings.datajud_api_key:
+        return ExibicaoDatajud("sem_chave", None, None)
+    if extrair_segmento_tribunal(numero_cnj) is None:
+        return ExibicaoDatajud("numero_invalido", None, None)
+    alias = resolver_alias_datajud(numero_cnj)
+    if alias is None:
+        return ExibicaoDatajud("tribunal_nao_suportado", None, None)
+
+    url = f"{DATAJUD_BASE_URL}/api_publica_{alias}/_search"
+    payload = {"query": {"match": {"numeroProcesso": _apenas_digitos(numero_cnj)}}}
+    headers = {"Authorization": f"APIKey {settings.datajud_api_key}"}
+    try:
+        resposta = await client.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=httpx.Timeout(
+                TIMEOUT_REQUISICAO_SEGUNDOS,
+                read=TIMEOUT_CONSULTA_PUBLICA_SEGUNDOS,
+            ),
+        )
+        resposta.raise_for_status()
+        corpo = resposta.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.info(
+            "Consulta pública do DataJud indisponível (tribunal=%s, erro=%s)",
+            alias,
+            type(exc).__name__,
+        )
+        return ExibicaoDatajud("indisponivel", alias, None)
+
+    hits = (corpo.get("hits") or {}).get("hits") or []
+    if not hits:
+        return ExibicaoDatajud("ausente", alias, None)
+    try:
+        processo = DatajudProcessoRaw.model_validate(hits[0].get("_source") or {})
+    except ValidationError:
+        logger.info("Consulta pública do DataJud com item inválido (tribunal=%s)", alias)
+        return ExibicaoDatajud("indisponivel", alias, None)
+    return ExibicaoDatajud("encontrado", alias, processo)

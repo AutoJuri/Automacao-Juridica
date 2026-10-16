@@ -56,6 +56,7 @@ export function PautasPage() {
         item.parte_ativa?.nome,
         item.parte_passiva?.nome,
         item.juiz,
+        item.de_assunto,
       ]
         .filter(Boolean)
         .join(' ')
@@ -186,6 +187,14 @@ function CardPauta({ item, mock }: { item: AudienciaPainel; mock: boolean }) {
       <p className="text-[13px] text-[#374151] mt-2 flex gap-1.5">
         <User className="w-3.5 h-3.5 text-[#9CA3AF] mt-0.5 shrink-0" aria-hidden />
         <span>{item.juiz?.trim() || 'Magistrado não informado'}</span>
+      </p>
+      <p className="text-[13px] text-[#374151] mt-2">
+        <span className="block text-[10px] font-semibold text-[#9CA3AF] tracking-[0.14em] uppercase mb-0.5">
+          Objeto (Assunto do Requerimento)
+        </span>
+        <span className={item.de_assunto?.trim() ? '' : 'text-[#9CA3AF] italic'}>
+          {item.de_assunto?.trim() || 'Não informado'}
+        </span>
       </p>
       {item.fonte === 'cpo' ? (
         <p className="text-[12px] text-[#9CA3AF] mt-2">Fonte: capa do CPO</p>

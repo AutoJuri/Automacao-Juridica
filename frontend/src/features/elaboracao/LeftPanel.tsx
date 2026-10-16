@@ -3,6 +3,7 @@ import { Button } from '#/components/ui/button'
 import { ScrollArea } from '#/components/ui/scroll-area'
 import { Separator } from '#/components/ui/separator'
 import type { ProcessoDetalhe } from '#/features/processos/processos.types'
+import type { CamposManuais } from './elaboracao.manual'
 import { SeletorPeca } from './SeletorPeca'
 import { InformacoesProcessoPanel } from './InformacoesProcessoPanel'
 import { SeletorPecaEspecifica } from './SeletorPecaEspecifica'
@@ -14,6 +15,10 @@ interface LeftPanelProps {
   onPecaChange: (id: string) => void
   processo: ProcessoDetalhe | null
   carregando: boolean
+  semProcesso?: boolean
+  campos?: CamposManuais
+  onCampos?: (campos: CamposManuais) => void
+  onCamposBlur?: () => void
 }
 
 export function LeftPanel({
@@ -23,6 +28,10 @@ export function LeftPanel({
   onPecaChange,
   processo,
   carregando,
+  semProcesso = false,
+  campos,
+  onCampos,
+  onCamposBlur,
 }: LeftPanelProps) {
   return (
     <aside
@@ -53,9 +62,16 @@ export function LeftPanel({
           <div className="p-4 space-y-5">
             <SeletorPeca pecaSelecionada={pecaSelecionada} onChange={onPecaChange} />
             <Separator className="bg-[#E5E7EB]" />
-            <InformacoesProcessoPanel processo={processo} carregando={carregando} />
+            <InformacoesProcessoPanel
+              processo={processo}
+              carregando={carregando}
+              semProcesso={semProcesso}
+              campos={campos}
+              onCampos={onCampos}
+              onCamposBlur={onCamposBlur}
+            />
             <Separator className="bg-[#E5E7EB]" />
-            <SeletorPecaEspecifica />
+            <SeletorPecaEspecifica processoId={processo?.id ?? null} />
           </div>
         </ScrollArea>
       )}

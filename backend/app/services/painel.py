@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cnj import variantes_numero_cnj
 from app.models.audiencia import Audiencia
 from app.models.audiencia_cpo import AudienciaCpo
 from app.models.intimacao import Intimacao
@@ -268,12 +269,18 @@ async def listar_processos(
     termo = (q or "").strip()
     if termo:
         like = f"%{termo}%"
+        likes_numero = [like]
+        for variante in variantes_numero_cnj(termo):
+            candidato = f"%{variante}%"
+            if candidato not in likes_numero:
+                likes_numero.append(candidato)
         stmt = stmt.where(
             or_(
-                Processo.nu_processo.ilike(like),
+                *[Processo.nu_processo.ilike(item) for item in likes_numero],
                 Processo.de_classe.ilike(like),
                 Processo.de_assunto.ilike(like),
                 Processo.parte_ativa["nome"].astext.ilike(like),
+                Processo.parte_passiva["nome"].astext.ilike(like),
             )
         )
     processos = list((await db.scalars(stmt.limit(LISTA_MAX))).all())
@@ -451,6 +458,7 @@ def audiencia_para_painel(
         foro=getattr(ficha, "foro", None) if ficha is not None else None,
         vara=getattr(ficha, "vara", None) if ficha is not None else None,
         juiz=getattr(ficha, "juiz", None) if ficha is not None else None,
+        de_assunto=getattr(ficha, "de_assunto", None) if ficha is not None else None,
         fonte=fonte,
     )
 

@@ -50,7 +50,7 @@ export function ProcessoDetalhe({ processoId }: ProcessoDetalheProps) {
   const processo = detalheQuery.data
 
   return (
-    <div className="flex-1 flex flex-col gap-4 overflow-hidden min-h-0 min-w-0">
+    <div className="flex flex-col gap-4 min-w-0 pb-2">
       <ProcessoCabecalho processo={processo} />
       <ProcessoAndamentos
         processoId={processo.id}

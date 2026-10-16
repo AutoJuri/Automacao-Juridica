@@ -12,7 +12,6 @@ describe('SECOES_LATERAL', () => {
     expect(SECOES_LATERAL.map((item) => [item.to, item.label])).toEqual([
       ['/', 'Andamentos'],
       ['/consulta-pasta', 'Consultas'],
-      ['/intimacoes-diretas', 'Intimações'],
       ['/pautas', 'Audiências'],
       ['/push-robos', 'Push Robôs'],
     ])
@@ -50,5 +49,12 @@ describe('secaoTopoAtiva', () => {
     expect(secaoTopoAtiva('/elaboracoes', '/elaboracoes')).toBe(true)
     expect(secaoTopoAtiva('/elaboracoes', '/elaboracao/abc-123')).toBe(true)
     expect(secaoTopoAtiva('/elaboracoes', '/')).toBe(false)
+  })
+
+  it('marca Drive na lista e dentro de uma pasta', () => {
+    expect(secaoTopoAtiva('/drive', '/drive')).toBe(true)
+    expect(secaoTopoAtiva('/drive', '/drive/abc-123')).toBe(true)
+    expect(secaoTopoAtiva('/drive', '/driver')).toBe(false)
+    expect(secaoTopoAtiva('/drive', '/tarefas')).toBe(false)
   })
 })

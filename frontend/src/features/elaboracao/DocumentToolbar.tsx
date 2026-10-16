@@ -11,6 +11,7 @@ import {
   Pencil,
   Redo2,
   Scissors,
+  SeparatorHorizontal,
   Strikethrough,
   Underline,
   Undo2,
@@ -225,6 +226,17 @@ export function DocumentFormatToolbar({
           editor?.chain().focus().setTextAlign('justify').run()
         }}
       />
+      <div className="w-px h-5 bg-[#E5E7EB] mx-1.5" />
+      <button
+        type="button"
+        disabled={!ativo}
+        title={ativo ? 'Quebra de página (Ctrl+Enter)' : 'Entre em edição para inserir uma página'}
+        onClick={() => editor?.chain().focus().insertContent({ type: 'quebraDePagina' }).run()}
+        className="h-8 px-2 inline-flex items-center gap-1.5 rounded-md text-[12px] text-[#4B5563] hover:bg-[#F3F4F6] disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <SeparatorHorizontal className="w-4 h-4" />
+        Quebra de página
+      </button>
       <select
         disabled={!ativo}
         value={espacamento}

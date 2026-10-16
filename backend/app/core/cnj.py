@@ -51,6 +51,22 @@ _ALIAS_POR_SEGMENTO_FIXO = {
 }
 
 
+def variantes_numero_cnj(numero_cnj: str) -> list[str]:
+    """Formas equivalentes de um CNJ completo: só dígitos e com a máscara.
+
+    A carteira pode ter o número gravado de um jeito ou de outro. Quem busca
+    precisa achar os dois. Lista vazia se o texto não for um CNJ.
+    """
+    if extrair_segmento_tribunal(numero_cnj) is None:
+        return []
+    digitos = re.sub(r"\D", "", numero_cnj.strip())
+    mascarado = (
+        f"{digitos[:7]}-{digitos[7:9]}.{digitos[9:13]}."
+        f"{digitos[13]}.{digitos[14:16]}.{digitos[16:20]}"
+    )
+    return [digitos, mascarado]
+
+
 def extrair_segmento_tribunal(numero_cnj: str) -> tuple[str, str] | None:
     """Devolve `(segmento, tribunal)` a partir do número CNJ. `None` se o
     formato não bater — ex.: número interno do e-SAJ (`cd_processo`), que

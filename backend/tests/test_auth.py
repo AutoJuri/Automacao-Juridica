@@ -24,8 +24,14 @@ def _email() -> str:
     return f"pytest-auth-{uuid4().hex[:12]}@example.com"
 
 
-def _corpo_cadastro(email: str, *, name: str = "Advogado Teste", password: str = SENHA) -> dict:
-    return {"name": name, "email": email, "password": password}
+def _corpo_cadastro(
+    email: str,
+    *,
+    name: str = "Advogado Teste",
+    password: str = SENHA,
+    cargo: str = "advogado",
+) -> dict:
+    return {"name": name, "email": email, "password": password, "cargo": cargo}
 
 
 async def _cadastrar(client, email: str | None = None):
@@ -45,6 +51,7 @@ class TestCadastro:
         assert corpo["access_token"]
         assert corpo["token_type"] == "bearer"
         assert corpo["user"]["email"] == email
+        assert corpo["user"]["cargo"] == "advogado"
         assert "password_hash" not in corpo["user"]
         assert client.cookies.get(COOKIE_REFRESH)
 
@@ -65,6 +72,23 @@ class TestCadastro:
             json={"name": "A", "email": "nao-e-email", "password": "curta"},
         )
         assert resposta.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_cargo_do_perfil_e_rejeita_papel_de_organizacao(self, cliente_auth):
+        client, _db = cliente_auth
+        email = _email()
+        criado = await client.post(
+            "/auth/cadastro",
+            json=_corpo_cadastro(email, cargo="estagiario"),
+        )
+        assert criado.status_code == 201, criado.text
+        assert criado.json()["user"]["cargo"] == "estagiario"
+
+        recusado = await client.post(
+            "/auth/cadastro",
+            json=_corpo_cadastro(_email(), cargo="owner"),
+        )
+        assert recusado.status_code == 422
 
 
 class TestLogin:

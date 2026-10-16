@@ -38,3 +38,11 @@ A inspeção dessas capturas mudou três suposições do ADR-010:
 - Processo com muitas movimentações (467 numa das capturas) demora vários ciclos de 10 min para "esvaziar a fila" pela primeira vez (round-robin do lote de 5) — aceitável no MVP; se ficar lento demais na prática, é o próximo ponto a revisitar (aumentar `MOVIMENTACOES_LOTE` ou paralelizar fetches).
 - `peticoes_diversas` ficou fora desta etapa (não apareceu nas 5 capturas). Superado pelo ADR-013: o mesmo HTML do lote passou a persistir petições diversas, capa, partes e audiências CPO.
 - ADR-010 item 3 ("Movimentações: só depois de uma captura CPO com `movimentacoes` preenchido... parser que ignore cabeçalho de tabela") está superado por este ADR — a fixture existe e o parser real não precisou da heurística de cabeçalho.
+
+## Atualização (2026-09-29)
+
+O portal passou a omitir `tbody#tabelaTodasMovimentacoes` em parte das fichas e a colocar `#btnExibirMovimentacoes`. As linhas saem de `GET /cpopg/carregarMovimentacoesAjax.do`, em páginas, com cursor opaco. Tratar toda ausência da tabela como falta de acesso descartava capa e petições que já estavam no HTML e marcava o processo como sincronizado.
+
+1. Falta de acesso = sem a tabela **e** sem o botão. O popup de senha continua não sendo sinal.
+2. Com o botão, o pipe busca o AJAX e segue o cursor até 40 páginas. O cursor não é gravado nem logado. Falha nesse pedido não avança `movimentacoes_synced_at`.
+3. Processos que já tinham sido carimbados sem nenhuma movimentação voltam para o início da fila (migration `f1c8a4e2b7d0`).

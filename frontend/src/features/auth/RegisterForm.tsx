@@ -9,16 +9,24 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { useAuthStore } from '#/store/auth.store'
+import { tokenDoDestino } from '#/features/organizations/organizations.redirect'
 import { cadastrar } from './auth.api'
+import { CARGOS, ROTULO_CARGO } from './auth.cargo'
 import { MUITAS_TENTATIVAS, mensagemDeErro } from './auth.errors'
 import { registerSchema, type RegisterFormValues } from './auth.schemas'
 import { FieldError, FormError } from './AuthFormFeedback'
 
 interface RegisterFormProps {
+  redirectTo?: string | null
+  emailTravado?: string
   onSwitchToLogin: () => void
 }
 
-export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
+export function RegisterForm({
+  redirectTo = null,
+  emailTravado,
+  onSwitchToLogin,
+}: RegisterFormProps) {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
   const [showPassword, setShowPassword] = useState(false)
@@ -28,13 +36,26 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) })
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: emailTravado ?? '',
+      cargo: '',
+      password: '',
+      confirm: '',
+    },
+  })
 
   const criarConta = useMutation({
     // O backend já emite a sessão no cadastro, então não há login extra aqui.
     mutationFn: cadastrar,
     onSuccess: ({ access_token, user }) => {
       setAuth(access_token, user)
+      if (redirectTo) {
+        navigate({ to: '/convite/$token', params: { token: tokenDoDestino(redirectTo) } })
+        return
+      }
       navigate({ to: '/' })
     },
   })
@@ -61,8 +82,13 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       </div>
 
       <form
-        onSubmit={handleSubmit(({ name, email, password }) =>
-          criarConta.mutate({ name, email, password }),
+        onSubmit={handleSubmit(({ name, email, cargo, password }) =>
+          criarConta.mutate({
+            name,
+            email,
+            password,
+            cargo: cargo as (typeof CARGOS)[number],
+          }),
         )}
         className="space-y-4"
         noValidate
@@ -98,6 +124,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               id="reg-email"
               type="email"
               autoComplete="email"
+              readOnly={Boolean(emailTravado)}
               placeholder="seu@email.com.br"
               aria-invalid={errors.email !== undefined}
               {...register('email')}
@@ -105,6 +132,32 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             />
           </div>
           <FieldError message={errors.email?.message} />
+          {emailTravado ? (
+            <p className="text-xs text-[#6B7280]">Este convite vale só para este e-mail.</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reg-cargo" className="text-xs font-medium text-[#374151] uppercase tracking-wide">
+            Cargo
+          </Label>
+          <select
+            id="reg-cargo"
+            aria-invalid={errors.cargo !== undefined}
+            {...register('cargo')}
+            className="h-11 w-full rounded-md border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B5BDB]"
+          >
+            <option value="">Selecione seu cargo</option>
+            {CARGOS.map((cargo) => (
+              <option key={cargo} value={cargo}>
+                {ROTULO_CARGO[cargo]}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-[#6B7280]">
+            Fica no seu perfil. O papel dentro de um escritório é definido no convite.
+          </p>
+          <FieldError message={errors.cargo?.message} />
         </div>
 
         <div className="space-y-1.5">

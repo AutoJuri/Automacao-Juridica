@@ -8,7 +8,6 @@ export const SIDEBAR_WIDTH = 80
 export const SECOES_LATERAL = [
   { to: '/', label: 'Andamentos', icone: 'layers' },
   { to: '/consulta-pasta', label: 'Consultas', icone: 'search' },
-  { to: '/intimacoes-diretas', label: 'Intimações', icone: 'inbox', badge: 'intimacoes' },
   { to: '/pautas', label: 'Audiências', icone: 'calendar' },
   { to: '/push-robos', label: 'Push Robôs', icone: 'radio' },
 ] as const
@@ -36,13 +35,16 @@ export function estaEmGerencias(pathname: string): boolean {
   return ROTAS_GERENCIAS.has(pathname)
 }
 
-/** Gerências cobre Andamentos/Consultas/etc.; Elaborações cobre também a minuta. */
+/** Gerências cobre Andamentos/Consultas/etc.; Elaborações cobre também a minuta; Drive cobre as pastas. */
 export function secaoTopoAtiva(to: SecaoTopoTo, pathname: string): boolean {
   if (to === '/') {
     return estaEmGerencias(pathname)
   }
   if (to === '/elaboracoes') {
     return pathname === '/elaboracoes' || pathname.startsWith('/elaboracao/')
+  }
+  if (to === '/drive') {
+    return pathname === '/drive' || pathname.startsWith('/drive/')
   }
   return pathname === to
 }

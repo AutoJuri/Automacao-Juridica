@@ -122,7 +122,7 @@ export function CenterPanel({
         onEspacamento={setEspacamento}
       />
 
-      <div className="flex-1 min-h-0 px-4 overflow-hidden flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DocumentViewer
           editor={editor}
           editando={editando}

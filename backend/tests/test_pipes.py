@@ -212,6 +212,71 @@ class TestPipeMovimentacoes:
         assert resultado["CD1"].movimentacoes == []
 
     @pytest.mark.asyncio
+    async def test_botao_exibir_busca_paginas_ajax_e_junta_as_linhas(self):
+        html_ficha = """
+        <div id="foroProcesso">Foro de Teste</div>
+        <a id="btnExibirMovimentacoes" href="javascript:">Exibir movimentações</a>
+        """
+        html_pagina_1 = """
+        <input id="cursorMovimentacoesPaginado" type="hidden" value="CURSOR1">
+        <tr class="containerMovimentacao">
+          <td class="dataMovimentacao">01/02/2026</td>
+          <td class="descricaoMovimentacao">Primeira</td>
+        </tr>
+        """
+        html_pagina_2 = """
+        <tr class="containerMovimentacao">
+          <td class="dataMovimentacao">02/02/2026</td>
+          <td class="descricaoMovimentacao">Segunda</td>
+        </tr>
+        """
+        chamadas: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            chamadas.append(request.url.path)
+            if request.url.path.endswith("carregarMovimentacoesAjax.do"):
+                assert request.headers["x-requested-with"] == "XMLHttpRequest"
+                texto = html_pagina_2 if request.url.params.get("cursor") else html_pagina_1
+                return httpx.Response(200, headers={"content-type": "text/html"}, text=texto)
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=html_ficha)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(
+                client, [("CD1", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1")]
+            )
+
+        assert chamadas == [
+            "/cpopg/show.do",
+            "/cpopg/carregarMovimentacoesAjax.do",
+            "/cpopg/carregarMovimentacoesAjax.do",
+        ]
+        detalhe = resultado["CD1"]
+        assert detalhe.requer_senha_processo is False
+        assert detalhe.movimentacoes_sob_demanda is False
+        assert detalhe.cursor_movimentacoes is None
+        assert [m.descricao for m in detalhe.movimentacoes] == ["Primeira", "Segunda"]
+        assert detalhe.capa is not None
+        assert detalhe.capa.foro == "Foro de Teste"
+
+    @pytest.mark.asyncio
+    async def test_falha_no_ajax_nao_marca_o_processo_como_bloqueado(self):
+        html_ficha = """
+        <a id="btnExibirMovimentacoes" href="javascript:">Exibir movimentações</a>
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("carregarMovimentacoesAjax.do"):
+                return httpx.Response(500, headers={"content-type": "text/html"}, text="erro")
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=html_ficha)
+
+        async with _client(handler) as client:
+            resultado = await pipe_movimentacoes.coletar(
+                client, [("CD1", "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1")]
+            )
+
+        assert resultado == {}
+
+    @pytest.mark.asyncio
     async def test_sessao_invalida_sobe_para_o_chamador(self):
         html_login = (
             "<!doctype html><html><body>"

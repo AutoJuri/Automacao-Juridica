@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react'
 import { FileText, UploadCloud, X } from 'lucide-react'
 import { extensaoArquivo, FOCO_CAMPO, propsFocoCampo, validarArquivoModelo } from './elaboracao.ui'
+import { GuardarNoDrive } from './GuardarNoDrive'
 
-interface ArquivoModelo {
-  nome: string
-  tamanho: number
+interface SeletorPecaEspecificaProps {
+  /** Processo da elaboração, para sugerir a pasta do Drive ligada a ele. */
+  processoId?: string | null
 }
 
-export function SeletorPecaEspecifica() {
+export function SeletorPecaEspecifica({ processoId = null }: SeletorPecaEspecificaProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [arquivo, setArquivo] = useState<ArquivoModelo | null>(null)
+  // O File fica só em memória, até o clique em "Guardar no Drive".
+  const [arquivo, setArquivo] = useState<File | null>(null)
   const [texto, setTexto] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState(false)
@@ -21,7 +23,7 @@ export function SeletorPecaEspecifica() {
       return
     }
     setErro(null)
-    setArquivo({ nome: file.name, tamanho: file.size })
+    setArquivo(file)
     const ext = extensaoArquivo(file.name)
     if (ext === 'txt') {
       const leitor = new FileReader()
@@ -40,8 +42,8 @@ export function SeletorPecaEspecifica() {
         Peça modelo específica
       </p>
       <p className="text-[12px] text-[#6B7280] leading-snug mb-3">
-        O arquivo e o texto ficam só neste browser, para você consultar o estilo.
-        Nada é enviado ao servidor — a IA ainda não assimila o modelo.
+        O arquivo e o texto ficam só neste browser, para você consultar o estilo. Nada é enviado ao
+        servidor, a menos que você use “Guardar no Drive”. A IA ainda não assimila o modelo.
       </p>
 
       <input
@@ -85,33 +87,42 @@ export function SeletorPecaEspecifica() {
         <p className="text-[12px] font-medium text-[#374151] text-center">
           Arraste ou clique para enviar TXT, PDF, DOCX
         </p>
-        <p className="text-[11px] text-[#9CA3AF]">Máximo 5 MB · não sai deste computador</p>
+        <p className="text-[11px] text-[#9CA3AF]">
+          Máximo 5 MB · só sai deste computador se você guardar no Drive
+        </p>
       </button>
 
       {arquivo ? (
-        <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
-          <FileText className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-[#111827] truncate">{arquivo.nome}</p>
-            <p className="text-[11px] text-[#6B7280]">
-              {(arquivo.tamanho / 1024).toFixed(1)} KB
-              {extensaoArquivo(arquivo.nome) !== 'txt'
-                ? ' · PDF/DOCX anexado (o texto não é extraído daqui)'
-                : ' · texto copiado para o campo abaixo'}
-            </p>
+        <>
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
+            <FileText className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-[#111827] truncate">{arquivo.name}</p>
+              <p className="text-[11px] text-[#6B7280]">
+                {(arquivo.size / 1024).toFixed(1)} KB
+                {extensaoArquivo(arquivo.name) !== 'txt'
+                  ? ' · PDF/DOCX anexado (o texto não é extraído daqui)'
+                  : ' · texto copiado para o campo abaixo'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setArquivo(null)
+                setErro(null)
+              }}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              aria-label="Remover arquivo"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setArquivo(null)
-              setErro(null)
-            }}
-            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
-            aria-label="Remover arquivo"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <GuardarNoDrive
+            key={`${arquivo.name}-${arquivo.size}-${arquivo.lastModified}`}
+            arquivo={arquivo}
+            processoId={processoId}
+          />
+        </>
       ) : null}
 
       {erro ? <p className="mt-2 text-[12px] text-[#B45309]">{erro}</p> : null}

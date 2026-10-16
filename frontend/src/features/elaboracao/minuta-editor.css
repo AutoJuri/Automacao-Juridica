@@ -1,4 +1,13 @@
 .minuta-editor .tiptap {
+  box-sizing: border-box;
+  width: 210mm;
+  min-width: 210mm;
+  margin: 0 auto;
+  padding: 25.4mm;
+  background: #fff;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
   outline: none;
   font-family: var(--minuta-font, 'Times New Roman', Times, serif);
   font-size: var(--minuta-size, 12pt);
@@ -6,12 +15,60 @@
   color: #111827;
 }
 
-.minuta-editor .tiptap p {
-  margin: 0 0 0.75em;
+.minuta-editor .folha-intervalo,
+.minuta-editor .folha-sobra {
+  display: block;
+  clear: both;
+  user-select: none;
+  pointer-events: none;
 }
 
-.minuta-editor .tiptap p:last-child {
-  margin-bottom: 0;
+.minuta-editor .folha-intervalo {
+  width: calc(210mm + 16px);
+  margin-left: calc(-25.4mm - 8px);
+  margin-right: calc(-25.4mm - 8px);
+}
+
+.minuta-editor .folha-fim,
+.minuta-editor .folha-inicio {
+  width: 210mm;
+  margin-left: 8px;
+}
+
+.minuta-editor .folha-fim,
+.minuta-editor .folha-inicio,
+.minuta-editor .folha-vao,
+.minuta-editor .folha-sobra {
+  display: block;
+}
+
+.minuta-editor .folha-fim,
+.minuta-editor .folha-inicio,
+.minuta-editor .folha-sobra {
+  background: #fff;
+}
+
+.minuta-editor .folha-vao {
+  background: #e5e7eb;
+}
+
+.minuta-editor .folha-fim {
+  box-shadow: 0 8px 10px -8px rgba(15, 23, 42, 0.28);
+}
+
+.minuta-editor .folha-inicio {
+  box-shadow: 0 -1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.minuta-editor .quebra-pagina {
+  height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.minuta-editor .tiptap p {
+  margin: 0 0 0.75em;
 }
 
 .minuta-editor .tiptap strong {

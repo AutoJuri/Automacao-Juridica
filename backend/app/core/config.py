@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_oauth_redirect_uri: str = "http://localhost:8000/credentials/email/gmail/callback"
+    # Drive (ADR-022): mesmo OAuth client do Gmail, outro redirect URI e outro
+    # consentimento (`drive.file`). A chave do Picker e o número do projeto
+    # são identificadores públicos do Google; ficam aqui só para não entrarem
+    # no bundle do frontend.
+    google_drive_oauth_redirect_uri: str = "http://localhost:8000/drive/google/callback"
+    google_picker_api_key: str = ""
+    google_project_number: str = ""
     microsoft_client_id: str = ""
     microsoft_client_secret: str = ""
     microsoft_oauth_redirect_uri: str = (
@@ -49,6 +56,21 @@ class Settings(BaseSettings):
     # mesmo sendo pública — o CNJ pode trocá-la a qualquer momento). Vazio
     # por padrão: não trava o boot, o job diário só loga e não consulta.
     datajud_api_key: str = ""
+
+    # IA da elaboração (ADR-016) — adapter plugável, nunca chamado do
+    # frontend. `stub` é o padrão: gera/edita a minuta sem rede, para testar
+    # a canaleta completa antes de existir uma chave de provedor real.
+    # Trocar para `anthropic` ou `openrouter` é só variável de ambiente —
+    # nenhum código de chamada muda.
+    llm_provider: str = "stub"
+    llm_model: str = ""
+    anthropic_api_key: str = ""
+    # Chave da conta OpenRouter (não é por modelo). Vazia por padrão: o
+    # boot não trava; `LLM_PROVIDER=openrouter` falha na primeira chamada.
+    openrouter_api_key: str = ""
+    # Teto de tokens de saída — ADR-016 §3 (nunca travar o Uvicorn do
+    # Playwright com geração sem limite).
+    llm_max_output_tokens: int = 4000
 
     @model_validator(mode="after")
     def _rejeita_segredos_placeholder(self) -> "Settings":

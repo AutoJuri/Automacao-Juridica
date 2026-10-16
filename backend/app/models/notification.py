@@ -18,12 +18,18 @@ NOTIFICATION_TIPO_MOVIMENTACAO = "movimentacao"
 NOTIFICATION_TIPO_INTIMACAO = "intimacao"
 NOTIFICATION_TIPO_AUDIENCIA = "audiencia"
 NOTIFICATION_TIPO_SISTEMA = "sistema"
+NOTIFICATION_TIPO_CONVITE_ORG = "convite_org"
+NOTIFICATION_TIPO_TASK_ATRIBUIDA = "task_atribuida"
+NOTIFICATION_TIPO_TASK_CONCLUIDA = "task_concluida"
 
 NOTIFICATION_TIPOS = (
     NOTIFICATION_TIPO_MOVIMENTACAO,
     NOTIFICATION_TIPO_INTIMACAO,
     NOTIFICATION_TIPO_AUDIENCIA,
     NOTIFICATION_TIPO_SISTEMA,
+    NOTIFICATION_TIPO_CONVITE_ORG,
+    NOTIFICATION_TIPO_TASK_ATRIBUIDA,
+    NOTIFICATION_TIPO_TASK_CONCLUIDA,
 )
 
 
@@ -42,6 +48,15 @@ class Notification(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ForeignKey("processos.id", ondelete="SET NULL"),
         index=True,
     )
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="SET NULL"),
+        index=True,
+    )
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+    )
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
     titulo: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
@@ -57,8 +72,11 @@ class Notification(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
 __all__ = [
     "NOTIFICATION_TIPOS",
     "NOTIFICATION_TIPO_AUDIENCIA",
+    "NOTIFICATION_TIPO_CONVITE_ORG",
     "NOTIFICATION_TIPO_INTIMACAO",
     "NOTIFICATION_TIPO_MOVIMENTACAO",
     "NOTIFICATION_TIPO_SISTEMA",
+    "NOTIFICATION_TIPO_TASK_ATRIBUIDA",
+    "NOTIFICATION_TIPO_TASK_CONCLUIDA",
     "Notification",
 ]

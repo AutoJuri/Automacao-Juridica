@@ -23,7 +23,10 @@ export function AppChrome({
   const comSidebar = estaEmGerencias(pathname)
 
   return (
-    <div className="flex flex-col h-screen bg-[#F0F2F7] overflow-hidden">
+    <div
+      className="flex flex-col h-screen bg-[#F0F2F7] overflow-hidden"
+      style={{ '--navbar-height': `${NAVBAR_HEIGHT}px` } as CSSProperties}
+    >
       <Navbar onAbrirProcesso={onAbrirProcesso} />
       {comSidebar ? <AppSidebar /> : null}
       <div

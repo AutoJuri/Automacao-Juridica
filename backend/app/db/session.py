@@ -16,6 +16,9 @@ engine = create_async_engine(
     # O Railway fica atrás de um proxy que derruba conexões ociosas.
     pool_pre_ping=True,
     pool_recycle=1800,
+    # Sem isso, uma conexão que o proxy segura sem responder prende o job
+    # de 10 min para sempre (`max_instances=1` passa a pular os ciclos).
+    connect_args={"timeout": 20, "command_timeout": 60},
 )
 
 SessionLocal = async_sessionmaker(

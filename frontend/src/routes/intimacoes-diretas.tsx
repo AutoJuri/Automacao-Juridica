@@ -1,9 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { IntimacoesDiretasPage } from '#/features/intimacoes/IntimacoesDiretasPage'
-import { requireAuth } from '#/lib/route-guards'
-
+/**
+ * A tela continua em `features/intimacoes/IntimacoesDiretasPage.tsx`.
+ * Fora do menu por enquanto: quem abre a URL volta para Andamentos.
+ */
 export const Route = createFileRoute('/intimacoes-diretas')({
-  beforeLoad: requireAuth,
-  component: IntimacoesDiretasPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/' })
+  },
 })

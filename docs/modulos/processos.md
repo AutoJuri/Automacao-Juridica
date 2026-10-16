@@ -47,14 +47,14 @@ Expõe ao advogado autenticado os processos, intimações, audiências, moviment
 | `frontend/src/features/push/PushRobosPage.tsx` | Push Robôs — processos do ciclo; form/PJe ilustrativos com aviso |
 | `frontend/src/features/secoes/SecaoPlaceholderPage.tsx` | Página em branco (Peticionamento, Custas DARE) |
 | `frontend/src/features/secoes/SecaoShell.tsx` | AppChrome + padding das seções de Gerências (Consulta, Pautas, Push) |
-| `frontend/src/features/elaboracao/ElaboracaoPage.tsx` | Minuta 3 colunas; cabeçalho/ficha reais; editor TipTap |
+| `frontend/src/features/elaboracao/ElaboracaoPage.tsx` | Minuta 3 colunas; cabeçalho/ficha reais; editor TipTap; IA ligada (ADR-016, ver `/docs/modulos/elaboracao.md`) |
 | `frontend/src/features/elaboracao/useMinutaEditor.ts` | Instância TipTap (formatação local; sem code/heading) |
-| `frontend/src/features/elaboracao/GrifoSelecaoPanel.tsx` | Painel visual de trecho selecionado (sem IA) |
+| `frontend/src/features/elaboracao/GrifoSelecaoPanel.tsx` | Executa edição de trecho selecionado via IA (provider `stub` por padrão) |
 | `frontend/src/features/elaboracao/elaboracao.processo.ts` | CNJ/polos/foro/valor e completude a partir da ficha real |
-| `frontend/src/features/elaboracao/elaboracao.minuta.ts` | HTML da minuta (dados reais escapados) + opções da toolbar |
+| `frontend/src/features/elaboracao/elaboracao.minuta.ts` | HTML placeholder (dados reais escapados) usado até a 1ª versão da IA existir + opções da toolbar |
 | `frontend/src/features/notificacoes/notifications.api.ts` / `notifications.constants.ts` / `notifications.query.ts` | Lista, marcar lida, query key `['notifications']` e polling do sino (60s, só aba visível) |
 
-A página `/elaboracao/$elaboracaoId` abre a capa pelo id da elaboração. O botão Elaborar no detalhe escolhe a peça, cria ou reabre essa capa e navega para ela. O editor (TipTap) formata o texto. O corpo jurídico **ainda não** é gerado por IA — só o cabeçalho usa dados do e-SAJ, escapados antes de virar HTML. O painel de grifo é visual. Copiar usa a área de transferência. Peça-modelo (TXT/PDF/DOCX) e versões da minuta ficam **só neste browser** (`localStorage` para versões) — nada vai ao servidor. Word/PDF/Extrair/Elaborar e jurisprudência oficial continuam desabilitados. Quando a IA ligar, o recorte é o **ADR-016** (LLM só no backend, chat+grifo, sem busca de julgado na web no v1) e o pacote da minuta é o **ADR-019** (sem treino: instrução, esqueleto do tipo, capa, documento alvo, fatos do advogado, estilo só se houver upload).
+A página `/elaboracao/$elaboracaoId` abre a capa pelo id da elaboração. O botão Elaborar no detalhe escolhe a peça, cria ou reabre essa capa e navega para ela. O editor (TipTap) formata o texto. O corpo jurídico na tela **ainda não** chama a IA — só o cabeçalho usa dados do e-SAJ, escapados antes de virar HTML. O painel de grifo é visual. No servidor, gerar, editar, sugerir peça e estilo já existem (ADR-016); as versões geradas ficam cifradas. Peça-modelo e o histórico visível da minuta continuam neste browser até a tela usar esses endpoints. Word/PDF/Extrair e jurisprudência oficial continuam desabilitados. O pacote da minuta é o **ADR-019**.
 
 Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: Gerências (abre `/`), Elaborações, Drive e Tarefas. A rail esquerda só existe dentro de Gerências (`/`, `/consulta-pasta`, `/pautas`, `/push-robos`) e começa abaixo da navbar. **Intimações** saiu do menu: a página continua em `features/intimacoes/IntimacoesDiretasPage.tsx` e `/intimacoes-diretas` redireciona para Andamentos. `/gerencias` redireciona para Andamentos. Elaborações é o hall em `/elaboracoes` (ADR-021). Drive tem pastas livres em `/drive` e `/drive/$pastaId` (sem rail; módulo `drive.md`). Tarefas tem quadro próprio. Peticionamento, Custas DARE, Certidões e Validar Assinatura saíram do menu; `/peticionamento` e `/custas-dare` ainda existem como placeholder. `/elaboracao/$elaboracaoId` é a minuta de uma capa — não confundir com a lista `/elaboracoes`.
 
@@ -118,7 +118,7 @@ TanStack Query: chave `PROCESSOS_QUERY_KEY` (`['processos']` / `['processos', id
 - **Movimentações sem hora:** `data_movimentacao` do CPO vem `dd/mm/aaaa` sem hora (meia-noite SP); o frontend usa `formatarDataSP` (não `formatarDataHoraSP`) para não sugerir uma hora que o e-SAJ nunca informou
 - **Movimentações são só o que já foi buscado:** a lista não é o histórico completo do e-SAJ até o throttle (`Processo.movimentacoes_synced_at`, ADR-012) passar por aquele processo — pode aparecer incompleta num processo com muitos andamentos
 - **Título não se repete na descrição pública:** `movimentacao_para_publico` omite a primeira linha de `descricao` quando ela é igual ao `titulo` (o texto completo permanece no banco para o hash)
-- **CPO sem acesso pleno:** `movimentacoes_status=indisponivel` — nunca pedimos senha dos autos; `pendente` = o lote do ciclo ainda não passou por aquele processo
+- **CPO sem acesso pleno:** `movimentacoes_status=indisponivel` — a ficha não trouxe a tabela nem o botão "Exibir movimentações"; nunca pedimos senha dos autos. Ficha com esse botão busca as linhas em `carregarMovimentacoesAjax.do`. `pendente` = o lote do ciclo ainda não passou por aquele processo
 - **Documento da movimentação:** ícone na lista + “Visualizar PDF” no detalhe. O modal mostra o **texto coletado**; “Baixar PDF” abre o e-SAJ no browser do advogado. `url_documento` só quando o CPO deu `abrirDocumentoVinculadoMovimentacao.do` em https no host do e-SAJ; se o portal apontou `#liberarAutoPorSenha`, `tem_documento=true` e o link abre a ficha CPO (`url_cpo`). PDF nunca é baixado nem proxied.
 - **`url_cpo` no banco e no fetch:** só `https://esaj.tjsp.jus.br/cpopg/...` (`url_cpo_publica`); o pipe não GET em URL de outro host
 - **Throttle CPO:** `movimentacoes_synced_at` só após savepoint ok (ou senha dos autos); `IntegrityError` não marca sincronizado
@@ -242,6 +242,8 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 | 2026-09-07 | Sino faz polling de 60s (aba visível) — badge atualiza sem recarregar a página |
 | 2026-09-18 | ADR-016: decisão da IA da elaboração (ainda sem endpoint) |
 | 2026-09-21 | Intimações fora do menu (página guardada, rota redireciona); Consultas sem Peticionar; pauta mostra assunto; Andamentos com área de movimentações alta e scroll |
+| 2026-09-29 | Movimentações que o e-SAJ só entrega no botão "Exibir movimentações" passam a ser buscadas; falta de acesso continua só quando a ficha não tem tabela nem esse botão |
 | 2026-10-06 | ADR-019: pacote da minuta sem treino (ainda sem endpoint) |
 | 2026-10-08 | Hall `/elaboracoes` e minuta em `/elaboracao/$elaboracaoId` (ADR-021). O texto continua no navegador |
 | 2026-10-15 | Consultas: CNJ fora da carteira consulta `GET /processos/publico` e mostra a ficha pública sem gravar, com no máximo 100 movimentos. A busca local por CNJ acha o número com ou sem máscara |
+| 2026-10-15 | A IA da elaboração entra no backend sem trocar a capa: fatos, estilo e versões cifradas. A tela do hall permanece a da ADR-021 |

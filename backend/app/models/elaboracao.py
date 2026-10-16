@@ -1,19 +1,20 @@
-"""Capa de uma elaboração de peça.
+﻿"""Capa de uma elaboração de peça.
 
 Uma linha por (usuário, processo, peça) quando há processo. Sem processo,
 os dados da capa foram digitados à mão e não há limite de quantidade.
-O texto da minuta não fica aqui — continua no navegador até a etapa da IA.
+O texto da minuta no editor continua no navegador. Quando a IA gera ou
+edita, cada versão fica cifrada em `elaboracao_versoes` (ADR-016).
 """
 
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.mixins import CreatedAtMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.processo import Processo
@@ -89,9 +90,48 @@ class Elaboracao(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     foro_vara: Mapped[str | None] = mapped_column(String(255))
     valor_causa: Mapped[str | None] = mapped_column(String(100))
     juiz: Mapped[str | None] = mapped_column(String(255))
+    fatos_extras_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
+    estilo_perfil_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
 
     user: Mapped["User"] = relationship()
     processo: Mapped["Processo | None"] = relationship()
+    versoes: Mapped[list["ElaboracaoVersao"]] = relationship(
+        back_populates="elaboracao",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ElaboracaoVersao.created_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return f"<Elaboracao {self.peca} processo={self.processo_id}>"
+
+
+ORIGEM_GERACAO = "geracao"
+ORIGEM_CHAT = "chat"
+ORIGEM_GRIFO = "grifo"
+ORIGENS_VERSAO = (ORIGEM_GERACAO, ORIGEM_CHAT, ORIGEM_GRIFO)
+
+
+class ElaboracaoVersao(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    __tablename__ = "elaboracao_versoes"
+    __table_args__ = (
+        Index("ix_elaboracao_versoes_elaboracao_id_created_at", "elaboracao_id", "created_at"),
+    )
+
+    elaboracao_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("elaboracoes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    origem: Mapped[str] = mapped_column(String(20), nullable=False)
+    instrucao_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
+    trecho_alvo_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
+    conteudo_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    llm_provider: Mapped[str] = mapped_column(String(30), nullable=False)
+    llm_model: Mapped[str | None] = mapped_column(Text)
+
+    elaboracao: Mapped["Elaboracao"] = relationship(back_populates="versoes")
+
+    def __repr__(self) -> str:
+        return f"<ElaboracaoVersao {self.origem} elaboracao={self.elaboracao_id}>"

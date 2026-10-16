@@ -2,8 +2,10 @@
 
 Contrato real (capturas ao vivo, ADR-012 / ADR-013):
 
-- Movimentações: `tbody#tabelaTodasMovimentacoes` (completo, `display:none`).
-  `tabelaUltimasMovimentacoes` nunca é fonte.
+- Movimentações: `tbody#tabelaTodasMovimentacoes` quando o HTML já traz
+  o histórico. Se a ficha só tem `#btnExibirMovimentacoes`, as linhas
+  vêm de `carregarMovimentacoesAjax.do` (o pipe pagina). `tabelaUltimasMovimentacoes`
+  nunca é fonte.
 - Capa complementar (foro, vara, juiz, distribuição, controle, área, valor):
   ids `*Processo` no header. Classe/assunto já vêm do JSON — não entram aqui.
 - Partes: `table#tableTodasPartes` (completa, `display:none`) quando existe.
@@ -13,8 +15,9 @@ Contrato real (capturas ao vivo, ADR-012 / ADR-013):
   Primeira `tr.label` é cabeçalho (Data / Tipo) — descartar.
 - Incidentes/apensos preenchidos ainda sem fixture: só os marcadores de
   vazio `td#processoSemIncidentes` e `tbody#dadosApensosNaoDisponiveis`.
-- Sem `tabelaTodasMovimentacoes` ⇒ `requer_senha_processo=True` e nada mais
-  (não pede senha dos autos).
+- Sem a tabela e sem o botão de carregar ⇒ `requer_senha_processo=True`
+  e nada mais (não pede senha dos autos). Capa e petições da ficha com
+  o botão são lidas neste HTML; as movimentações, no pedido seguinte.
 
 Nunca solicita nem guarda senha de autos.
 """
@@ -41,6 +44,9 @@ from app.services.esaj_http import ESAJ_BASE_URL
 logger = logging.getLogger(__name__)
 
 ID_TABELA_TODAS_MOVIMENTACOES = "tabelaTodasMovimentacoes"
+ID_BOTAO_EXIBIR_MOVIMENTACOES = "btnExibirMovimentacoes"
+ID_CURSOR_MOVIMENTACOES = "cursorMovimentacoesPaginado"
+ID_CURSOR_PROXIMA_PAGINA = "trCursorMovimentacoes"
 ID_TABELA_TODAS_PARTES = "tableTodasPartes"
 ID_TABELA_PARTES_PRINCIPAIS = "tablePartesPrincipais"
 ID_SEM_INCIDENTES = "processoSemIncidentes"
@@ -299,6 +305,40 @@ def _parsear_audiencias_cpo(soup: BeautifulSoup) -> list[AudienciaCpoRaw]:
     return audiencias
 
 
+def _linhas_movimentacao(raiz) -> list[MovimentacaoRaw]:
+    movimentacoes: list[MovimentacaoRaw] = []
+    for linha in raiz.find_all("tr", class_="containerMovimentacao"):
+        raw = _parsear_linha(linha)
+        if raw is not None:
+            movimentacoes.append(raw)
+    return movimentacoes
+
+
+def _cursor_movimentacoes(soup: BeautifulSoup) -> str | None:
+    """Cursor opaco da próxima página. Não logar o valor."""
+    campo = soup.find(id=ID_CURSOR_MOVIMENTACOES)
+    if isinstance(campo, Tag):
+        valor = campo.get("value")
+        if isinstance(valor, str) and valor.strip():
+            return valor.strip()
+    linha = soup.find(id=ID_CURSOR_PROXIMA_PAGINA)
+    if isinstance(linha, Tag):
+        valor = linha.get("data-cursor")
+        if isinstance(valor, str) and valor.strip():
+            return valor.strip()
+    return None
+
+
+def parsear_fragmento_movimentacoes(html: str) -> tuple[list[MovimentacaoRaw], str | None]:
+    """Lê uma página de `carregarMovimentacoesAjax.do`.
+
+    A primeira página traz `input#cursorMovimentacoesPaginado`; as seguintes
+    trazem `tr#trCursorMovimentacoes` com `data-cursor`. Sem o tr, acabou.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    return _linhas_movimentacao(soup), _cursor_movimentacoes(soup)
+
+
 def parsear_cpo_html(html: str) -> CpoDetalheRaw:
     """Extrai movimentações e blocos complementares do HTML do CPO.
 
@@ -308,18 +348,15 @@ def parsear_cpo_html(html: str) -> CpoDetalheRaw:
     """
     soup = BeautifulSoup(html, "lxml")
     tbody = soup.find(id=ID_TABELA_TODAS_MOVIMENTACOES)
-    if tbody is None:
+    sob_demanda = soup.find(id=ID_BOTAO_EXIBIR_MOVIMENTACOES) is not None
+    if tbody is None and not sob_demanda:
         return CpoDetalheRaw(requer_senha_processo=True)
-
-    movimentacoes: list[MovimentacaoRaw] = []
-    for linha in tbody.find_all("tr", class_="containerMovimentacao"):
-        raw = _parsear_linha(linha)
-        if raw is not None:
-            movimentacoes.append(raw)
 
     return CpoDetalheRaw(
         requer_senha_processo=False,
-        movimentacoes=movimentacoes,
+        movimentacoes_sob_demanda=tbody is None,
+        cursor_movimentacoes=_cursor_movimentacoes(soup) if tbody is not None else None,
+        movimentacoes=_linhas_movimentacao(tbody) if isinstance(tbody, Tag) else [],
         capa=_parsear_capa(soup),
         partes=_parsear_partes(soup),
         peticoes=_parsear_peticoes(soup),

@@ -1,6 +1,11 @@
-"""Capa da elaboração. Nenhum campo de credencial ou texto de minuta entra aqui."""
+"""Capa da elaboração e respostas da IA.
+
+A capa não leva credencial. A minuta gerada sai só decriptada, nos schemas
+da IA — nunca os campos `*_encrypted`.
+"""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -105,3 +110,48 @@ class ProcessoParaIniciarSchema(BaseModel):
 class PaginaProcessosParaIniciarSchema(BaseModel):
     items: list[ProcessoParaIniciarSchema]
     total: int
+
+
+FATOS_EXTRAS_MAX = 8000
+INSTRUCAO_MAX = 4000
+TRECHO_SELECIONADO_MAX = 4000
+ESTILO_TEXTO_MAX = 50_000
+
+
+class FatosExtrasUpdateSchema(BaseModel):
+    fatos_extras: str | None = Field(default=None, max_length=FATOS_EXTRAS_MAX)
+
+
+class EditarMinutaSchema(BaseModel):
+    instrucao: str = Field(min_length=1, max_length=INSTRUCAO_MAX)
+    trecho_selecionado: str | None = Field(default=None, max_length=TRECHO_SELECIONADO_MAX)
+
+
+class EstiloTextoSchema(BaseModel):
+    texto: str = Field(min_length=1, max_length=ESTILO_TEXTO_MAX)
+
+
+class ElaboracaoPublicSchema(BaseModel):
+    id: UUID
+    processo_id: UUID | None
+    peca: str
+    fatos_extras: str | None = None
+    estilo_perfil: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SugestaoPecaSchema(BaseModel):
+    peca: str | None = None
+    explicacao: str | None = None
+
+
+class VersaoMinutaPublicSchema(BaseModel):
+    id: UUID
+    origem: Literal["geracao", "chat", "grifo"]
+    instrucao: str | None = None
+    trecho_selecionado: str | None = None
+    conteudo_html: str
+    llm_provider: str
+    llm_model: str | None = None
+    criado_em: datetime

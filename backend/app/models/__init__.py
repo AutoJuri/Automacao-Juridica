@@ -10,7 +10,7 @@ from app.models.audiencia_cpo import AudienciaCpo
 from app.models.drive_arquivo import DriveArquivo
 from app.models.drive_conexao import DriveConexao
 from app.models.drive_pasta import DrivePasta
-from app.models.elaboracao import Elaboracao
+from app.models.elaboracao import Elaboracao, ElaboracaoVersao
 from app.models.intimacao import Intimacao
 from app.models.job_log import JobLog
 from app.models.movimentacao import Movimentacao
@@ -32,6 +32,7 @@ __all__ = [
     "DriveConexao",
     "DrivePasta",
     "Elaboracao",
+    "ElaboracaoVersao",
     "Base",
     "Intimacao",
     "JobLog",

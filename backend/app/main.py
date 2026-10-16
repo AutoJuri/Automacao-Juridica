@@ -15,6 +15,7 @@ from app.api import (
     credentials,
     drive,
     drive_google,
+    elaboracao,
     elaboracoes,
     notifications,
     organizations,
@@ -83,6 +84,7 @@ app.include_router(tasks.router_org)
 app.include_router(credentials.router)
 app.include_router(drive.router)
 app.include_router(drive_google.router)
+app.include_router(elaboracao.router)
 app.include_router(elaboracoes.router)
 app.include_router(processos.router)
 app.include_router(processos.router_intimacoes)

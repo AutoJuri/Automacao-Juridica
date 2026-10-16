@@ -83,7 +83,7 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `c7e2a9d4b1f8`):
+Tabelas (head atual: `f1c8a4e2b7d0`):
 
 ```
 users                   (+ cargo do perfil, nulo nas contas anteriores — ADR-020)
@@ -214,4 +214,5 @@ Módulos futuros que vão depender deste:
 | 2026-10-07 | `users.cargo` e CHECK dos papéis da organização — migration `e3b7a1c9d4f8` (ADR-020) |
 | 2026-10-08 | Tabela `elaboracoes` — migration `a9c4e2b7d1f6` (ADR-021). Se a tabela já existia no formato da branch de IA, a migration só completa a capa |
 | 2026-10-13 | Tabela `drive_pastas` — migration `b4d8f1a6c3e2` (ADR-022). `user_id` com CASCADE, `processo_id` opcional com SET NULL |
-| 2026-10-13 | Google Drive — migration `c7e2a9d4b1f8` (head, ADR-022). Cria `drive_conexoes` (token em BYTEA, `user_id` único) e `drive_arquivos` (ficha, `origem` com CHECK, único por pasta + id do Google); adiciona `drive_pastas.google_folder_id` |
+| 2026-10-13 | Google Drive — migration `c7e2a9d4b1f8` (ADR-022). Cria `drive_conexoes` (token em BYTEA, `user_id` único) e `drive_arquivos` (ficha, `origem` com CHECK, único por pasta + id do Google); adiciona `drive_pastas.google_folder_id` |
+| 2026-10-15 | IA da elaboração — `e782fdd01295` continua depois do Drive e só acrescenta fatos extras e `elaboracao_versoes`. `c3a19f2d7b64` acrescenta o perfil de estilo. `f1c8a4e2b7d0` (head) reabre o CPO dos processos sem movimentação |

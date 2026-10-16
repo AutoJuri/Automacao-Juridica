@@ -26,6 +26,8 @@ LIMITE_ACEITE_CONVITE = "10/hour"
 LIMITE_DRIVE_ENVIO = "60/hour"
 LIMITE_DRIVE_PICKER_TOKEN = "30/hour"
 LIMITE_CONSULTA_PUBLICA = "60/hour"
+# IA da elaboração (ADR-016). Compartilhado por gerar, editar, estilo e sugestão.
+LIMITE_ELABORACAO_GERAR = "30/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

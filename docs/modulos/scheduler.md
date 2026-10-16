@@ -1,6 +1,6 @@
 # Módulo: Scheduler e Ciclo Automático
 
-> Última atualização: 2026-09-06
+> Última atualização: 2026-10-01
 > Camada: Backend
 
 ---
@@ -31,11 +31,13 @@ Integra o APScheduler ao processo FastAPI com três jobs — renovação noturna
 
 | Job | Frequência | Descrição |
 |---|---|---|
-| `job_renovacao_diaria` | Cron, 1h da manhã (`America/Sao_Paulo`) | Renova o cookie de **todos** os advogados com credencial ativa (`TribunalCredential.is_active=True`), independente do status atual da sessão — chama `validar_credencial_esaj(user_id, job_tipo="reauth")` |
+| `job_renovacao_diaria` | Cron, 1h da manhã (`America/Sao_Paulo`) | Renova o cookie de **todos** os advogados com credencial ativa (`TribunalCredential.is_active=True`), independente do status atual da sessão — chama `validar_credencial_esaj(user_id, job_tipo="reauth")` dentro do teto de 120s |
 | `job_ciclo_dez_minutos` | Interval, 10 minutos | Para cada advogado com credencial ativa: se Playwright já está rodando, skip; senão decide por sessão — pipes (`ativo` com cookie válido), reauth (`ativo` com cookie expirado, `reauth_pendente`, ou erros com backoff expirado), retoma pipes (`bloqueado` + backoff expirado), ou não faz nada (backoff pendente) |
 | `job_datajud_diario` | Cron, 3h da manhã (`America/Sao_Paulo`) | Job de **sistema** (não por advogado): seleciona um lote round-robin de processos de todos os advogados (nunca consultado primeiro, depois o mais atrasado) e complementa via DataJud — ver `/docs/modulos/datajud.md` (Etapa 9 / ADR-015) |
 
-Os três jobs: `id` fixo, `replace_existing=True`, `max_instances=1`, `coalesce=True` — uma execução atrasada nunca roda em paralelo com a próxima, só recupera o atraso.
+Os três jobs: `id` fixo, `replace_existing=True`, `max_instances=1`, `coalesce=True` — uma execução atrasada nunca roda em paralelo com a próxima, só recupera o atraso. Se a execução anterior não devolver, os ticks seguintes são pulados (`maximum number of running instances reached`) e a coleta para.
+
+Cada advogado do ciclo de 10 min e da renovação noturna passa por `_aguardar_advogado` com teto de 120s. O ciclo de pipes e o login já têm teto interno de 60s; este é a rede de segurança para quando o cancelamento não solta a tarefa (thread do Playwright, conexão muda no proxy do Postgres). O job devolve o slot, cancela a tarefa interna e segue para o próximo advogado. A engine async usa `command_timeout=60` e `timeout=20` na conexão (`app/db/session.py`) para um `SELECT` preso no proxy não segurar o processo. A flag em memória de login (`validacao_em_andamento`) expira em 180s: uma thread órfã não faz o tick seguinte pular o advogado até o processo reiniciar.
 
 ### Por que timezone explícito no cron
 
@@ -123,13 +125,14 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 - ❌ Não ligar o scheduler em `APP_ENV=development` sem `SCHEDULER_ENABLED=true` — o default é off de propósito (uvicorn --reload dispararia Playwright/httpx contra o e-SAJ)
 - ❌ Não disparar pipes enquanto `validacao_em_andamento(user_id)` — o Playwright da renovação/Revalidar pode estar anulando o cookie agora
-- ❌ Não esperar 5 min em `reauth_pendente` para retentar — o stale (`REAUTH_PENDENTE_STALE_MINUTOS`) foi removido; o set em memória cobre duplicata no processo, restart retenta na hora
+- ❌ Não esperar 5 min em `reauth_pendente` para retentar — o stale (`REAUTH_PENDENTE_STALE_MINUTOS`) foi removido; a flag em memória (expira em 180s) cobre duplicata no processo, restart retenta na hora
 - ❌ Não chamar `scheduler.start()`/`shutdown()` fora do `lifespan` do FastAPI — o scheduler é um singleton do processo, iniciar duas vezes sem `replace_existing` duplica jobs
 - ❌ Não disparar reautenticação completa (Playwright) para rate limit (429) — o cookie continua bom, só espera o backoff
 - ❌ Não ignorar `proximo_retry` ao decidir se retenta — sem isso o scheduler martela o e-SAJ a cada 10 min durante um bloqueio
 - ❌ Não resetar `bloqueado` → `ativo` sem reconsultar o banco — outra rotina (ex.: advogado clicando "Revalidar") pode ter mudado o status nesse meio tempo
 - ❌ Não tornar os horários configuráveis por variável de ambiente nesta etapa — decisão consciente, mesma linha de `TIMEOUT_VALIDACAO_SEGUNDOS`
 - ❌ Não deixar o `AsyncIOScheduler` sem timezone explícito — o host roda em UTC
+- ❌ Não confiar só no `asyncio.wait_for` de 60s para liberar `max_instances=1` — um `asyncio.to_thread` (Playwright) ou uma conexão que não responde ao cancelamento segura o job por horas. O teto de 120s em `_aguardar_advogado` existe para o ciclo devolver o slot mesmo assim
 
 ---
 
@@ -140,3 +143,5 @@ class TribunalSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 | 2026-08-21 | Implementação inicial: dois jobs (`job_renovacao_diaria`, `job_ciclo_dez_minutos`), decisão por advogado, `EsajRateLimitError` com backoff próprio, recuperação de `reauth_pendente` travado (ADR-008/ADR-011) |
 | 2026-08-21 | Hardening pós-review: scheduler off em development; `ativo`+cookie expirado → reauth; `reauth_pendente` retenta no tick (sem stale de 5 min); skip pipes se validação Playwright em andamento |
 | 2026-09-06 | Etapa 9: terceiro job (`job_datajud_diario`, cron 3h) — job de sistema, fora do ciclo por advogado, detalhado em `/docs/modulos/datajud.md` |
+| 2026-10-01 | Teto de 120s por advogado no ciclo de 10 min (`_aguardar_advogado`), para um login ou uma conexão presa não pular os ticks seguintes. Comandos asyncpg com `command_timeout` de 30s |
+| 2026-10-01 | Renovação noturna também passa pelo teto de 120s. A flag de login em memória expira em 180s. `command_timeout` do Postgres sobe para 60s |

@@ -12,7 +12,7 @@
 - **Scraping:** Playwright (login e-SAJ, headless, Etapa 6+) + httpx (APIs internas) + BeautifulSoup4 (HTML)
 - **Banco:** PostgreSQL no Railway
 - **Criptografia:** AES-256-GCM via `cryptography` lib (Etapa 5+)
-- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015), LLM da elaboração via API (padrão Claude Sonnet 5, só no backend — ADR-016 e ADR-019, ainda não implementado)
+- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015), LLM da elaboração só no backend (ADR-016 e ADR-019; `stub` sem rede, `openrouter` e `anthropic` no adapter)
 - **Infra:** Monorepo (frontend/ + backend/), Dockerfile + `railway.toml` da API (ver `/docs/modulos/deploy.md`), Railway
 
 ---
@@ -38,7 +38,7 @@
 - Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
 - Scheduler **off** em `APP_ENV=development` (override `SCHEDULER_ENABLED=true`); em produção liga sozinho
 - DataJud: complemento somente-leitura em tabela separada (`processos_datajud`), nunca sobrescreve campos do e-SAJ; job diário isolado do ciclo de 10 min; alias de tribunal resolvido genericamente por número CNJ, não hardcode de TJSP (ADR-015). `GET /processos/publico` lê um CNJ fora da carteira e não grava (60/hora, espera de até 30s)
-- IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem treino, fine-tune ou RAG jurídico nacional; cada Elaborar manda instrução + esqueleto do tipo + capa + documento alvo + fatos do advogado + estilo só se houver upload (ADR-016, ADR-019); Gemini free só com texto sintético
+- IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem treino, fine-tune ou RAG jurídico nacional (ADR-016, ADR-019). O adapter (`stub`, `openrouter`, `anthropic`) gera, edita, sugere peça e extrai estilo; as versões ficam cifradas no servidor. A tela do hall ainda guarda o texto da minuta no navegador até os botões chamarem esses endpoints
 - Rate limit (429) nos pipes vira `bloqueado` com backoff, sem invalidar o cookie — só sessão inválida/erro de login zera o cookie (ADR-011)
 - `reauth_pendente` e cookie `ativo` expirado disparam reauth no próximo tick de 10 min; duplicata de Playwright no mesmo processo é barrada por `_VALIDACOES_EM_ANDAMENTO` (fecha o gap da ADR-008)
 - Contexto Playwright **isolado por advogado** — nunca compartilhado, sempre headless em produção
@@ -93,7 +93,7 @@ automacao-juridica/
 │       ├── features/
 │       │   ├── auth/
 │       │   ├── processos/
-│       │   ├── elaboracao/    → hall + minuta TipTap (capa no servidor; texto local; IA: ADR-016)
+│       │   ├── elaboracao/    → hall + minuta TipTap (capa no servidor; IA no backend, ADR-016)
 │       │   ├── secoes/        → placeholders (Gerências, Tarefas…)
 │       │   ├── organizations/ → escritório, membros e convites (ADR-017)
 │       │   ├── tarefas/       → Kanban pessoal e por organização (ADR-018)
@@ -125,18 +125,18 @@ automacao-juridica/
 
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
-| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `c7e2a9d4b1f8`, tabelas do Drive 2026-10-13) |
+| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `f1c8a4e2b7d0`, Drive + versões da IA, 2026-10-15) |
 | Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo (hardening Etapa 13, 2026-09-09) |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (Chromium Docker 2026-09-15) |
-| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + CPO complementar 2026-08-25) |
-| Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (Etapa 8 + hardening 2026-08-21) |
+| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (CPO com AJAX de movimentações, 2026-10-01) |
+| Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (teto de 120s por advogado no ciclo de 10 min, 2026-10-01) |
 | Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (consulta pública por CNJ em Consultas, 2026-10-15) |
 | Integração DataJud (CNJ) | Backend / Frontend | `/docs/modulos/datajud.md` | Completo (consulta avulsa sem gravar, 2026-10-15) |
 | Deploy (Railway) | Infra | `/docs/modulos/deploy.md` | Completo (digest UV, `/docs` só em dev, Chromium no container, 2026-09-15) |
 | Organizações e Convites | Backend / Frontend | `/docs/modulos/organizacoes.md` | Completo (2026-10-02) |
 | Tarefas (Kanban) | Backend / Frontend | `/docs/modulos/tarefas.md` | Completo (2026-10-06, ADR-018) |
-| Elaboração | Backend / Frontend | `/docs/modulos/elaboracao.md` | Completo (2026-10-08, ADR-021) |
+| Elaboração | Backend / Frontend | `/docs/modulos/elaboracao.md` | Completo (hall ADR-021; endpoints da IA ADR-016 no backend, 2026-10-15) |
 | Drive | Backend / Frontend | `/docs/modulos/drive.md` | Pastas livres e Google Drive implementados (2026-10-13). Conexão local feita; em produção, conferir as variáveis do Google no Railway (ADR-022) |
 
 ---
@@ -156,7 +156,7 @@ automacao-juridica/
 | ADR-009 | Sessão SQLAlchemy dedicada para captura do código MFA | `/docs/decisions/009-sessao-dedicada-captura-email.md` |
 | ADR-010 | Contrato dos pipes e-SAJ (id de audiência, carteira, CPO, petições) | `/docs/decisions/010-contrato-pipes-esaj.md` |
 | ADR-011 | Timezone explícito no scheduler, rate limit sem invalidar cookie, `reauth_pendente` no próximo tick | `/docs/decisions/011-scheduler-timezone-e-rate-limit.md` |
-| ADR-012 | Pipe de movimentações via HTML do CPO: seletor real (`tabelaTodasMovimentacoes`), detecção de bloqueio pela ausência da tabela, throttle por processo | `/docs/decisions/012-movimentacoes-cpo-html.md` |
+| ADR-012 | Pipe de movimentações via HTML do CPO: seletor `tabelaTodasMovimentacoes` ou AJAX `carregarMovimentacoesAjax.do` quando a ficha só tem o botão; bloqueio só sem os dois; throttle por processo | `/docs/decisions/012-movimentacoes-cpo-html.md` |
 | ADR-013 | CPO enriquece a ficha (capa, partes, petições, audiências da página); JSON segue classe/assunto/polos/intimações/agenda | `/docs/decisions/013-cpo-enriquece-ficha.md` |
 | ADR-014 | Chrome em dois eixos: áreas no topo, rail operacional só em Gerências | `/docs/decisions/014-chrome-dois-eixos.md` |
 | ADR-015 | DataJud em tabela separada, job diário isolado, resolução de tribunal genérica por número CNJ | `/docs/decisions/015-datajud-complemento-generico.md` |

@@ -3,7 +3,7 @@ tests/fixtures/ (a captura real é gitignorada, ver ADR-012)."""
 
 from pathlib import Path
 
-from app.services.esaj_cpo_parser import parsear_cpo_html, url_cpo_publica
+from app.services.esaj_cpo_parser import parsear_cpo_html, parsear_fragmento_movimentacoes, url_cpo_publica
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
@@ -210,6 +210,75 @@ class TestParsearCpoBlocosComplementares:
         assert resultado.audiencias_cpo == []
         assert resultado.sem_incidentes is False
         assert resultado.sem_apensos is False
+
+    def test_botao_exibir_movimentacoes_nao_marca_senha_e_guarda_capa(self):
+        html = """
+        <div id="foroProcesso">Foro de Teste</div>
+        <div id="varaProcesso">1ª Vara Cível</div>
+        <a id="btnExibirMovimentacoes" href="javascript:">Exibir movimentações</a>
+        <div id="containerMovimentacoes"></div>
+        <h2 class="tituloDoBloco">Petições diversas</h2>
+        <table>
+          <tr class="label"><td>Data</td><td>Tipo</td></tr>
+          <tr>
+            <td>01/02/2026</td>
+            <td>Petição Intermediária</td>
+          </tr>
+        </table>
+        """
+        resultado = parsear_cpo_html(html)
+
+        assert resultado.requer_senha_processo is False
+        assert resultado.movimentacoes_sob_demanda is True
+        assert resultado.movimentacoes == []
+        assert resultado.capa is not None
+        assert resultado.capa.foro == "Foro de Teste"
+        assert resultado.capa.vara == "1ª Vara Cível"
+        assert len(resultado.peticoes) == 1
+        assert resultado.peticoes[0].tipo == "Petição Intermediária"
+
+
+class TestFragmentoMovimentacoes:
+    def test_primeira_pagina_traz_linhas_e_cursor(self):
+        html = """
+        <input id="cursorMovimentacoesPaginado" type="hidden" value="CURSOR1">
+        <tbody id="tabelaPrimeiraPaginaMovimentacoes">
+          <tr class="containerMovimentacao">
+            <td class="dataMovimentacao">01/02/2026</td>
+            <td></td>
+            <td class="descricaoMovimentacao">Juntada de petição</td>
+          </tr>
+        </tbody>
+        """
+        linhas, cursor = parsear_fragmento_movimentacoes(html)
+
+        assert cursor == "CURSOR1"
+        assert len(linhas) == 1
+        assert linhas[0].descricao == "Juntada de petição"
+
+    def test_pagina_seguinte_le_data_cursor_e_acaba_sem_ele(self):
+        html = """
+        <tr class="containerMovimentacao">
+          <td class="dataMovimentacao">02/02/2026</td>
+          <td class="descricaoMovimentacao">Conclusos</td>
+        </tr>
+        <tr id="trCursorMovimentacoes" data-cursor="CURSOR2"></tr>
+        """
+        linhas, cursor = parsear_fragmento_movimentacoes(html)
+
+        assert cursor == "CURSOR2"
+        assert linhas[0].titulo == "Conclusos"
+
+        sem_proxima, cursor_vazio = parsear_fragmento_movimentacoes(
+            """
+            <tr class="containerMovimentacao">
+              <td class="dataMovimentacao">03/02/2026</td>
+              <td class="descricaoMovimentacao">Arquivado</td>
+            </tr>
+            """
+        )
+        assert cursor_vazio is None
+        assert sem_proxima[0].descricao == "Arquivado"
 
 
 class TestUrlCpoPublica:

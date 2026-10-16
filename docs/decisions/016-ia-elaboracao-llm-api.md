@@ -1,7 +1,7 @@
 # ADR-016: IA da elaboração via API (LLM no backend), copiloto da minuta, sem RAG jurídico nacional no v1
 
 **Data:** 2026-09-18
-**Status:** Aceito (decisão de produto/arquitetura; **implementação ainda não começou**)
+**Status:** Aceito — **Fases 1, 2, 3 e 4 implementadas** (2/4 em 2026-09-21; 1/3 em 2026-09-22) com provider `stub` (sem rede, sem chave); Fases 5/6 e o provider `anthropic` real (chave em produção) ainda não. Ver `/docs/modulos/elaboracao.md`.
 
 Preços e nomes de modelo abaixo são um **retrato em 2026-09-18**. Conferir as páginas oficiais na hora de ligar a chave — mudam com frequência.
 
@@ -81,10 +81,10 @@ O adapter permite cair para GPT (OpenAI) ou Gemini **pago** sem redesenhar o pro
 
 ### 6. Fases de implementação (não ligar tudo no primeiro PR)
 
-1. Sugerir peça + select livre.  
-2. Campo de fatos + Elaborar (ficha + tipo + chat curto), sem upload.  
-3. Upload do modelo → perfil de estilo.  
-4. Chat + grifo sobre a minuta.  
+1. ~~Sugerir peça + select livre.~~ **Implementado em 2026-09-22** — heurística de palavras-chave no `stub` (`GET /elaboracoes/sugestao-peca`); select continua livre.
+2. ~~Campo de fatos + Elaborar (ficha + tipo + chat curto), sem upload.~~ **Implementado em 2026-09-21.**
+3. ~~Upload do modelo → perfil de estilo.~~ **Implementado em 2026-09-22** — só texto (TXT/colar) nesta rodada; PDF/DOCX ficam anexados, sem extração (`POST /elaboracoes/{id}/estilo`).
+4. ~~Chat + grifo sobre a minuta.~~ **Implementado em 2026-09-21.**
 5. Imagens (visão + anexos) e vídeo só como arquivo.  
 6. Jurisprudência: seleção/cola; busca automática só com fonte licenciada.
 
@@ -137,7 +137,8 @@ Fluxo sugerido para o Igor: (a) Gemini Flash + textos inventados para sentir o p
 - Export com anexos (incluindo vídeo) é pipeline de arquivo, não “o LLM desenhou o Word”.
 - Jurisprudência ilustrativa do mock **não** vira fonte oficial; o aviso amarelo permanece até haver cola/marca do advogado ou API licenciada.
 - Custo por Elaborar em Sonnet 5 é da ordem de **centavos a poucos dólares** por peça grande (depende do tamanho do contexto). Rate limit e teto de tokens são obrigatórios.
-- Módulo HTTP/documentação de implementação só nasce quando o primeiro endpoint existir. Até lá, este ADR é a fonte do provedor e do recorte da tela; o contrato do pacote da minuta (sem treino) é o ADR-019.
+- Os endpoints da IA existem no backend (`/elaboracoes/{id}/gerar`, `/editar`, `/fatos`, `/estilo`, `/versoes` e `/sugestao-peca`). A capa e a tela do hall seguem o ADR-021. O contrato do pacote da minuta, sem treino, é o ADR-019.
+- O adapter (`LLM_PROVIDER`/`LLM_MODEL`) e o `StubLLMProvider` cobrem gerar, editar, sugerir peça e extrair estilo sem chave real. `AnthropicProvider` e `OpenRouterProvider` já estão escritos.
 
 ---
 

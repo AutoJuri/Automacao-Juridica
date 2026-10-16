@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-09-15
+> Última atualização: 2026-10-07
 > Camada: Infra / Backend
 
 ---
@@ -83,15 +83,19 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `e5b3f7a2c916`):
+Tabelas (head atual: `c7e2a9d4b1f8`):
 
 ```
-users
+users                   (+ cargo do perfil, nulo nas contas anteriores — ADR-020)
+├── drive_pastas            (pastas livres do Drive; processo_id opcional, SET NULL; google_folder_id — ADR-022)
+├── drive_conexoes          (token do Google Drive em BYTEA, AES-256-GCM; um por usuário — ADR-022)
+├── drive_arquivos          (ficha do arquivo no Google; origem upload/drive/elaboracao; sem o conteúdo)
 ├── refresh_tokens          (auth — só hash SHA-256 do token)
 ├── password_reset_tokens   (auth — uso único, expiração curta)
 ├── tribunal_credentials
 ├── tribunal_sessions
 ├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at, fixado)
+│   ├── elaboracoes         (capa da peça; processo_id nulo se os dados foram digitados — ADR-021)
 │   ├── movimentacoes       (+ tem_documento, url_documento)
 │   ├── peticoes_diversas   (HTML CPO — ADR-013)
 │   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
@@ -101,7 +105,16 @@ users
 │   └── notifications   (processo_id nullable)
 ├── intimacoes
 ├── audiencias
-├── notifications
+├── notifications       (+ task_id e organization_id nulos, ON DELETE SET NULL)
+├── kanban_columns      (pessoal: user_id preenchido; org: organization_id — ADR-018)
+├── kanban_boards       (nome e frase; sem linha, a API usa o padrão)
+├── tasks               (pessoal: organization_id nulo e created_by)
+├── organizations
+│   ├── organization_members
+│   ├── organization_invites   (token só como hash SHA-256 — ADR-017)
+│   ├── kanban_columns
+│   ├── kanban_boards
+│   └── tasks
 └── job_logs            (user_id nullable — logs de sistema)
 ```
 
@@ -139,6 +152,8 @@ Arquivos de model por domínio:
 | `audiencia.py` | `audiencias` |
 | `notification.py` | `notifications` |
 | `job_log.py` | `job_logs` |
+| `organization.py` | `organizations`, `organization_members`, `organization_invites` |
+| `task.py` | `kanban_columns`, `kanban_boards`, `tasks` |
 
 Constantes de domínio (valores válidos de `status`/`tipo`) ficam no próprio arquivo do model (`SESSION_STATUSES`, `NOTIFICATION_TIPOS`, `JOB_TIPOS`, etc.).
 
@@ -159,6 +174,8 @@ Módulos futuros que vão depender deste:
 | `processos` / pipes / etl | `processos`, `movimentacoes`, `intimacoes`, `audiencias` |
 | `notifications` | Tabela `notifications` |
 | `scheduler` | `job_logs`, `tribunal_sessions` |
+| `organizacoes` | `organizations`, `organization_members`, `organization_invites` |
+| `tarefas` | `kanban_columns`, `kanban_boards`, `tasks` |
 
 ---
 
@@ -191,3 +208,10 @@ Módulos futuros que vão depender deste:
 | 2026-08-28 | `processos.fixado` — pin na home, migration `d4a8c2e1f9b0` |
 | 2026-09-06 | Tabela `processos_datajud` (1:1, complemento DataJud, ADR-015), migration `e5b3f7a2c916` |
 | 2026-09-15 | Deploy Railway: `alembic upgrade head` no pre-deploy da API (`backend/railway.toml`) |
+| 2026-10-02 | Organizações, membros e convites — migration `b4e8c1a09f27` (revisa `e5b3f7a2c916`, ADR-017) |
+| 2026-10-03 | Colunas e tarefas do Kanban — migration `c7a1d4e8b2f0` (ADR-018) |
+| 2026-10-06 | Nome e frase do quadro em `kanban_boards` — migration `d1f6a9c3e8b4` |
+| 2026-10-07 | `users.cargo` e CHECK dos papéis da organização — migration `e3b7a1c9d4f8` (ADR-020) |
+| 2026-10-08 | Tabela `elaboracoes` — migration `a9c4e2b7d1f6` (ADR-021). Se a tabela já existia no formato da branch de IA, a migration só completa a capa |
+| 2026-10-13 | Tabela `drive_pastas` — migration `b4d8f1a6c3e2` (ADR-022). `user_id` com CASCADE, `processo_id` opcional com SET NULL |
+| 2026-10-13 | Google Drive — migration `c7e2a9d4b1f8` (head, ADR-022). Cria `drive_conexoes` (token em BYTEA, `user_id` único) e `drive_arquivos` (ficha, `origem` com CHECK, único por pasta + id do Google); adiciona `drive_pastas.google_folder_id` |

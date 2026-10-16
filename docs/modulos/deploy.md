@@ -57,6 +57,12 @@ O `railway.toml` é referência. **Preencha sempre no painel** (serviço novo po
 5. Depois do primeiro deploy: conferir no **log do pre-deploy** que o Alembic rodou; `https://<api>/health` e `https://<api>/health/db` devem responder `ok`.
 6. OAuth (Gmail/Outlook) e `DATAJUD_API_KEY` podem ficar vazios no primeiro ar. Sem OAuth, o advogado **não** conecta o e-mail do e-SAJ. Sem a chave, o job DataJud não consulta (só loga e sai).
 7. Memória: reserve folga (~1 GB) por causa do Chromium.
+8. **Google Drive (opcional no primeiro ar):** sem as variáveis abaixo, `/drive` funciona só com pastas e o cartão avisa que a conexão não foi configurada. Para ligar:
+   - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` — os mesmos do Gmail (cliente OAuth Web).
+   - `GOOGLE_DRIVE_OAUTH_REDIRECT_URI` — `https://<api>/drive/google/callback`, **idêntica** à cadastrada no cliente OAuth do Google Cloud.
+   - `GOOGLE_PICKER_API_KEY` — chave de API restrita por referrer ao domínio do frontend e à Picker API. É pública por natureza (vai ao navegador junto com o token curto).
+   - `GOOGLE_PROJECT_NUMBER` — número do projeto no Google Cloud (não é o ID).
+   - Escopo `drive.file` na tela de consentimento, Drive API e Picker API ativadas no projeto.
 
 Não cole `backend/.env` (development) no painel. Não commite `JWT_SECRET` / `AES_KEY`.
 

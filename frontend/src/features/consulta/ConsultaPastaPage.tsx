@@ -7,7 +7,19 @@ import {
   Search,
   Sparkles,
 } from 'lucide-react'
-import { mensagemDeErro } from '#/features/auth/auth.errors'
+import { MUITAS_TENTATIVAS, mensagemDeErro } from '#/features/auth/auth.errors'
+import {
+  AvisoCentral,
+  CardPublico,
+  EstadoBuscaPublica,
+  FichaPublica,
+  avisoPublico,
+} from '#/features/consulta/ConsultaPublicaPainel'
+import {
+  consultarProcessoPublico,
+  mesmosDigitos,
+  numeroCnjCompleto,
+} from '#/features/consulta/consulta.publico'
 import { VisualizadorPdfModal } from '#/features/processos/VisualizadorPdfModal'
 import { buscarProcesso, listarProcessos } from '#/features/processos/processos.api'
 import {
@@ -46,12 +58,17 @@ export function ConsultaPastaPage() {
   const [tipoBusca, setTipoBusca] = useState<'cnj' | 'partes' | 'livre'>('cnj')
   const [portal, setPortal] = useState<PortalKey>('todos')
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null)
+  const [escolheuPublico, setEscolheuPublico] = useState(false)
   const [pecaModal, setPecaModal] = useState<PecaPasta | null>(null)
 
   useEffect(() => {
     const handle = window.setTimeout(() => setBuscaDebounced(busca), 300)
     return () => window.clearTimeout(handle)
   }, [busca])
+
+  useEffect(() => {
+    setEscolheuPublico(false)
+  }, [buscaDebounced])
 
   const listaQuery = useQuery({
     queryKey: [...PROCESSOS_QUERY_KEY, 'consulta', buscaDebounced],
@@ -65,6 +82,23 @@ export function ConsultaPastaPage() {
     }
     return itens.filter((item) => item.tribunal === portal)
   }, [listaQuery.data, portal])
+
+  const cnjCompleto = numeroCnjCompleto(buscaDebounced)
+  const jaNaCarteira = (listaQuery.data ?? []).some((item) =>
+    mesmosDigitos(item.nu_processo, buscaDebounced),
+  )
+  const consultaPublicaAtiva = cnjCompleto && !jaNaCarteira && !listaQuery.isFetching
+  const publicoQuery = useQuery({
+    queryKey: ['processos', 'publico', buscaDebounced.trim()],
+    queryFn: () => consultarProcessoPublico(buscaDebounced),
+    enabled: consultaPublicaAtiva,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  })
+  const publico = publicoQuery.data ?? null
+  const soPublico = processos.length === 0 && publico?.situacao === 'encontrado'
+  const verPublico =
+    consultaPublicaAtiva && (escolheuPublico || soPublico) && publico?.situacao === 'encontrado'
 
   useEffect(() => {
     if (processos.some((p) => p.id === selecionadoId)) {
@@ -92,8 +126,8 @@ export function ConsultaPastaPage() {
             Consulta Processual Unificada & Pasta Digital
           </h1>
           <p className="text-sm text-[#6B7280] mt-1 max-w-2xl">
-            Busca nos processos já coletados. Documentos abrem no e-SAJ — nada é baixado
-            pelo nosso servidor.
+            Busca nos processos já coletados. Um número CNJ que não esteja na sua carteira
+            é consultado nos dados públicos do CNJ — sem partes, sem advogado e sem documentos.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -146,23 +180,49 @@ export function ConsultaPastaPage() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col">
               {listaQuery.isError ? (
-                <p className="text-sm text-[#9CA3AF] px-1">
-                  {mensagemDeErro(listaQuery.error, { 401: 'Sessão expirada. Entre novamente.' })}
-                </p>
+                <AvisoCentral
+                  mensagem={mensagemDeErro(listaQuery.error, {
+                    401: 'Sessão expirada. Entre novamente.',
+                  })}
+                />
               ) : listaQuery.isLoading ? (
                 <EstadoCarregando mensagem="Carregando processos…" />
-              ) : processos.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] px-1">
-                  Nenhum processo coletado para estes filtros.
-                </p>
+              ) : processos.length === 0 && publico?.situacao !== 'encontrado' ? (
+                consultaPublicaAtiva && publicoQuery.isFetching ? (
+                  <EstadoBuscaPublica />
+                ) : consultaPublicaAtiva && publicoQuery.isError ? (
+                  <AvisoCentral
+                    erro
+                    mensagem={mensagemDeErro(publicoQuery.error, {
+                      401: 'Sessão expirada. Entre novamente.',
+                      422: 'Informe um número CNJ completo.',
+                      429: MUITAS_TENTATIVAS,
+                      503: 'A consulta pública ainda não está configurada.',
+                    })}
+                  />
+                ) : consultaPublicaAtiva && publico ? (
+                  <AvisoCentral mensagem={avisoPublico(publico.situacao) ?? ''} />
+                ) : (
+                  <AvisoCentral mensagem="Nenhum processo coletado para estes filtros." />
+                )
               ) : (
                 <div className="space-y-2.5">
+                  {consultaPublicaAtiva && publico?.situacao === 'encontrado' ? (
+                    <CardPublico
+                      consulta={publico}
+                      selecionado={verPublico}
+                      onClick={() => setEscolheuPublico(true)}
+                    />
+                  ) : null}
                   {processos.map((processo) => (
                     <CardConsulta
                       key={processo.id}
                       processo={processo}
-                      selecionado={processo.id === selecionadoId}
-                      onClick={() => setSelecionadoId(processo.id)}
+                      selecionado={processo.id === selecionadoId && !verPublico}
+                      onClick={() => {
+                        setEscolheuPublico(false)
+                        setSelecionadoId(processo.id)
+                      }}
                     />
                   ))}
                 </div>
@@ -171,14 +231,16 @@ export function ConsultaPastaPage() {
           </section>
 
           <section className="min-h-0 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm overflow-y-auto px-6 py-5 flex flex-col">
-            {!selecionadoId ? (
-              <p className="text-sm text-[#9CA3AF]">Selecione um processo à esquerda.</p>
+            {verPublico && publico ? (
+              <FichaPublica consulta={publico} />
+            ) : !selecionadoId ? (
+              <AvisoCentral mensagem="Selecione um processo à esquerda." />
             ) : detalheQuery.isLoading ? (
               <EstadoCarregando mensagem="Carregando ficha…" />
             ) : detalheQuery.isError || !detalheQuery.data ? (
-              <p className="text-sm text-[#9CA3AF]">
-                {mensagemDeErro(detalheQuery.error, { 404: 'Processo não encontrado.' })}
-              </p>
+              <AvisoCentral
+                mensagem={mensagemDeErro(detalheQuery.error, { 404: 'Processo não encontrado.' })}
+              />
             ) : (
               <FichaConsulta
                 pecas={pecas}

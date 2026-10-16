@@ -5,6 +5,7 @@ import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 interface SeletorPecaProps {
   pecaSelecionada: string
   onChange: (id: string) => void
+  mostrarSugestao?: boolean
 }
 
 const grupos = [...new Set(modelosPeca.map((m) => m.grupo))]
@@ -13,7 +14,11 @@ function getPecaById(id: string): ModeloPeca | undefined {
   return modelosPeca.find((m) => m.id === id)
 }
 
-export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
+export function SeletorPeca({
+  pecaSelecionada,
+  onChange,
+  mostrarSugestao = true,
+}: SeletorPecaProps) {
   const peca = getPecaById(pecaSelecionada)
 
   return (
@@ -21,9 +26,11 @@ export function SeletorPeca({ pecaSelecionada, onChange }: SeletorPecaProps) {
       <p className="text-[10px] font-semibold text-[#9CA3AF] tracking-[0.18em] uppercase mb-1">
         Seletor de peça
       </p>
-      <p className="text-[10px] font-semibold text-[#2563EB] tracking-[0.12em] uppercase mb-2">
-        Sugerido por IA
-      </p>
+      {mostrarSugestao ? (
+        <p className="text-[10px] font-semibold text-[#2563EB] tracking-[0.12em] uppercase mb-2">
+          Sugerido por IA
+        </p>
+      ) : null}
       <div className="relative">
         <div className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
           <FileText className="w-3.5 h-3.5 text-[#9CA3AF]" />

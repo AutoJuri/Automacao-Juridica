@@ -4,11 +4,15 @@
 para não vazar existência. `id_esaj` nunca sai no JSON.
 """
 
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+import httpx
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.rate_limit import LIMITE_CONSULTA_PUBLICA, limiter
+from app.schemas.consulta_publica import ConsultaPublicaSchema
 from app.schemas.processo import (
     AudienciaPainelSchema,
     IntimacaoPainelSchema,
@@ -17,8 +21,10 @@ from app.schemas.processo import (
     ProcessoFixarSchema,
     ProcessoListSchema,
 )
-from app.services import painel
+from app.services import datajud, painel
+from app.services.consulta_publica import montar_consulta_publica
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/processos", tags=["processos"])
 
 _NAO_ENCONTRADO = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo não encontrado")
@@ -31,6 +37,34 @@ async def listar_processos(
     q: str | None = Query(default=None, max_length=120),
 ) -> list[ProcessoListSchema]:
     return await painel.listar_processos(db, current_user.id, q=q)
+
+
+@router.get("/publico", response_model=ConsultaPublicaSchema)
+@limiter.limit(LIMITE_CONSULTA_PUBLICA)
+async def consultar_publico(
+    request: Request,
+    current_user: CurrentUser,
+    numero: str = Query(min_length=20, max_length=30),
+) -> ConsultaPublicaSchema:
+    """Ficha pública de um CNJ que pode não ser da carteira. Não grava nada.
+
+    `current_user` só garante login. O número não precisa ser de um processo
+    deste usuário — é exatamente o caso de uso.
+    """
+    logger.info("Consulta pública de CNJ para user_id=%s", current_user.id)
+    async with httpx.AsyncClient() as client:
+        exibicao = await datajud.consultar_exibicao(client, numero.strip())
+    if exibicao.situacao == "numero_invalido":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe um número CNJ completo",
+        )
+    if exibicao.situacao == "sem_chave":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="A consulta pública ainda não está configurada",
+        )
+    return montar_consulta_publica(numero, exibicao)
 
 
 @router.get("/{processo_id}", response_model=ProcessoDetalheSchema)

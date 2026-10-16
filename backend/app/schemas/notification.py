@@ -14,6 +14,8 @@ class NotificationPublicSchema(BaseModel):
 
     id: UUID
     processo_id: UUID | None = None
+    task_id: UUID | None = None
+    organization_id: UUID | None = None
     tipo: str
     titulo: str
     message: str

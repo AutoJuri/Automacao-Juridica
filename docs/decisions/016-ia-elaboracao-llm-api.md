@@ -121,7 +121,7 @@ Fluxo sugerido para o Igor: (a) Gemini Flash + textos inventados para sentir o p
 
 ## Alternativas consideradas
 
-- **Fine-tune / LoRA no estilo do escritório:** descartado no v1 (volume, custo, vazamento). Perfil JSON extraído das peças dele resolve o “fazer igual”.
+- **Fine-tune / LoRA no estilo do escritório:** descartado no v1 (volume, custo, vazamento). Perfil JSON extraído das peças dele resolve o “fazer igual”. O pacote que substitui treino e RAG está no ADR-019.
 - **RAG nacional de lei/jurisprudência:** descartado. Não há API oficial do STJ/STF de ementa (SCON e portal STF são HTML). LexML é metadado. DataJud não é tese. Scraping Google/STJ + “o modelo busca na web” gera julgado falso e ToS frágil.
 - **API comercial de acórdãos (Jusbrasil enterprise, etc.):** fica para **depois**, se houver contrato; aí sim o painel lista candidatos **com link**, o advogado marca, a IA só usa o marcado.
 - **Modelo 100% local (Llama no Railway):** qualidade e GPU. Pode ser oferta futura para quem não quer dado em API dos EUA; não é o v1.
@@ -137,7 +137,7 @@ Fluxo sugerido para o Igor: (a) Gemini Flash + textos inventados para sentir o p
 - Export com anexos (incluindo vídeo) é pipeline de arquivo, não “o LLM desenhou o Word”.
 - Jurisprudência ilustrativa do mock **não** vira fonte oficial; o aviso amarelo permanece até haver cola/marca do advogado ou API licenciada.
 - Custo por Elaborar em Sonnet 5 é da ordem de **centavos a poucos dólares** por peça grande (depende do tamanho do contexto). Rate limit e teto de tokens são obrigatórios.
-- Módulo HTTP/documentação de implementação só nasce quando o primeiro endpoint existir; até lá este ADR é a fonte da decisão.
+- Módulo HTTP/documentação de implementação só nasce quando o primeiro endpoint existir. Até lá, este ADR é a fonte do provedor e do recorte da tela; o contrato do pacote da minuta (sem treino) é o ADR-019.
 
 ---
 

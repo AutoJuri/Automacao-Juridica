@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Download, Pin, WandSparkles } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { IniciarElaboracaoDialog } from '#/features/elaboracao/IniciarElaboracaoDialog'
 import { Button } from '#/components/ui/button'
 import { mensagemDeErro } from '#/features/auth/auth.errors'
 import { AudienciaCpoLista } from './AudienciaCpoLista'
@@ -79,6 +81,8 @@ function PartesCpo({ partes, pendente }: { partes: ParteCpoPublica[]; pendente: 
 
 export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [elaborarAberto, setElaborarAberto] = useState(false)
   const cpoPendente = processo.movimentacoes_status === 'pendente'
   const campoCpo = (valor: string | null | undefined) => textoCampoCpo(valor, cpoPendente)
   const numero = formatarNumeroCnj(processo.nu_processo)
@@ -213,14 +217,13 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
           </div>
 
           <Button
-            asChild
+            type="button"
             size="sm"
+            onClick={() => setElaborarAberto(true)}
             className="h-9 px-3 bg-[#2563EB] text-white text-[12px] font-semibold rounded-lg"
           >
-            <Link to="/elaboracao/$processoId" params={{ processoId: processo.id }}>
-              <WandSparkles className="w-3.5 h-3.5" aria-hidden />
-              Elaborar
-            </Link>
+            <WandSparkles className="w-3.5 h-3.5" aria-hidden />
+            Elaborar
           </Button>
         </div>
       </div>
@@ -272,6 +275,15 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
           <ProcessoDatajudSecao datajud={processo.datajud} />
         </div>
       </details>
+      <IniciarElaboracaoDialog
+        aberto={elaborarAberto}
+        processoId={processo.id}
+        onAberto={setElaborarAberto}
+        onCriada={(elaboracaoId) => {
+          setElaborarAberto(false)
+          void navigate({ to: '/elaboracao/$elaboracaoId', params: { elaboracaoId } })
+        }}
+      />
     </section>
   )
 }

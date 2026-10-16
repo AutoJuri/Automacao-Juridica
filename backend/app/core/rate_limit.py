@@ -22,6 +22,10 @@ LIMITE_REDEFINIR_SENHA = "10/hour"
 LIMITE_CREDENCIAL_ESAJ = "5/hour"
 LIMITE_OAUTH_AUTHORIZE = "10/hour"
 LIMITE_OAUTH_CALLBACK = "20/hour"
+LIMITE_ACEITE_CONVITE = "10/hour"
+LIMITE_DRIVE_ENVIO = "60/hour"
+LIMITE_DRIVE_PICKER_TOKEN = "30/hour"
+LIMITE_CONSULTA_PUBLICA = "60/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

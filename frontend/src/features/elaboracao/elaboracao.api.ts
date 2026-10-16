@@ -16,7 +16,7 @@ export async function atualizarFatosExtras(
   elaboracaoId: string,
   fatosExtras: string | null,
 ): Promise<ElaboracaoSessao> {
-  const { data } = await api.patch<ElaboracaoSessao>(`/elaboracoes/${elaboracaoId}`, {
+  const { data } = await api.patch<ElaboracaoSessao>(`/elaboracoes/${elaboracaoId}/fatos`, {
     fatos_extras: fatosExtras,
   })
   return data

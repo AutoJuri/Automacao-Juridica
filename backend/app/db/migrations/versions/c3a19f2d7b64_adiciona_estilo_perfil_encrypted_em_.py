@@ -21,6 +21,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    inspector = sa.inspect(op.get_bind())
+    colunas = {coluna["name"] for coluna in inspector.get_columns("elaboracoes")}
+    if "estilo_perfil_encrypted" in colunas:
+        return
     op.add_column(
         "elaboracoes",
         sa.Column("estilo_perfil_encrypted", sa.LargeBinary(), nullable=True),

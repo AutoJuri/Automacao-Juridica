@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, WandSparkles, X } from 'lucide-react'
+import { Sparkles, WandSparkles, X } from 'lucide-react'
 import { ACOES_GRIFO } from './elaboracao.minuta'
 import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'
 
@@ -9,34 +9,12 @@ interface GrifoSelecaoPanelProps {
   bottom: number | null
   left: number
   onFechar: () => void
-  onExecutar: (instrucao: string) => void
-  executando: boolean
-  erro: string | null
 }
 
-export function GrifoSelecaoPanel({
-  trecho,
-  top,
-  bottom,
-  left,
-  onFechar,
-  onExecutar,
-  executando,
-  erro,
-}: GrifoSelecaoPanelProps) {
+export function GrifoSelecaoPanel({ trecho, top, bottom, left, onFechar }: GrifoSelecaoPanelProps) {
   const [prompt, setPrompt] = useState('')
-  const [validacao, setValidacao] = useState<string | null>(null)
+  const [aviso, setAviso] = useState(false)
   const preview = trecho.trim().length > 160 ? `${trecho.trim().slice(0, 160)}…` : trecho.trim()
-
-  function executar() {
-    const instrucao = prompt.trim()
-    if (!instrucao) {
-      setValidacao('Descreva o que a IA deve fazer com este trecho.')
-      return
-    }
-    setValidacao(null)
-    onExecutar(instrucao)
-  }
 
   return (
     <div
@@ -80,7 +58,7 @@ export function GrifoSelecaoPanel({
             type="button"
             onClick={() => {
               setPrompt(acao.rotulo)
-              setValidacao(null)
+              setAviso(false)
             }}
             className="h-7 px-2.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] text-[12px] font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE]"
           >
@@ -93,38 +71,27 @@ export function GrifoSelecaoPanel({
         value={prompt}
         onChange={(e) => {
           setPrompt(e.target.value)
-          setValidacao(null)
+          setAviso(false)
         }}
         rows={2}
-        disabled={executando}
         placeholder="Ex: Como deseja reescrever este trecho específico?"
-        className={`w-full resize-none rounded-lg border border-[#E5E7EB] bg-[#F8F9FC] px-3 py-2 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] disabled:opacity-60 ${FOCO_CAMPO}`}
+        className={`w-full resize-none rounded-lg border border-[#E5E7EB] bg-[#F8F9FC] px-3 py-2 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] ${FOCO_CAMPO}`}
         {...propsFocoCampo}
       />
 
       <button
         type="button"
-        onClick={executar}
-        disabled={executando}
-        className="mt-3 w-full h-10 inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+        onClick={() => setAviso(true)}
+        className="mt-3 w-full h-10 inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold"
       >
-        {executando ? (
-          <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-        ) : (
-          <WandSparkles className="w-4 h-4" aria-hidden />
-        )}
-        {executando ? 'Executando…' : 'Executar alteração no grifo'}
+        <WandSparkles className="w-4 h-4" aria-hidden />
+        Executar alteração no grifo
       </button>
 
-      {validacao ? (
+      {aviso ? (
         <p className="mt-2 text-[12px] text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded-md px-2.5 py-2 leading-snug">
-          {validacao}
-        </p>
-      ) : null}
-
-      {erro ? (
-        <p className="mt-2 text-[12px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-md px-2.5 py-2 leading-snug">
-          {erro}
+          <Sparkles className="w-3.5 h-3.5 inline mr-1" aria-hidden />
+          IA ainda não está em operação — o trecho não é reescrito daqui.
         </p>
       ) : null}
     </div>

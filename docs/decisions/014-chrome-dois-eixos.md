@@ -16,7 +16,7 @@ A SPA autenticada usa dois eixos:
 1. **Navbar superior** — quatro áreas: Gerências, Elaborações, Drive e Tarefas. Logo, sino, Configurações e Sair ficam fora desse grupo.
 2. **Rail esquerda** — só existe **dentro de Gerências**. Contém Andamentos, Consultas, Intimações, Audiências e Push Robôs. Fica abaixo da navbar.
 
-Gerências abre Andamentos (`/`). `/gerencias` redireciona para `/`. Elaborações no topo também cobre a minuta `/elaboracao/$processoId` (rota distinta de `/elaboracoes`). Drive e Tarefas são placeholders autenticados, sem rail.
+Gerências abre Andamentos (`/`). `/gerencias` redireciona para `/`. Elaborações no topo também cobre a minuta `/elaboracao/$elaboracaoId` (rota distinta de `/elaboracoes`). Drive é autenticado, sem rail, e também cobre `/drive/$pastaId` (ADR-022). Tarefas tem quadro próprio.
 
 ## Alternativas consideradas
 
@@ -28,6 +28,6 @@ Gerências abre Andamentos (`/`). `/gerencias` redireciona para `/`. Elaboraçõ
 
 - Fica mais fácil crescer Elaborações/Drive/Tarefas sem competir com o ciclo e-SAJ na mesma barra.
 - Quem entra em Elaborações perde a rail de propósito — voltar ao acompanhamento é clicar Gerências.
-- A minuta de um processo continua em `/elaboracao/$processoId`; a lista `/elaboracoes` ainda está vazia.
+- A minuta abre em `/elaboracao/$elaboracaoId`. A lista `/elaboracoes` mostra o que está em andamento e os processos que ainda não têm elaboração (ADR-021).
 
 **Atualização (2026-09-21):** Intimações saiu da rail por enquanto. O código da tela permanece; `/intimacoes-diretas` redireciona para Andamentos. O estado atual do menu está em `/docs/modulos/processos.md`.

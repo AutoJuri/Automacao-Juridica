@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_oauth_redirect_uri: str = "http://localhost:8000/credentials/email/gmail/callback"
+    # Drive (ADR-022): mesmo OAuth client do Gmail, outro redirect URI e outro
+    # consentimento (`drive.file`). A chave do Picker e o número do projeto
+    # são identificadores públicos do Google; ficam aqui só para não entrarem
+    # no bundle do frontend.
+    google_drive_oauth_redirect_uri: str = "http://localhost:8000/drive/google/callback"
+    google_picker_api_key: str = ""
+    google_project_number: str = ""
     microsoft_client_id: str = ""
     microsoft_client_secret: str = ""
     microsoft_oauth_redirect_uri: str = (

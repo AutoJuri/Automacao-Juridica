@@ -1,13 +1,11 @@
-"""cria elaboracoes e elaboracao_versoes
+"""acrescenta fatos extras e versões da minuta
 
 Revision ID: e782fdd01295
-Revises: e5b3f7a2c916
+Revises: c7e2a9d4b1f8
 Create Date: 2026-09-21 23:41:05.978608
 
-IA da elaboração (ADR-016) — sessão por `(user_id, processo_id, peca)` com
-os fatos extras do advogado, e o histórico de versões da minuta (geração,
-chat, grifo). Campos com texto do advogado/da minuta em BYTEA (cifrados com
-AES-256-GCM, mesma função de `tribunal_credentials`) — nunca `VARCHAR`/`TEXT`.
+A capa `elaboracoes` já existe (ADR-021). Esta revisão só guarda o texto da
+IA: fatos extras cifrados na capa e o histórico em `elaboracao_versoes`.
 """
 from typing import Sequence, Union
 
@@ -16,47 +14,22 @@ import sqlalchemy as sa
 
 
 revision: str = "e782fdd01295"
-down_revision: Union[str, None] = "e5b3f7a2c916"
+down_revision: Union[str, None] = "c7e2a9d4b1f8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "elaboracoes",
-        sa.Column("id", sa.UUID(), nullable=False),
-        sa.Column("user_id", sa.UUID(), nullable=False),
-        sa.Column("processo_id", sa.UUID(), nullable=False),
-        sa.Column("peca", sa.String(length=100), nullable=False),
-        sa.Column("fatos_extras_encrypted", sa.LargeBinary(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(
-            ["processo_id"],
-            ["processos.id"],
-            name=op.f("fk_elaboracoes_processo_id_processos"),
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name=op.f("fk_elaboracoes_user_id_users"),
-            ondelete="CASCADE",
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_elaboracoes")),
-        sa.UniqueConstraint(
-            "user_id", "processo_id", "peca", name=op.f("uq_elaboracoes_user_id_processo_id_peca")
-        ),
-    )
-    op.create_index(
-        op.f("ix_elaboracoes_processo_id"), "elaboracoes", ["processo_id"], unique=False
-    )
-    op.create_index(op.f("ix_elaboracoes_user_id"), "elaboracoes", ["user_id"], unique=False)
-
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    colunas = {coluna["name"] for coluna in inspector.get_columns("elaboracoes")}
+    if "fatos_extras_encrypted" not in colunas:
+        op.add_column(
+            "elaboracoes",
+            sa.Column("fatos_extras_encrypted", sa.LargeBinary(), nullable=True),
+        )
+    if "elaboracao_versoes" in inspector.get_table_names():
+        return
     op.create_table(
         "elaboracao_versoes",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -98,6 +71,4 @@ def downgrade() -> None:
     )
     op.drop_index(op.f("ix_elaboracao_versoes_elaboracao_id"), table_name="elaboracao_versoes")
     op.drop_table("elaboracao_versoes")
-    op.drop_index(op.f("ix_elaboracoes_user_id"), table_name="elaboracoes")
-    op.drop_index(op.f("ix_elaboracoes_processo_id"), table_name="elaboracoes")
-    op.drop_table("elaboracoes")
+    op.drop_column("elaboracoes", "fatos_extras_encrypted")

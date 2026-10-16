@@ -1,36 +1,20 @@
 import { useRef, useState } from 'react'
-import { FileText, Sparkles, UploadCloud, X } from 'lucide-react'
+import { FileText, UploadCloud, X } from 'lucide-react'
 import { extensaoArquivo, FOCO_CAMPO, propsFocoCampo, validarArquivoModelo } from './elaboracao.ui'
-
-interface ArquivoModelo {
-  nome: string
-  tamanho: number
-}
+import { GuardarNoDrive } from './GuardarNoDrive'
 
 interface SeletorPecaEspecificaProps {
-  elaboracaoId: string | null
-  /** JSON (string) do perfil já aplicado nesta sessão — `null` se nenhum. */
-  estiloAtual: string | null
-  onSalvarEstilo: (texto: string) => void
-  salvandoEstilo: boolean
-  /** Sem sessão de elaboração ainda (ficha carregando) — não há onde salvar. */
-  desabilitado?: boolean
+  /** Processo da elaboração, para sugerir a pasta do Drive ligada a ele. */
+  processoId?: string | null
 }
 
-export function SeletorPecaEspecifica({
-  elaboracaoId,
-  estiloAtual,
-  onSalvarEstilo,
-  salvandoEstilo,
-  desabilitado = false,
-}: SeletorPecaEspecificaProps) {
+export function SeletorPecaEspecifica({ processoId = null }: SeletorPecaEspecificaProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [arquivo, setArquivo] = useState<ArquivoModelo | null>(null)
+  // O File fica só em memória, até o clique em "Guardar no Drive".
+  const [arquivo, setArquivo] = useState<File | null>(null)
   const [texto, setTexto] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState(false)
-  // PDF/DOCX ainda não têm extração — só o TXT/colar alimentam a IA (Fase 3).
-  const podeAplicarEstilo = Boolean(elaboracaoId) && !desabilitado && texto.trim().length > 0
 
   function aplicarArquivo(file: File) {
     const recusa = validarArquivoModelo(file)
@@ -39,7 +23,7 @@ export function SeletorPecaEspecifica({
       return
     }
     setErro(null)
-    setArquivo({ nome: file.name, tamanho: file.size })
+    setArquivo(file)
     const ext = extensaoArquivo(file.name)
     if (ext === 'txt') {
       const leitor = new FileReader()
@@ -58,19 +42,9 @@ export function SeletorPecaEspecifica({
         Peça modelo específica
       </p>
       <p className="text-[12px] text-[#6B7280] leading-snug mb-3">
-        TXT ou texto colado: você revisa abaixo e, se quiser, envia à IA para
-        extrair o estilo desta elaboração. PDF/DOCX ficam só anexados aqui —
-        ainda sem extração de texto.
+        O arquivo e o texto ficam só neste browser, para você consultar o estilo. Nada é enviado ao
+        servidor, a menos que você use “Guardar no Drive”. A IA ainda não assimila o modelo.
       </p>
-
-      {estiloAtual ? (
-        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2">
-          <Sparkles className="w-3.5 h-3.5 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
-          <p className="text-[12px] text-[#1D4ED8] leading-snug">
-            Estilo desta sessão já aplicado a partir de um modelo enviado.
-          </p>
-        </div>
-      ) : null}
 
       <input
         ref={inputRef}
@@ -113,33 +87,42 @@ export function SeletorPecaEspecifica({
         <p className="text-[12px] font-medium text-[#374151] text-center">
           Arraste ou clique para enviar TXT, PDF, DOCX
         </p>
-        <p className="text-[11px] text-[#9CA3AF]">Máximo 5 MB · não sai deste computador</p>
+        <p className="text-[11px] text-[#9CA3AF]">
+          Máximo 5 MB · só sai deste computador se você guardar no Drive
+        </p>
       </button>
 
       {arquivo ? (
-        <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
-          <FileText className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-[#111827] truncate">{arquivo.nome}</p>
-            <p className="text-[11px] text-[#6B7280]">
-              {(arquivo.tamanho / 1024).toFixed(1)} KB
-              {extensaoArquivo(arquivo.nome) !== 'txt'
-                ? ' · PDF/DOCX anexado (o texto não é extraído daqui)'
-                : ' · texto copiado para o campo abaixo'}
-            </p>
+        <>
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
+            <FileText className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-[#111827] truncate">{arquivo.name}</p>
+              <p className="text-[11px] text-[#6B7280]">
+                {(arquivo.size / 1024).toFixed(1)} KB
+                {extensaoArquivo(arquivo.name) !== 'txt'
+                  ? ' · PDF/DOCX anexado (o texto não é extraído daqui)'
+                  : ' · texto copiado para o campo abaixo'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setArquivo(null)
+                setErro(null)
+              }}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
+              aria-label="Remover arquivo"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setArquivo(null)
-              setErro(null)
-            }}
-            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[#6B7280] hover:bg-[#F3F4F6]"
-            aria-label="Remover arquivo"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <GuardarNoDrive
+            key={`${arquivo.name}-${arquivo.size}-${arquivo.lastModified}`}
+            arquivo={arquivo}
+            processoId={processoId}
+          />
+        </>
       ) : null}
 
       {erro ? <p className="mt-2 text-[12px] text-[#B45309]">{erro}</p> : null}
@@ -152,21 +135,6 @@ export function SeletorPecaEspecifica({
         className={`mt-3 w-full resize-none rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] ${FOCO_CAMPO}`}
         {...propsFocoCampo}
       />
-
-      <button
-        type="button"
-        disabled={!podeAplicarEstilo || salvandoEstilo}
-        onClick={() => onSalvarEstilo(texto.trim())}
-        title={
-          elaboracaoId
-            ? 'Envia este texto à IA para extrair o estilo desta elaboração'
-            : 'Carregando sessão de elaboração…'
-        }
-        className="mt-2 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] text-[12px] font-semibold text-white hover:bg-[#1D4ED8] disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Sparkles className="w-3.5 h-3.5" aria-hidden />
-        {salvandoEstilo ? 'Aplicando…' : 'Aplicar estilo'}
-      </button>
     </div>
   )
 }

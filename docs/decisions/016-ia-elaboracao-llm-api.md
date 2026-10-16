@@ -121,7 +121,7 @@ Fluxo sugerido para o Igor: (a) Gemini Flash + textos inventados para sentir o p
 
 ## Alternativas consideradas
 
-- **Fine-tune / LoRA no estilo do escritório:** descartado no v1 (volume, custo, vazamento). Perfil JSON extraído das peças dele resolve o “fazer igual”.
+- **Fine-tune / LoRA no estilo do escritório:** descartado no v1 (volume, custo, vazamento). Perfil JSON extraído das peças dele resolve o “fazer igual”. O pacote que substitui treino e RAG está no ADR-019.
 - **RAG nacional de lei/jurisprudência:** descartado. Não há API oficial do STJ/STF de ementa (SCON e portal STF são HTML). LexML é metadado. DataJud não é tese. Scraping Google/STJ + “o modelo busca na web” gera julgado falso e ToS frágil.
 - **API comercial de acórdãos (Jusbrasil enterprise, etc.):** fica para **depois**, se houver contrato; aí sim o painel lista candidatos **com link**, o advogado marca, a IA só usa o marcado.
 - **Modelo 100% local (Llama no Railway):** qualidade e GPU. Pode ser oferta futura para quem não quer dado em API dos EUA; não é o v1.
@@ -137,10 +137,8 @@ Fluxo sugerido para o Igor: (a) Gemini Flash + textos inventados para sentir o p
 - Export com anexos (incluindo vídeo) é pipeline de arquivo, não “o LLM desenhou o Word”.
 - Jurisprudência ilustrativa do mock **não** vira fonte oficial; o aviso amarelo permanece até haver cola/marca do advogado ou API licenciada.
 - Custo por Elaborar em Sonnet 5 é da ordem de **centavos a poucos dólares** por peça grande (depende do tamanho do contexto). Rate limit e teto de tokens são obrigatórios.
-- Módulo HTTP/documentação de implementação só nasce quando o primeiro endpoint existir; até lá este ADR é a fonte da decisão. **Atualização 2026-09-21:** os endpoints existem (`/elaboracoes/*`), documentados em `/docs/modulos/elaboracao.md` — este ADR continua sendo a fonte da decisão de produto/comparação de provedores, o módulo é a fonte da implementação.
-- O adapter (`LLM_PROVIDER`/`LLM_MODEL`) e um `StubLLMProvider` determinístico permitiram implementar e testar toda a Fase 2 (fatos extras + Elaborar) e a Fase 4 (chat + grifo) de ponta a ponta **sem** chave de LLM real — inclusive o teste de rate limit, ownership e cifra. O `AnthropicProvider` (Claude) já está escrito (§5), só falta a chave em produção.
-- O mesmo adapter ganhou `sugerir_peca` (Fase 1) e `extrair_perfil_estilo` (Fase 3) sem alterar o restante da feature — `StubLLMProvider` usa heurística de palavras-chave e estatística simples de texto, respectivamente; `AnthropicProvider` já tem os prompts reais escritos, também esperando a chave. O catálogo de peças (id/nome/palavras-chave) existe duplicado em `backend/app/services/elaboracao_pecas.py` e `frontend/.../elaboracao.mock.ts` — unificar numa fonte única fica para depois.
-- Fase 3 desta rodada cobre só texto (TXT lido no browser + colar) — PDF/DOCX continuam anexados sem extração de conteúdo; parsing binário (e a "biblioteca permanente" de peças por advogado) ficam para uma iteração futura.
+- Os endpoints da IA existem no backend (`/elaboracoes/{id}/gerar`, `/editar`, `/fatos`, `/estilo`, `/versoes` e `/sugestao-peca`). A capa e a tela do hall seguem o ADR-021. O contrato do pacote da minuta, sem treino, é o ADR-019.
+- O adapter (`LLM_PROVIDER`/`LLM_MODEL`) e o `StubLLMProvider` cobrem gerar, editar, sugerir peça e extrair estilo sem chave real. `AnthropicProvider` e `OpenRouterProvider` já estão escritos.
 
 ---
 

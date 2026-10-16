@@ -367,23 +367,15 @@ class TestOwnershipEFluxoCompleto:
         )
         assert primeira.status_code == 201
         corpo = primeira.json()
-        assert corpo["fatos_extras"] is None
-        assert set(corpo.keys()) == {
-            "id",
-            "processo_id",
-            "peca",
-            "fatos_extras",
-            "estilo_perfil",
-            "created_at",
-            "updated_at",
-        }
+        assert corpo["processo_id"] == processo_id
+        assert corpo["peca"] == "contestacao"
 
         segunda = await client.post(
             "/elaboracoes",
             json={"processo_id": processo_id, "peca": "contestacao"},
             headers=_headers(token),
         )
-        assert segunda.status_code == 201
+        assert segunda.status_code == 200
         assert segunda.json()["id"] == corpo["id"]
 
     @pytest.mark.asyncio
@@ -402,7 +394,7 @@ class TestOwnershipEFluxoCompleto:
         ).json()["id"]
 
         resposta = await client.patch(
-            f"/elaboracoes/{elaboracao_id}",
+            f"/elaboracoes/{elaboracao_id}/fatos",
             json={"fatos_extras": "O réu foi citado por edital irregular."},
             headers=_headers(token),
         )
@@ -432,7 +424,7 @@ class TestOwnershipEFluxoCompleto:
 
         token_b, _user_b = await _cadastrar(client)
         resposta = await client.patch(
-            f"/elaboracoes/{elaboracao_id}",
+            f"/elaboracoes/{elaboracao_id}/fatos",
             json={"fatos_extras": "Tentativa de acesso indevido."},
             headers=_headers(token_b),
         )
@@ -523,7 +515,7 @@ class TestOwnershipEFluxoCompleto:
             )
         ).json()["id"]
         await client.patch(
-            f"/elaboracoes/{elaboracao_id}",
+            f"/elaboracoes/{elaboracao_id}/fatos",
             json={"fatos_extras": "O réu nunca foi notificado."},
             headers=_headers(token),
         )

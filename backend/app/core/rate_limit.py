@@ -22,9 +22,11 @@ LIMITE_REDEFINIR_SENHA = "10/hour"
 LIMITE_CREDENCIAL_ESAJ = "5/hour"
 LIMITE_OAUTH_AUTHORIZE = "10/hour"
 LIMITE_OAUTH_CALLBACK = "20/hour"
-# IA da elaboração (ADR-016) — custo real com provider de verdade, mesmo
-# que o `stub` de hoje não gaste nada. Compartilhado por gerar, editar e
-# aplicar estilo (POST /elaboracoes/{id}/estilo) — todos chamam o provider.
+LIMITE_ACEITE_CONVITE = "10/hour"
+LIMITE_DRIVE_ENVIO = "60/hour"
+LIMITE_DRIVE_PICKER_TOKEN = "30/hour"
+LIMITE_CONSULTA_PUBLICA = "60/hour"
+# IA da elaboração (ADR-016). Compartilhado por gerar, editar, estilo e sugestão.
 LIMITE_ELABORACAO_GERAR = "30/hour"
 
 

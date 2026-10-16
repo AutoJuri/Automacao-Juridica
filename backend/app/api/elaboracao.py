@@ -13,7 +13,6 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.rate_limit import LIMITE_ELABORACAO_GERAR, limiter
 from app.schemas.elaboracao import (
     EditarMinutaSchema,
-    ElaboracaoCreateSchema,
     ElaboracaoPublicSchema,
     EstiloTextoSchema,
     FatosExtrasUpdateSchema,
@@ -50,20 +49,6 @@ _MODELO_NAO_CONFIGURADO = HTTPException(
 )
 
 
-@router.post("", response_model=ElaboracaoPublicSchema, status_code=status.HTTP_201_CREATED)
-async def criar_ou_buscar_elaboracao(
-    body: ElaboracaoCreateSchema,
-    current_user: CurrentUser,
-    db: DbSession,
-) -> ElaboracaoPublicSchema:
-    resultado = await elaboracao_service.obter_ou_criar_elaboracao(
-        db, current_user.id, processo_id=body.processo_id, peca=body.peca
-    )
-    if resultado is None:
-        raise _PROCESSO_NAO_ENCONTRADO
-    return resultado
-
-
 @router.get("/sugestao-peca", response_model=SugestaoPecaSchema)
 @limiter.limit(LIMITE_ELABORACAO_GERAR)
 async def sugestao_peca(
@@ -83,7 +68,7 @@ async def sugestao_peca(
     return resultado
 
 
-@router.patch("/{elaboracao_id}", response_model=ElaboracaoPublicSchema)
+@router.patch("/{elaboracao_id}/fatos", response_model=ElaboracaoPublicSchema)
 async def atualizar_fatos_extras(
     elaboracao_id: UUID,
     body: FatosExtrasUpdateSchema,

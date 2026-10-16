@@ -3,29 +3,22 @@ import { Button } from '#/components/ui/button'
 import { ScrollArea } from '#/components/ui/scroll-area'
 import { Separator } from '#/components/ui/separator'
 import type { ProcessoDetalhe } from '#/features/processos/processos.types'
-import type { SugestaoPeca } from './elaboracao.types'
+import type { CamposManuais } from './elaboracao.manual'
 import { SeletorPeca } from './SeletorPeca'
 import { InformacoesProcessoPanel } from './InformacoesProcessoPanel'
 import { SeletorPecaEspecifica } from './SeletorPecaEspecifica'
-import { FatosExtrasPanel } from './FatosExtrasPanel'
 
 interface LeftPanelProps {
   collapsed: boolean
   onToggle: () => void
   pecaSelecionada: string
   onPecaChange: (id: string) => void
-  /** `null` = sem sugestão (ou a peça selecionada já não é mais a sugerida). */
-  sugestaoPeca: SugestaoPeca | null
   processo: ProcessoDetalhe | null
   carregando: boolean
-  fatosExtras: string | null
-  onSalvarFatosExtras: (texto: string | null) => void
-  salvandoFatosExtras: boolean
-  fatosExtrasDesabilitado: boolean
-  elaboracaoId: string | null
-  estiloAtual: string | null
-  onSalvarEstilo: (texto: string) => void
-  salvandoEstilo: boolean
+  semProcesso?: boolean
+  campos?: CamposManuais
+  onCampos?: (campos: CamposManuais) => void
+  onCamposBlur?: () => void
 }
 
 export function LeftPanel({
@@ -33,17 +26,12 @@ export function LeftPanel({
   onToggle,
   pecaSelecionada,
   onPecaChange,
-  sugestaoPeca,
   processo,
   carregando,
-  fatosExtras,
-  onSalvarFatosExtras,
-  salvandoFatosExtras,
-  fatosExtrasDesabilitado,
-  elaboracaoId,
-  estiloAtual,
-  onSalvarEstilo,
-  salvandoEstilo,
+  semProcesso = false,
+  campos,
+  onCampos,
+  onCamposBlur,
 }: LeftPanelProps) {
   return (
     <aside
@@ -72,28 +60,18 @@ export function LeftPanel({
       {!collapsed && (
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-5">
-            <SeletorPeca
-              pecaSelecionada={pecaSelecionada}
-              onChange={onPecaChange}
-              sugestao={sugestaoPeca}
+            <SeletorPeca pecaSelecionada={pecaSelecionada} onChange={onPecaChange} />
+            <Separator className="bg-[#E5E7EB]" />
+            <InformacoesProcessoPanel
+              processo={processo}
+              carregando={carregando}
+              semProcesso={semProcesso}
+              campos={campos}
+              onCampos={onCampos}
+              onCamposBlur={onCamposBlur}
             />
             <Separator className="bg-[#E5E7EB]" />
-            <InformacoesProcessoPanel processo={processo} carregando={carregando} />
-            <Separator className="bg-[#E5E7EB]" />
-            <FatosExtrasPanel
-              valorInicial={fatosExtras}
-              onSalvar={onSalvarFatosExtras}
-              salvando={salvandoFatosExtras}
-              desabilitado={fatosExtrasDesabilitado}
-            />
-            <Separator className="bg-[#E5E7EB]" />
-            <SeletorPecaEspecifica
-              elaboracaoId={elaboracaoId}
-              estiloAtual={estiloAtual}
-              onSalvarEstilo={onSalvarEstilo}
-              salvandoEstilo={salvandoEstilo}
-              desabilitado={!elaboracaoId}
-            />
+            <SeletorPecaEspecifica processoId={processo?.id ?? null} />
           </div>
         </ScrollArea>
       )}

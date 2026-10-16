@@ -1,6 +1,6 @@
 # Módulo: Integração DataJud (CNJ)
 
-> Última atualização: 2026-09-15
+> Última atualização: 2026-10-15
 > Camada: Backend / Frontend
 
 ---
@@ -9,7 +9,7 @@
 
 Complementa a ficha de um processo já rastreado (hoje via e-SAJ/TJSP) com dados públicos da API do DataJud (CNJ) — classe, assuntos, órgão julgador, data de ajuizamento, grau, formato e movimentos públicos. É sempre uma seção **separada e somente-leitura**: nunca sobrescreve o que já vem do e-SAJ. Um job diário isolado (fora do ciclo de 10 min dos pipes) faz a coleta em lote round-robin. Ver ADR-015 para o racional completo.
 
-Este módulo **não** descobre processos novos por nome/OAB do advogado — a API pública do DataJud não expõe partes nem advogados (Portaria CNJ nº 160/2020) e só responde consultas por número de processo já conhecido.
+Uma consulta avulsa (`GET /processos/publico`) lê um CNJ completo que pode não estar na carteira e devolve a ficha na hora, sem gravar. Este módulo **não** descobre processos novos por nome/OAB do advogado — a API pública do DataJud não expõe partes nem advogados (Portaria CNJ nº 160/2020) e só responde consultas por número de processo já conhecido.
 
 ---
 
@@ -18,7 +18,7 @@ Este módulo **não** descobre processos novos por nome/OAB do advogado — a AP
 | Arquivo | Responsabilidade |
 |---|---|
 | `backend/app/core/cnj.py` | `extrair_segmento_tribunal` / `resolver_alias_datajud` — parse do número CNJ e resolução genérica do alias do índice DataJud por segmento/tribunal |
-| `backend/app/services/datajud.py` | `consultar_processo` — cliente HTTP (httpx) da API pública do DataJud, timeout 10s, nunca lança |
+| `backend/app/services/datajud.py` | `consultar_processo` (job, 10s, falha vira `None`) e `consultar_exibicao` (tela, até 30s, separa ausente de indisponível) |
 | `backend/app/schemas/datajud_raw.py` | `DatajudProcessoRaw` e submodelos — schema Pydantic do `_source` de um hit (`extra="ignore"`) |
 | `backend/app/models/processo_datajud.py` | `ProcessoDatajud` — tabela complementar 1:1 com `Processo` |
 | `backend/app/services/datajud_jobs.py` | `job_datajud_diario` — job de sistema, lote round-robin, isolamento de falha por processo |
@@ -30,12 +30,20 @@ Este módulo **não** descobre processos novos por nome/OAB do advogado — a AP
 | `backend/app/db/migrations/versions/e5b3f7a2c916_cria_processos_datajud.py` | Migration da tabela `processos_datajud` |
 | `frontend/src/features/processos/ProcessoDatajudSecao.tsx` | Seção somente-leitura na ficha do processo |
 | `frontend/src/features/processos/processos.types.ts` | `ProcessoDatajudPublica`, `DatajudAssuntoPublica`, `DatajudMovimentoPublica` |
+| `backend/app/services/consulta_publica.py` | Monta a ficha avulsa sem gravar; mostra no máximo os 100 movimentos mais recentes |
+| `backend/app/schemas/consulta_publica.py` | `ConsultaPublicaSchema` — resposta de `GET /processos/publico` |
+| `frontend/src/features/consulta/consulta.publico.ts` | Detecta CNJ completo e chama a consulta avulsa |
+| `frontend/src/features/consulta/ConsultaPublicaPainel.tsx` | Cartão e ficha públicos na tela de Consultas |
 
 ---
 
 ## Endpoints
 
-Nenhum endpoint dedicado — os dados do DataJud saem embutidos em `GET /processos/{id}` (campo `datajud`, ver `/docs/modulos/processos.md`). Não existe endpoint para disparar uma consulta manual ao DataJud (fora de escopo desta etapa, ver ADR-015).
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/processos/publico?numero=` | Consulta avulsa de um CNJ completo na API pública. Exige login e tem limite de 60 por hora. Não grava o processo e não aceita nome nem OAB. `422` se o número não for um CNJ; `503` se a chave não estiver configurada |
+
+O complemento dos processos já rastreados continua saindo em `GET /processos/{id}` (campo `datajud`).
 
 ---
 
@@ -69,7 +77,7 @@ job_datajud_diario
 - **Nunca sobrescreve o e-SAJ:** `ProcessoDatajud` é uma tabela separada, 1:1 com `Processo` — os campos que já vêm do e-SAJ (`de_classe`, `de_assunto`, `foro`, `vara`...) nunca são tocados por este módulo
 - **Isolamento por processo:** `_processar_processo` roda em `try/except` próprio — falha em um processo nunca impede os demais no mesmo lote (`security.mdc` §8), igual ao padrão do `job_ciclo_dez_minutos`
 - **Nunca lança para o chamador:** `datajud.consultar_processo` devolve `None` em qualquer falha (rede, HTTP, JSON malformado, validação Pydantic) — nunca propaga exceção
-- **Timeout curto:** 10s por requisição HTTP (`security.mdc` §12) — API pública de terceiro, não pode travar o job
+- **Timeout curto no job:** 10s por requisição HTTP — API pública de terceiro, não pode travar o lote. A consulta avulsa da tela (`GET /processos/publico`) espera até 30s só para ler a resposta
 - **Log sem payload:** qualquer log de erro do cliente/job usa só o tipo do problema (status HTTP, nome da exceção) — nunca o corpo da resposta
 - **Chave de API em variável de ambiente:** `DATAJUD_API_KEY`, mesmo sendo uma chave pública compartilhada da wiki do CNJ — nunca hardcoded (o CNJ já trocou essa chave antes). Sem a chave, `job_datajud_diario` loga uma vez e sai — não marca `encontrado=false` em lote
 - **Alias por segmento/tribunal, não hardcode de TJSP:** `resolver_alias_datajud` cobre Justiça Estadual (27 UFs), TRFs (1–6), TRTs (1–24) e STF/STJ/TST; tribunal fora dessa tabela devolve `None` (skip, não erro) — ver ADR-015
@@ -128,7 +136,8 @@ Nenhum módulo depende deste além do painel — é estritamente aditivo.
 - ❌ Não logar o payload da resposta do DataJud em caso de erro — só o tipo do problema
 - ❌ Não hardcodar `DATAJUD_API_KEY` no código — variável de ambiente, mesmo sendo uma chave pública compartilhada
 - ❌ Não varrer o lote do job diário com `DATAJUD_API_KEY` vazio — isso gravaria `encontrado=false` e atrasaria a consulta real
-- ❌ Não criar endpoint para "atualizar dados públicos" manualmente nesta etapa — só o job diário automático (fora de escopo, ver ADR-015)
+- ❌ Não usar `GET /processos/publico` para gravar processo, atualizar a ficha da carteira ou buscar por nome/OAB — a rota só lê um CNJ e devolve a ficha pública
+- ❌ Não fazer uma segunda chamada ao DataJud para “o resto” dos movimentos — eles já vêm todos na primeira resposta. A ficha corta em 100 e deixa o restante de fora
 
 ---
 
@@ -138,3 +147,4 @@ Nenhum módulo depende deste além do painel — é estritamente aditivo.
 |---|---|
 | 2026-09-06 | Implementação inicial (Etapa 9): `app/core/cnj.py`, cliente `app/services/datajud.py`, model `ProcessoDatajud` + migration, `job_datajud_diario`, exposição em `ProcessoDetalheSchema.datajud`, seção somente-leitura na ficha do processo (ADR-015) |
 | 2026-09-15 | `job_datajud_diario` não varre o lote quando `DATAJUD_API_KEY` está vazio |
+| 2026-10-15 | Consulta avulsa em `GET /processos/publico`: CNJ que não está na carteira, só leitura, sem gravar. A tela espera até 30s; o job diário continua em 10s. A ficha mostra formato, sistema, sigilo, atualização no CNJ, complemento do movimento e no máximo os 100 movimentos mais recentes. A data compacta `AAAAMMDDhhmmss` é lida como UTC e a tela mostra o horário de Brasília |

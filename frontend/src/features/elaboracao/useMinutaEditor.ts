@@ -5,6 +5,8 @@ import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { TextStyleKit } from '@tiptap/extension-text-style'
 
+import { PaginacaoMinuta, QuebraDePagina } from './paginacao'
+
 export function useMinutaEditor({
   html,
   chave,
@@ -38,6 +40,8 @@ export function useMinutaEditor({
         color: false,
         lineHeight: { types: ['paragraph', 'textStyle'] },
       }),
+      QuebraDePagina,
+      PaginacaoMinuta,
     ],
     content: html || '<p></p>',
     editable: editando,

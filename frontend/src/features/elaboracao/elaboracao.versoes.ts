@@ -12,6 +12,23 @@ export function chaveVersoes(processoId: string, pecaId: string): string {
   return `${PREFIXO}.${processoId}.${pecaId}`
 }
 
+export function chaveVersoesElaboracao(elaboracaoId: string): string {
+  return `${PREFIXO}.elaboracao.${elaboracaoId}`
+}
+
+export function lerVersoesDaElaboracao(
+  ler: (chave: string) => string | null,
+  elaboracaoId: string,
+  processoId: string | null,
+  pecaId: string,
+): VersaoMinuta[] {
+  const atuais = lerVersoes(ler(chaveVersoesElaboracao(elaboracaoId)))
+  if (atuais.length > 0 || !processoId) {
+    return atuais
+  }
+  return lerVersoes(ler(chaveVersoes(processoId, pecaId)))
+}
+
 export function lerVersoes(bruto: string | null): VersaoMinuta[] {
   if (!bruto) {
     return []

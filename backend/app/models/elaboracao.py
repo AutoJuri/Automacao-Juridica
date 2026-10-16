@@ -1,21 +1,15 @@
-"""Sessão de elaboração de peça e histórico de versões (IA — ADR-016).
+﻿"""Capa de uma elaboração de peça.
 
-`Elaboracao` é uma sessão por `(user_id, processo_id, peca)`: guarda os
-fatos extras que o advogado digitou (input humano, não vem do e-SAJ).
-`ElaboracaoVersao` é cada rascunho gerado ou editado — a "fonte de verdade"
-do documento passa a ser o servidor quando a IA está ligada (mesmo em modo
-`stub`), em vez do `localStorage` do browser.
-
-Campos com texto do advogado ou da minuta são cifrados com AES-256-GCM
-(`app.core.security.encrypt_secret` / `decrypt_secret`) no mesmo espírito do
-`security.mdc` para dado processual sigiloso — mesmo não sendo credencial de
-terceiro como CPF/senha do e-SAJ.
+Uma linha por (usuário, processo, peça) quando há processo. Sem processo,
+os dados da capa foram digitados à mão e não há limite de quantidade.
+O texto da minuta no editor continua no navegador. Quando a IA gera ou
+edita, cada versão fica cifrada em `elaboracao_versoes` (ADR-016).
 """
 
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Index, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Index, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,44 +20,81 @@ if TYPE_CHECKING:
     from app.models.processo import Processo
     from app.models.user import User
 
-ORIGEM_GERACAO = "geracao"
-ORIGEM_CHAT = "chat"
-ORIGEM_GRIFO = "grifo"
+PECAS: dict[str, str] = {
+    "contestacao": "Contestação",
+    "replica": "Réplica",
+    "recurso_inominado": "Recurso Inominado",
+    "apelacao": "Apelação",
+    "agravo_interno": "Agravo Interno",
+    "memoriais": "Memoriais",
+    "peticao_inicial": "Petição Inicial",
+    "tutela_urgencia": "Tutela de Urgência",
+    "impugnacao_contestacao": "Impugnação à Contestação",
+    "embargos_declaracao": "Embargos de Declaração",
+}
 
-ORIGENS_VERSAO = (ORIGEM_GERACAO, ORIGEM_CHAT, ORIGEM_GRIFO)
+_MANUAIS_NULOS = " AND ".join(
+    f"{coluna} IS NULL"
+    for coluna in (
+        "titulo",
+        "nu_processo",
+        "parte_ativa",
+        "parte_passiva",
+        "classe",
+        "assunto",
+        "foro_vara",
+        "valor_causa",
+        "juiz",
+    )
+)
 
 
 class Elaboracao(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "elaboracoes"
     __table_args__ = (
-        # Uma sessão por peça, por processo, por advogado — reabrir a tela
-        # continua a mesma elaboração em vez de duplicar.
-        UniqueConstraint("user_id", "processo_id", "peca"),
+        CheckConstraint(
+            "processo_id IS NOT NULL OR titulo IS NOT NULL",
+            name="origem",
+        ),
+        CheckConstraint(
+            f"processo_id IS NULL OR ({_MANUAIS_NULOS})",
+            name="manual_so_sem_processo",
+        ),
+        Index(
+            "uq_elaboracoes_user_processo_peca",
+            "user_id",
+            "processo_id",
+            "peca",
+            unique=True,
+            postgresql_where=text("processo_id IS NOT NULL"),
+        ),
+        Index("ix_elaboracoes_user_id_updated_at", "user_id", "updated_at"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
-    processo_id: Mapped[uuid.UUID] = mapped_column(
+    processo_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("processos.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
     )
-    # Id da peça do seletor do frontend (ex.: "contestacao") — ver
-    # `frontend/src/features/elaboracao/elaboracao.mock.ts`.
     peca: Mapped[str] = mapped_column(String(100), nullable=False)
-    # Fatos/tese que o advogado digitou — o e-SAJ não tem isso.
+    titulo: Mapped[str | None] = mapped_column(String(120))
+    nu_processo: Mapped[str | None] = mapped_column(String(50))
+    parte_ativa: Mapped[str | None] = mapped_column(String(255))
+    parte_passiva: Mapped[str | None] = mapped_column(String(255))
+    classe: Mapped[str | None] = mapped_column(String(255))
+    assunto: Mapped[str | None] = mapped_column(String(255))
+    foro_vara: Mapped[str | None] = mapped_column(String(255))
+    valor_causa: Mapped[str | None] = mapped_column(String(100))
+    juiz: Mapped[str | None] = mapped_column(String(255))
     fatos_extras_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
-    # Perfil de estilo (JSON) extraído do último modelo de peça enviado
-    # (ADR-016 Fase 3) — cifrado como todo texto do advogado nesta tabela.
     estilo_perfil_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
 
     user: Mapped["User"] = relationship()
-    processo: Mapped["Processo"] = relationship()
+    processo: Mapped["Processo | None"] = relationship()
     versoes: Mapped[list["ElaboracaoVersao"]] = relationship(
         back_populates="elaboracao",
         cascade="all, delete-orphan",
@@ -73,6 +104,12 @@ class Elaboracao(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Elaboracao {self.peca} processo={self.processo_id}>"
+
+
+ORIGEM_GERACAO = "geracao"
+ORIGEM_CHAT = "chat"
+ORIGEM_GRIFO = "grifo"
+ORIGENS_VERSAO = (ORIGEM_GERACAO, ORIGEM_CHAT, ORIGEM_GRIFO)
 
 
 class ElaboracaoVersao(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
@@ -88,13 +125,9 @@ class ElaboracaoVersao(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         index=True,
     )
     origem: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Instrução do chat/grifo que gerou esta versão — None na primeira geração.
     instrucao_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
-    # Trecho selecionado no grifo — None fora do grifo.
     trecho_alvo_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
     conteudo_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    # Auditoria/debug — não é segredo, ajuda a saber se saiu do stub ou de
-    # um provedor real depois.
     llm_provider: Mapped[str] = mapped_column(String(30), nullable=False)
     llm_model: Mapped[str | None] = mapped_column(Text)
 
@@ -102,13 +135,3 @@ class ElaboracaoVersao(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
 
     def __repr__(self) -> str:
         return f"<ElaboracaoVersao {self.origem} elaboracao={self.elaboracao_id}>"
-
-
-__all__ = [
-    "ORIGEM_CHAT",
-    "ORIGEM_GERACAO",
-    "ORIGEM_GRIFO",
-    "ORIGENS_VERSAO",
-    "Elaboracao",
-    "ElaboracaoVersao",
-]

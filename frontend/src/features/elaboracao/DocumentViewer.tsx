@@ -1,7 +1,7 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { EditorContent, type Editor } from '@tiptap/react'
-import { ScrollArea } from '#/components/ui/scroll-area'
 import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
+import { totalDePaginas } from './paginacao'
 import './minuta-editor.css'
 
 interface DocumentViewerProps {
@@ -21,38 +21,58 @@ export function DocumentViewer({
   tamanho,
   espacamento,
 }: DocumentViewerProps) {
-  return (
-    <ScrollArea className="flex-1 min-h-0">
-      <div
-        className={`minuta-editor mx-auto w-full max-w-[960px] my-6 rounded-sm shadow-sm border transition-all duration-200 bg-white ${
-          editando ? 'is-editing border-[#2563EB] ring-2 ring-[#2563EB]/15' : 'is-readonly border-[#E5E7EB]'
-        }`}
-        style={
-          {
-            '--minuta-font': fonte,
-            '--minuta-size': tamanho,
-            '--minuta-line': espacamento,
-          } as CSSProperties
-        }
-      >
-        <div className="flex items-center justify-between px-10 py-3 border-b border-[#F3F4F6]">
-          <span className="text-[10px] font-semibold text-[#9CA3AF] tracking-widest uppercase">
-            AdvogAtiva — Minuta processual
-          </span>
-          {editando ? (
-            <span className="text-[10px] font-semibold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] rounded-md px-2 py-0.5">
-              Modo edição ativo
-            </span>
-          ) : (
-            <span className="text-[10px] font-semibold text-[#6B7280]">
-              Modo leitura e IA (clique em Editar p/ alterar)
-            </span>
-          )}
-        </div>
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [total, setTotal] = useState(1)
+  const [atual, setAtual] = useState(1)
 
-        <div className="px-12 py-10 min-h-[420px]">
+  useEffect(() => {
+    if (!editor) {
+      return
+    }
+    const ler = () => setTotal(totalDePaginas(editor))
+    ler()
+    editor.on('transaction', ler)
+    return () => {
+      editor.off('transaction', ler)
+    }
+  }, [editor])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) {
+      return
+    }
+    const ler = () => {
+      const limite = viewport.getBoundingClientRect().top + 48
+      let pagina = 1
+      viewport.querySelectorAll<HTMLElement>('[data-folha]').forEach((marca) => {
+        const numero = Number(marca.dataset.folha)
+        if (Number.isFinite(numero) && marca.getBoundingClientRect().top <= limite) {
+          pagina = numero
+        }
+      })
+      setAtual(pagina)
+    }
+    ler()
+    viewport.addEventListener('scroll', ler, { passive: true })
+    return () => viewport.removeEventListener('scroll', ler)
+  }, [total, editor, carregando])
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto bg-[#E5E7EB]">
+        <div
+          className={`minuta-editor py-6 ${editando ? 'is-editing' : 'is-readonly'}`}
+          style={
+            {
+              '--minuta-font': fonte,
+              '--minuta-size': tamanho,
+              '--minuta-line': espacamento,
+            } as CSSProperties
+          }
+        >
           {carregando ? (
-            <div className="min-h-[200px] flex flex-col">
+            <div className="mx-auto flex min-h-[297mm] w-[210mm] items-center bg-white shadow-sm">
               <EstadoCarregando mensagem="Carregando cabeçalho do processo…" />
             </div>
           ) : editor ? (
@@ -60,6 +80,12 @@ export function DocumentViewer({
           ) : null}
         </div>
       </div>
-    </ScrollArea>
+      <div className="flex shrink-0 items-center justify-between border-t border-[#E5E7EB] bg-white px-4 py-1.5">
+        <span className="text-[11px] text-[#6B7280]">{editando ? 'Modo edição' : 'Modo leitura'}</span>
+        <span className="text-[11px] font-medium text-[#374151]">
+          Página {Math.min(atual, Math.max(total, 1))} de {Math.max(total, 1)}
+        </span>
+      </div>
+    </div>
   )
 }

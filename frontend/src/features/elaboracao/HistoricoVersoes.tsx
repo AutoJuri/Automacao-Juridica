@@ -1,24 +1,18 @@
-import { Clock } from 'lucide-react'
+import { Clock, Save } from 'lucide-react'
 import { formatarDataHoraSP } from '#/features/processos/processos.dates'
-import type { VersaoMinutaApi } from './elaboracao.types'
-
-const ROTULO_ORIGEM: Record<VersaoMinutaApi['origem'], string> = {
-  geracao: 'Geração inicial',
-  chat: 'Edição via chat',
-  grifo: 'Edição de trecho (grifo)',
-}
+import type { VersaoMinuta } from './elaboracao.versoes'
 
 interface HistoricoVersoesProps {
-  versoes: VersaoMinutaApi[]
+  versoes: VersaoMinuta[]
   versaoAtivaId: string | null
-  carregando: boolean
+  onSalvar: () => void
   onRestaurar: (id: string) => void
 }
 
 export function HistoricoVersoes({
   versoes,
   versaoAtivaId,
-  carregando,
+  onSalvar,
   onRestaurar,
 }: HistoricoVersoesProps) {
   return (
@@ -27,15 +21,20 @@ export function HistoricoVersoes({
         Histórico de versões
       </p>
       <p className="text-[12px] text-[#6B7280] mb-2">
-        Cada geração, chat ou edição de trecho pela IA salva uma versão no servidor.
+        Salva a minuta neste browser. Não vai ao servidor — se limpar os dados do site, some.
       </p>
 
-      {carregando ? (
-        <p className="text-[12px] text-[#9CA3AF]">Carregando histórico…</p>
-      ) : versoes.length === 0 ? (
-        <p className="text-[12px] text-[#9CA3AF]">
-          Nenhuma versão ainda — clique em Elaborar para gerar o primeiro rascunho.
-        </p>
+      <button
+        type="button"
+        onClick={onSalvar}
+        className="w-full h-9 mb-3 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] text-[12px] font-semibold text-white hover:bg-[#1D4ED8]"
+      >
+        <Save className="w-3.5 h-3.5" aria-hidden />
+        Salvar versão
+      </button>
+
+      {versoes.length === 0 ? (
+        <p className="text-[12px] text-[#9CA3AF]">Nenhuma versão salva ainda.</p>
       ) : (
         <div className="space-y-1">
           {versoes.map((versao) => {
@@ -50,7 +49,7 @@ export function HistoricoVersoes({
                   }
                 }}
                 disabled={ativa}
-                title={ativa ? 'Versão atual' : `Voltar para ${ROTULO_ORIGEM[versao.origem]}`}
+                title={ativa ? 'Versão atual' : `Voltar para ${versao.rotulo}`}
                 className={`w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-lg border transition-colors ${
                   ativa
                     ? 'bg-[#EFF6FF] border-[#2563EB] text-[#1D4ED8] cursor-default'
@@ -62,12 +61,12 @@ export function HistoricoVersoes({
                 />
                 <div className="flex-1 min-w-0">
                   <p className={`text-[13px] font-semibold ${ativa ? 'text-[#1D4ED8]' : 'text-[#374151]'}`}>
-                    {ROTULO_ORIGEM[versao.origem]}
+                    {versao.rotulo}
                     {ativa ? (
                       <span className="ml-1.5 text-[10px] font-medium text-[#2563EB]">Atual</span>
                     ) : null}
                   </p>
-                  <p className="text-[11px] text-[#9CA3AF]">{formatarDataHoraSP(versao.criado_em)}</p>
+                  <p className="text-[11px] text-[#9CA3AF]">{formatarDataHoraSP(versao.criadoEm)}</p>
                 </div>
                 {ativa ? null : (
                   <span className="text-[11px] font-semibold text-[#2563EB] shrink-0">Voltar</span>

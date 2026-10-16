@@ -2,11 +2,15 @@
 `httpx.MockTransport`."""
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 
+from app.schemas.datajud_raw import DatajudProcessoRaw
 from app.services import datajud
+from app.services.consulta_publica import montar_consulta_publica
+from app.services.datajud import ExibicaoDatajud
 
 NUMERO_CNJ_TJSP = "1002345-67.2025.8.26.0100"
 
@@ -145,3 +149,121 @@ class TestConsultarProcesso:
 
         assert resultado is None
         assert chamou is False
+
+
+def _hit_minimo() -> dict:
+    return {
+        "hits": {
+            "hits": [
+                {
+                    "_source": {
+                        "numeroProcesso": "10023456720258260100",
+                        "classe": {"nome": "Procedimento Comum Cível"},
+                        "orgaoJulgador": {"nome": "1ª Vara Cível"},
+                        "grau": "G1",
+                    }
+                }
+            ]
+        }
+    }
+
+
+class TestConsultarExibicao:
+    @pytest.mark.asyncio
+    async def test_encontrado_devolve_a_ficha(self, monkeypatch):
+        _com_chave(monkeypatch)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_hit_minimo())
+
+        async with _client(handler) as client:
+            resultado = await datajud.consultar_exibicao(client, NUMERO_CNJ_TJSP)
+
+        assert resultado.situacao == "encontrado"
+        assert resultado.tribunal == "tjsp"
+        assert resultado.processo is not None
+        assert resultado.processo.classe is not None
+        assert resultado.processo.classe.nome == "Procedimento Comum Cível"
+
+    @pytest.mark.asyncio
+    async def test_sem_hit_e_ausente_e_erro_e_indisponivel(self, monkeypatch):
+        _com_chave(monkeypatch)
+
+        def sem_hit(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"hits": {"hits": []}})
+
+        async with _client(sem_hit) as client:
+            ausente = await datajud.consultar_exibicao(client, NUMERO_CNJ_TJSP)
+        assert ausente.situacao == "ausente"
+        assert ausente.processo is None
+
+        def erro(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, text="fora")
+
+        async with _client(erro) as client:
+            indisponivel = await datajud.consultar_exibicao(client, NUMERO_CNJ_TJSP)
+        assert indisponivel.situacao == "indisponivel"
+
+    @pytest.mark.asyncio
+    async def test_numero_invalido_e_tribunal_fora_do_mapa(self, monkeypatch):
+        _com_chave(monkeypatch)
+
+        async with _client(lambda request: httpx.Response(200, json={})) as client:
+            invalido = await datajud.consultar_exibicao(client, "não é cnj")
+            eleitoral = await datajud.consultar_exibicao(client, "1002345-67.2025.6.26.0100")
+
+        assert invalido.situacao == "numero_invalido"
+        assert eleitoral.situacao == "tribunal_nao_suportado"
+
+
+class TestFichaPublica:
+    def test_ajuizamento_compacto_nao_vira_timestamp(self):
+        processo = DatajudProcessoRaw.model_validate(
+            {
+                "dataAjuizamento": "20250827120723",
+                "dataHoraUltimaAtualizacao": "2026-04-15T09:36:48.609000Z",
+                "nivelSigilo": "0",
+                "formato": {"nome": "Eletrônico"},
+                "sistema": {"nome": "SAJ"},
+                "orgaoJulgador": {"nome": "05 CIVEL DE BAURU"},
+                "movimentos": [
+                    {
+                        "nome": "Distribuição",
+                        "dataHora": "2025-08-27T12:17:56.000Z",
+                        "orgaoJulgador": {"nome": "05 CIVEL DE BAURU"},
+                        "complementosTabelados": [
+                            {"nome": "sorteio", "descricao": "tipo_de_distribuicao_redistribuicao"}
+                        ],
+                    }
+                ],
+            }
+        )
+        assert processo.data_ajuizamento == datetime(2025, 8, 27, 12, 7, 23, tzinfo=UTC)
+        ficha = montar_consulta_publica(
+            "1020590-88.2025.8.26.0071",
+            ExibicaoDatajud("encontrado", "tjsp", processo),
+        )
+        assert ficha.formato == "Eletrônico"
+        assert ficha.sistema == "SAJ"
+        assert ficha.sigilo == "Público"
+        assert ficha.atualizado_em is not None
+        assert len(ficha.movimentos) == 1
+        assert ficha.movimentos[0].complementos == ["sorteio"]
+        assert ficha.movimentos[0].orgao_julgador == "05 CIVEL DE BAURU"
+        assert ficha.movimentos_total == 1
+
+    def test_corta_movimentos_depois_de_cem(self):
+        processo = DatajudProcessoRaw.model_validate(
+            {
+                "movimentos": [
+                    {"nome": f"Andamento {indice}", "dataHora": f"2025-01-{(indice % 28) + 1:02d}T12:00:00.000Z"}
+                    for indice in range(130)
+                ]
+            }
+        )
+        ficha = montar_consulta_publica(
+            "1020590-88.2025.8.26.0071",
+            ExibicaoDatajud("encontrado", "tjsp", processo),
+        )
+        assert ficha.movimentos_total == 130
+        assert len(ficha.movimentos) == 100

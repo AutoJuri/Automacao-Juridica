@@ -83,15 +83,19 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `e3b7a1c9d4f8`):
+Tabelas (head atual: `c7e2a9d4b1f8`):
 
 ```
 users                   (+ cargo do perfil, nulo nas contas anteriores — ADR-020)
+├── drive_pastas            (pastas livres do Drive; processo_id opcional, SET NULL; google_folder_id — ADR-022)
+├── drive_conexoes          (token do Google Drive em BYTEA, AES-256-GCM; um por usuário — ADR-022)
+├── drive_arquivos          (ficha do arquivo no Google; origem upload/drive/elaboracao; sem o conteúdo)
 ├── refresh_tokens          (auth — só hash SHA-256 do token)
 ├── password_reset_tokens   (auth — uso único, expiração curta)
 ├── tribunal_credentials
 ├── tribunal_sessions
 ├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at, fixado)
+│   ├── elaboracoes         (capa da peça; processo_id nulo se os dados foram digitados — ADR-021)
 │   ├── movimentacoes       (+ tem_documento, url_documento)
 │   ├── peticoes_diversas   (HTML CPO — ADR-013)
 │   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
@@ -207,4 +211,7 @@ Módulos futuros que vão depender deste:
 | 2026-10-02 | Organizações, membros e convites — migration `b4e8c1a09f27` (revisa `e5b3f7a2c916`, ADR-017) |
 | 2026-10-03 | Colunas e tarefas do Kanban — migration `c7a1d4e8b2f0` (ADR-018) |
 | 2026-10-06 | Nome e frase do quadro em `kanban_boards` — migration `d1f6a9c3e8b4` |
-| 2026-10-07 | `users.cargo` e CHECK dos papéis da organização — migration `e3b7a1c9d4f8` (head, ADR-020) |
+| 2026-10-07 | `users.cargo` e CHECK dos papéis da organização — migration `e3b7a1c9d4f8` (ADR-020) |
+| 2026-10-08 | Tabela `elaboracoes` — migration `a9c4e2b7d1f6` (ADR-021). Se a tabela já existia no formato da branch de IA, a migration só completa a capa |
+| 2026-10-13 | Tabela `drive_pastas` — migration `b4d8f1a6c3e2` (ADR-022). `user_id` com CASCADE, `processo_id` opcional com SET NULL |
+| 2026-10-13 | Google Drive — migration `c7e2a9d4b1f8` (head, ADR-022). Cria `drive_conexoes` (token em BYTEA, `user_id` único) e `drive_arquivos` (ficha, `origem` com CHECK, único por pasta + id do Google); adiciona `drive_pastas.google_folder_id` |

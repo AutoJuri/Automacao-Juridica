@@ -18,14 +18,15 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntimacoesDiretasRouteImport } from './routes/intimacoes-diretas'
 import { Route as GerenciasRouteImport } from './routes/gerencias'
 import { Route as ElaboracoesRouteImport } from './routes/elaboracoes'
-import { Route as DriveRouteImport } from './routes/drive'
 import { Route as CustasDareRouteImport } from './routes/custas-dare'
 import { Route as ConvitesRouteImport } from './routes/convites'
 import { Route as ConsultaPastaRouteImport } from './routes/consulta-pasta'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DriveIndexRouteImport } from './routes/drive.index'
 import { Route as OrganizacoesOrgIdRouteImport } from './routes/organizacoes.$orgId'
-import { Route as ElaboracaoProcessoIdRouteImport } from './routes/elaboracao.$processoId'
+import { Route as ElaboracaoElaboracaoIdRouteImport } from './routes/elaboracao.$elaboracaoId'
+import { Route as DrivePastaIdRouteImport } from './routes/drive.$pastaId'
 import { Route as ConviteTokenRouteImport } from './routes/convite.$token'
 
 const TarefasRoute = TarefasRouteImport.update({
@@ -72,12 +73,7 @@ const ElaboracoesRoute = ElaboracoesRouteImport.update({
   id: '/elaboracoes',
   path: '/elaboracoes',
   getParentRoute: () => rootRouteImport,
-} as any)
-const DriveRoute = DriveRouteImport.update({
-  id: '/drive',
-  path: '/drive',
-  getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/elaboracoes.lazy').then((d) => d.Route))
 const CustasDareRoute = CustasDareRouteImport.update({
   id: '/custas-dare',
   path: '/custas-dare',
@@ -103,6 +99,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DriveIndexRoute = DriveIndexRouteImport.update({
+  id: '/drive/',
+  path: '/drive/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/drive.index.lazy').then((d) => d.Route))
 const OrganizacoesOrgIdRoute = OrganizacoesOrgIdRouteImport.update({
   id: '/organizacoes/$orgId',
   path: '/organizacoes/$orgId',
@@ -110,11 +111,18 @@ const OrganizacoesOrgIdRoute = OrganizacoesOrgIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/organizacoes.$orgId.lazy').then((d) => d.Route),
 )
-const ElaboracaoProcessoIdRoute = ElaboracaoProcessoIdRouteImport.update({
-  id: '/elaboracao/$processoId',
-  path: '/elaboracao/$processoId',
+const ElaboracaoElaboracaoIdRoute = ElaboracaoElaboracaoIdRouteImport.update({
+  id: '/elaboracao/$elaboracaoId',
+  path: '/elaboracao/$elaboracaoId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DrivePastaIdRoute = DrivePastaIdRouteImport.update({
+  id: '/drive/$pastaId',
+  path: '/drive/$pastaId',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/drive.$pastaId.lazy').then((d) => d.Route),
+)
 const ConviteTokenRoute = ConviteTokenRouteImport.update({
   id: '/convite/$token',
   path: '/convite/$token',
@@ -129,7 +137,6 @@ export interface FileRoutesByFullPath {
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/convites': typeof ConvitesRoute
   '/custas-dare': typeof CustasDareRoute
-  '/drive': typeof DriveRoute
   '/elaboracoes': typeof ElaboracoesRoute
   '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
@@ -140,8 +147,10 @@ export interface FileRoutesByFullPath {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/tarefas': typeof TarefasRoute
   '/convite/$token': typeof ConviteTokenRoute
-  '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
+  '/drive/$pastaId': typeof DrivePastaIdRoute
+  '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/drive/': typeof DriveIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,7 +158,6 @@ export interface FileRoutesByTo {
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/convites': typeof ConvitesRoute
   '/custas-dare': typeof CustasDareRoute
-  '/drive': typeof DriveRoute
   '/elaboracoes': typeof ElaboracoesRoute
   '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
@@ -160,8 +168,10 @@ export interface FileRoutesByTo {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/tarefas': typeof TarefasRoute
   '/convite/$token': typeof ConviteTokenRoute
-  '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
+  '/drive/$pastaId': typeof DrivePastaIdRoute
+  '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/drive': typeof DriveIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -170,7 +180,6 @@ export interface FileRoutesById {
   '/consulta-pasta': typeof ConsultaPastaRoute
   '/convites': typeof ConvitesRoute
   '/custas-dare': typeof CustasDareRoute
-  '/drive': typeof DriveRoute
   '/elaboracoes': typeof ElaboracoesRoute
   '/gerencias': typeof GerenciasRoute
   '/intimacoes-diretas': typeof IntimacoesDiretasRoute
@@ -181,8 +190,10 @@ export interface FileRoutesById {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/tarefas': typeof TarefasRoute
   '/convite/$token': typeof ConviteTokenRoute
-  '/elaboracao/$processoId': typeof ElaboracaoProcessoIdRoute
+  '/drive/$pastaId': typeof DrivePastaIdRoute
+  '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/drive/': typeof DriveIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -192,7 +203,6 @@ export interface FileRouteTypes {
     | '/consulta-pasta'
     | '/convites'
     | '/custas-dare'
-    | '/drive'
     | '/elaboracoes'
     | '/gerencias'
     | '/intimacoes-diretas'
@@ -203,8 +213,10 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/tarefas'
     | '/convite/$token'
-    | '/elaboracao/$processoId'
+    | '/drive/$pastaId'
+    | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/drive/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -212,7 +224,6 @@ export interface FileRouteTypes {
     | '/consulta-pasta'
     | '/convites'
     | '/custas-dare'
-    | '/drive'
     | '/elaboracoes'
     | '/gerencias'
     | '/intimacoes-diretas'
@@ -223,8 +234,10 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/tarefas'
     | '/convite/$token'
-    | '/elaboracao/$processoId'
+    | '/drive/$pastaId'
+    | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/drive'
   id:
     | '__root__'
     | '/'
@@ -232,7 +245,6 @@ export interface FileRouteTypes {
     | '/consulta-pasta'
     | '/convites'
     | '/custas-dare'
-    | '/drive'
     | '/elaboracoes'
     | '/gerencias'
     | '/intimacoes-diretas'
@@ -243,8 +255,10 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/tarefas'
     | '/convite/$token'
-    | '/elaboracao/$processoId'
+    | '/drive/$pastaId'
+    | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/drive/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -253,7 +267,6 @@ export interface RootRouteChildren {
   ConsultaPastaRoute: typeof ConsultaPastaRoute
   ConvitesRoute: typeof ConvitesRoute
   CustasDareRoute: typeof CustasDareRoute
-  DriveRoute: typeof DriveRoute
   ElaboracoesRoute: typeof ElaboracoesRoute
   GerenciasRoute: typeof GerenciasRoute
   IntimacoesDiretasRoute: typeof IntimacoesDiretasRoute
@@ -264,8 +277,10 @@ export interface RootRouteChildren {
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TarefasRoute: typeof TarefasRoute
   ConviteTokenRoute: typeof ConviteTokenRoute
-  ElaboracaoProcessoIdRoute: typeof ElaboracaoProcessoIdRoute
+  DrivePastaIdRoute: typeof DrivePastaIdRoute
+  ElaboracaoElaboracaoIdRoute: typeof ElaboracaoElaboracaoIdRoute
   OrganizacoesOrgIdRoute: typeof OrganizacoesOrgIdRoute
+  DriveIndexRoute: typeof DriveIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -333,13 +348,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ElaboracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/drive': {
-      id: '/drive'
-      path: '/drive'
-      fullPath: '/drive'
-      preLoaderRoute: typeof DriveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/custas-dare': {
       id: '/custas-dare'
       path: '/custas-dare'
@@ -375,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/drive/': {
+      id: '/drive/'
+      path: '/drive'
+      fullPath: '/drive/'
+      preLoaderRoute: typeof DriveIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organizacoes/$orgId': {
       id: '/organizacoes/$orgId'
       path: '/organizacoes/$orgId'
@@ -382,11 +397,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizacoesOrgIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/elaboracao/$processoId': {
-      id: '/elaboracao/$processoId'
-      path: '/elaboracao/$processoId'
-      fullPath: '/elaboracao/$processoId'
-      preLoaderRoute: typeof ElaboracaoProcessoIdRouteImport
+    '/elaboracao/$elaboracaoId': {
+      id: '/elaboracao/$elaboracaoId'
+      path: '/elaboracao/$elaboracaoId'
+      fullPath: '/elaboracao/$elaboracaoId'
+      preLoaderRoute: typeof ElaboracaoElaboracaoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/drive/$pastaId': {
+      id: '/drive/$pastaId'
+      path: '/drive/$pastaId'
+      fullPath: '/drive/$pastaId'
+      preLoaderRoute: typeof DrivePastaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/convite/$token': {
@@ -405,7 +427,6 @@ const rootRouteChildren: RootRouteChildren = {
   ConsultaPastaRoute: ConsultaPastaRoute,
   ConvitesRoute: ConvitesRoute,
   CustasDareRoute: CustasDareRoute,
-  DriveRoute: DriveRoute,
   ElaboracoesRoute: ElaboracoesRoute,
   GerenciasRoute: GerenciasRoute,
   IntimacoesDiretasRoute: IntimacoesDiretasRoute,
@@ -416,8 +437,10 @@ const rootRouteChildren: RootRouteChildren = {
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TarefasRoute: TarefasRoute,
   ConviteTokenRoute: ConviteTokenRoute,
-  ElaboracaoProcessoIdRoute: ElaboracaoProcessoIdRoute,
+  DrivePastaIdRoute: DrivePastaIdRoute,
+  ElaboracaoElaboracaoIdRoute: ElaboracaoElaboracaoIdRoute,
   OrganizacoesOrgIdRoute: OrganizacoesOrgIdRoute,
+  DriveIndexRoute: DriveIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

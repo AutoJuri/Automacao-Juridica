@@ -1,6 +1,6 @@
 """Testes de parsing do número CNJ e resolução do alias DataJud."""
 
-from app.core.cnj import extrair_segmento_tribunal, resolver_alias_datajud
+from app.core.cnj import extrair_segmento_tribunal, resolver_alias_datajud, variantes_numero_cnj
 
 
 class TestExtrairSegmentoTribunal:
@@ -17,6 +17,21 @@ class TestExtrairSegmentoTribunal:
     def test_numero_interno_do_esaj_nao_e_cnj(self):
         # cd_processo do e-SAJ não segue o formato do número CNJ.
         assert extrair_segmento_tribunal("01ABC23") is None
+
+
+class TestVariantesNumeroCnj:
+    def test_mascara_e_digitos_sao_equivalentes(self):
+        assert variantes_numero_cnj("1002345-67.2025.8.26.0100") == [
+            "10023456720258260100",
+            "1002345-67.2025.8.26.0100",
+        ]
+        assert variantes_numero_cnj("10023456720258260100") == [
+            "10023456720258260100",
+            "1002345-67.2025.8.26.0100",
+        ]
+
+    def test_texto_que_nao_e_cnj_nao_gera_variante(self):
+        assert variantes_numero_cnj("Maria Cristina") == []
 
 
 class TestResolverAliasDatajud:

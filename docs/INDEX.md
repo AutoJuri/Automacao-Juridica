@@ -37,7 +37,7 @@
 - Depois de `gerar_notificacoes`, marcar intimação/audiência nova com `is_new=False` — a notificação já foi emitida
 - Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
 - Scheduler **off** em `APP_ENV=development` (override `SCHEDULER_ENABLED=true`); em produção liga sozinho
-- DataJud: complemento somente-leitura em tabela separada (`processos_datajud`), nunca sobrescreve campos do e-SAJ; job diário isolado do ciclo de 10 min; alias de tribunal resolvido genericamente por número CNJ, não hardcode de TJSP (ADR-015)
+- DataJud: complemento somente-leitura em tabela separada (`processos_datajud`), nunca sobrescreve campos do e-SAJ; job diário isolado do ciclo de 10 min; alias de tribunal resolvido genericamente por número CNJ, não hardcode de TJSP (ADR-015). `GET /processos/publico` lê um CNJ fora da carteira e não grava (60/hora, espera de até 30s)
 - IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem treino, fine-tune ou RAG jurídico nacional; cada Elaborar manda instrução + esqueleto do tipo + capa + documento alvo + fatos do advogado + estilo só se houver upload (ADR-016, ADR-019); Gemini free só com texto sintético
 - Rate limit (429) nos pipes vira `bloqueado` com backoff, sem invalidar o cookie — só sessão inválida/erro de login zera o cookie (ADR-011)
 - `reauth_pendente` e cookie `ativo` expirado disparam reauth no próximo tick de 10 min; duplicata de Playwright no mesmo processo é barrada por `_VALIDACOES_EM_ANDAMENTO` (fecha o gap da ADR-008)
@@ -93,8 +93,8 @@ automacao-juridica/
 │       ├── features/
 │       │   ├── auth/
 │       │   ├── processos/
-│       │   ├── elaboracao/    → minuta TipTap (ficha real; IA: ADR-016, ainda não gera)
-│       │   ├── secoes/        → placeholders (Gerências, Drive…)
+│       │   ├── elaboracao/    → hall + minuta TipTap (capa no servidor; texto local; IA: ADR-016)
+│       │   ├── secoes/        → placeholders (Gerências, Tarefas…)
 │       │   ├── organizations/ → escritório, membros e convites (ADR-017)
 │       │   ├── tarefas/       → Kanban pessoal e por organização (ADR-018)
 │       │   ├── notificacoes/
@@ -125,17 +125,19 @@ automacao-juridica/
 
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
-| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `e3b7a1c9d4f8`, cargo do perfil 2026-10-07) |
+| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `c7e2a9d4b1f8`, tabelas do Drive 2026-10-13) |
 | Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo (hardening Etapa 13, 2026-09-09) |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (Chromium Docker 2026-09-15) |
 | Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (pipes + CPO complementar 2026-08-25) |
 | Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (Etapa 8 + hardening 2026-08-21) |
-| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (polling do sino 60s, 2026-09-07) |
-| Integração DataJud (CNJ) | Backend / Frontend | `/docs/modulos/datajud.md` | Completo (Etapa 9, 2026-09-06) |
+| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (consulta pública por CNJ em Consultas, 2026-10-15) |
+| Integração DataJud (CNJ) | Backend / Frontend | `/docs/modulos/datajud.md` | Completo (consulta avulsa sem gravar, 2026-10-15) |
 | Deploy (Railway) | Infra | `/docs/modulos/deploy.md` | Completo (digest UV, `/docs` só em dev, Chromium no container, 2026-09-15) |
 | Organizações e Convites | Backend / Frontend | `/docs/modulos/organizacoes.md` | Completo (2026-10-02) |
 | Tarefas (Kanban) | Backend / Frontend | `/docs/modulos/tarefas.md` | Completo (2026-10-06, ADR-018) |
+| Elaboração | Backend / Frontend | `/docs/modulos/elaboracao.md` | Completo (2026-10-08, ADR-021) |
+| Drive | Backend / Frontend | `/docs/modulos/drive.md` | Pastas livres e Google Drive implementados (2026-10-13). Conexão local feita; em produção, conferir as variáveis do Google no Railway (ADR-022) |
 
 ---
 
@@ -163,6 +165,8 @@ automacao-juridica/
 | ADR-018 | Tarefas com colunas do quadro e prazo vencido calculado na leitura | `/docs/decisions/018-tarefas-colunas-e-overdue.md` |
 | ADR-019 | Pacote da minuta sem treino: esqueleto por tipo de peça, capa, documento alvo e fatos do advogado | `/docs/decisions/019-pacote-da-minuta-sem-treino.md` |
 | ADR-020 | Cargo do perfil separado do papel na organização | `/docs/decisions/020-cargo-do-perfil-separado-do-papel.md` |
+| ADR-021 | Capa da elaboração por peça, com ou sem processo; texto da minuta continua no navegador | `/docs/decisions/021-capa-da-elaboracao-por-peca.md` |
+| ADR-022 | Cofre do Drive no Google Drive do advogado; a plataforma guarda só a ficha | `/docs/decisions/022-drive-google-como-cofre.md` |
 
 ---
 

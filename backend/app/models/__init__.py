@@ -7,6 +7,10 @@ Alembic roda o autogenerate.
 from app.db.base import Base
 from app.models.audiencia import Audiencia
 from app.models.audiencia_cpo import AudienciaCpo
+from app.models.drive_arquivo import DriveArquivo
+from app.models.drive_conexao import DriveConexao
+from app.models.drive_pasta import DrivePasta
+from app.models.elaboracao import Elaboracao
 from app.models.intimacao import Intimacao
 from app.models.job_log import JobLog
 from app.models.movimentacao import Movimentacao
@@ -24,6 +28,10 @@ from app.models.user import User
 __all__ = [
     "Audiencia",
     "AudienciaCpo",
+    "DriveArquivo",
+    "DriveConexao",
+    "DrivePasta",
+    "Elaboracao",
     "Base",
     "Intimacao",
     "JobLog",

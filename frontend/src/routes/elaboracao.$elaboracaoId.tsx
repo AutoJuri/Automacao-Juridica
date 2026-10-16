@@ -1,11 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
+
 import { ElaboracaoPage } from '#/features/elaboracao/ElaboracaoPage'
 import { requireAuth } from '#/lib/route-guards'
 
-export const Route = createFileRoute('/elaboracao/$processoId')({
+export const Route = createFileRoute('/elaboracao/$elaboracaoId')({
   beforeLoad: requireAuth,
   component: function ElaboracaoRoute() {
-    const { processoId } = Route.useParams()
-    return <ElaboracaoPage processoId={processoId} />
+    const { elaboracaoId } = Route.useParams()
+    return <ElaboracaoPage elaboracaoId={elaboracaoId} />
   },
 })

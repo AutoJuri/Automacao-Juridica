@@ -8,6 +8,8 @@ import {
   PROCESSOS_QUERY_KEY,
 } from '#/features/processos/processos.constants'
 import { CREDENTIALS_STATUS_QUERY_KEY } from '#/features/settings/credentials.constants'
+import { DRIVE_QUERY_KEY } from '#/features/drive/drive.constants'
+import { ELABORACOES_QUERY_KEY } from '#/features/elaboracao/elaboracoes.constants'
 import { TAREFAS_QUERY_KEY } from '#/features/tarefas/tarefas.constants'
 import { useOrgStore } from '#/store/org.store'
 
@@ -20,5 +22,7 @@ export function limparQueriesDaSessao(client: QueryClient): void {
   client.removeQueries({ queryKey: NOTIFICATIONS_QUERY_KEY })
   client.removeQueries({ queryKey: ORGANIZATIONS_QUERY_KEY })
   client.removeQueries({ queryKey: TAREFAS_QUERY_KEY })
+  client.removeQueries({ queryKey: ELABORACOES_QUERY_KEY })
+  client.removeQueries({ queryKey: DRIVE_QUERY_KEY })
   useOrgStore.getState().clear()
 }

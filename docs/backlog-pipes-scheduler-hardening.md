@@ -16,7 +16,7 @@ Itens 1–6 do review e as melhorias simples (testes, `is_new=False` após notif
 
 4. **Scripts de smoke (`disparar_coleta.py` e afins) imprimem CNJ/título.** Já documentado; não colar a saída no Git. Nada a mudar no código.
 
-5. **Busca `q` da lista de processos:** escapar `%`/`_` no `ILIKE` e incluir `parte_passiva["nome"]` (hoje só `parte_ativa`).
+5. **Busca `q` da lista de processos:** escapar `%`/`_` no `ILIKE`. O nome da parte passiva já entra na busca, junto com a parte ativa.
 
 6. **Testes de integração de ownership** com Postgres efêmero nas rotas `/processos` e `/notifications` (hoje `test_painel` mocka o service).
 

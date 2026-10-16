@@ -50,4 +50,11 @@ describe('secaoTopoAtiva', () => {
     expect(secaoTopoAtiva('/elaboracoes', '/elaboracao/abc-123')).toBe(true)
     expect(secaoTopoAtiva('/elaboracoes', '/')).toBe(false)
   })
+
+  it('marca Drive na lista e dentro de uma pasta', () => {
+    expect(secaoTopoAtiva('/drive', '/drive')).toBe(true)
+    expect(secaoTopoAtiva('/drive', '/drive/abc-123')).toBe(true)
+    expect(secaoTopoAtiva('/drive', '/driver')).toBe(false)
+    expect(secaoTopoAtiva('/drive', '/tarefas')).toBe(false)
+  })
 })

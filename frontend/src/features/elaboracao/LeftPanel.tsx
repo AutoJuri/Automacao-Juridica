@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { ScrollArea } from '#/components/ui/scroll-area'
@@ -7,6 +8,7 @@ import type { CamposManuais } from './elaboracao.manual'
 import { SeletorPeca } from './SeletorPeca'
 import { InformacoesProcessoPanel } from './InformacoesProcessoPanel'
 import { SeletorPecaEspecifica } from './SeletorPecaEspecifica'
+import { FaixaAutos } from '#/features/processos/FaixaAutos'
 
 interface LeftPanelProps {
   collapsed: boolean
@@ -70,6 +72,21 @@ export function LeftPanel({
               onCampos={onCampos}
               onCamposBlur={onCamposBlur}
             />
+            {processo?.id ? (
+              <>
+                <Separator className="bg-[#E5E7EB]" />
+                <div>
+                  <FaixaAutos processoId={processo.id} />
+                  <Link
+                    to="/preparar/$processoId"
+                    params={{ processoId: processo.id }}
+                    className="mt-2 inline-block text-[12px] font-semibold text-[#2563EB]"
+                  >
+                    Ver preparação
+                  </Link>
+                </div>
+              </>
+            ) : null}
             <Separator className="bg-[#E5E7EB]" />
             <SeletorPecaEspecifica processoId={processo?.id ?? null} />
           </div>

@@ -29,6 +29,7 @@ from app.schemas.elaboracao import (
     SugestaoPecaSchema,
     VersaoMinutaPublicSchema,
 )
+from app.services.dossie import contexto_de_autos
 from app.services.elaboracao_pecas import PECAS_IDS_VALIDOS
 from app.services.elaboracao_prompt import montar_contexto_elaboracao
 from app.services.llm import get_llm_provider
@@ -164,8 +165,14 @@ async def gerar_primeira_versao(
         return None
     fatos_extras = _decrypt_opcional(elaboracao.fatos_extras_encrypted)
     estilo_perfil = _decrypt_opcional(elaboracao.estilo_perfil_encrypted)
+    resumo, linha = await contexto_de_autos(db, user_id, processo.id)
     contexto = montar_contexto_elaboracao(
-        processo, peca=elaboracao.peca, fatos_extras=fatos_extras, estilo_perfil=estilo_perfil
+        processo,
+        peca=elaboracao.peca,
+        fatos_extras=fatos_extras,
+        estilo_perfil=estilo_perfil,
+        dossie=resumo,
+        linha_do_tempo=linha,
     )
 
     provider = get_llm_provider()

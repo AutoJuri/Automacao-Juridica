@@ -40,6 +40,9 @@ class ElaboracaoContexto:
     estilo_perfil: str | None = None
     jurisprudencia_marcada: tuple[str, ...] = field(default_factory=tuple)
     anexos_descricao: tuple[str, ...] = field(default_factory=tuple)
+    # Resumo dos autos (ADR-023). None = a pasta ainda não foi lida.
+    dossie: str | None = None
+    linha_do_tempo: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)

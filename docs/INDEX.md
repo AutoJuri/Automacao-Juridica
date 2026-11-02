@@ -12,7 +12,7 @@
 - **Scraping:** Playwright (login e-SAJ, headless, Etapa 6+) + httpx (APIs internas) + BeautifulSoup4 (HTML)
 - **Banco:** PostgreSQL no Railway
 - **Criptografia:** AES-256-GCM via `cryptography` lib (Etapa 5+)
-- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015), LLM da elaboração só no backend (ADR-016 e ADR-019; `stub` sem rede, `openrouter` e `anthropic` no adapter)
+- **Integrações:** Gmail API (Google) e Microsoft Graph API (Outlook) via OAuth2 (Etapa 5+, httpx puro, com `refresh_access_token` desde a Etapa 6), DataJud CNJ (gratuito, complemento somente-leitura desde a Etapa 9, ADR-015), LLM da elaboração só no backend (ADR-016 e ADR-019; `stub` sem rede, `openrouter` e `anthropic` no adapter), Resend para senha e convite (ADR-026; o OAuth do advogado não envia e-mail da plataforma)
 - **Infra:** Monorepo (frontend/ + backend/), Dockerfile + `railway.toml` da API (ver `/docs/modulos/deploy.md`), Railway
 
 ---
@@ -38,7 +38,7 @@
 - Scheduler: `CronTrigger`/`AsyncIOScheduler` sempre com `timezone=America/Sao_Paulo` explícito — o host roda em UTC (ADR-011)
 - Scheduler **off** em `APP_ENV=development` (override `SCHEDULER_ENABLED=true`); em produção liga sozinho
 - DataJud: complemento somente-leitura em tabela separada (`processos_datajud`), nunca sobrescreve campos do e-SAJ; job diário isolado do ciclo de 10 min; alias de tribunal resolvido genericamente por número CNJ, não hardcode de TJSP (ADR-015). `GET /processos/publico` lê um CNJ fora da carteira e não grava (60/hora, espera de até 30s)
-- IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem treino, fine-tune ou RAG jurídico nacional (ADR-016, ADR-019). O adapter (`stub`, `openrouter`, `anthropic`) gera, edita, sugere peça e extrai estilo; as versões ficam cifradas no servidor. A tela do hall ainda guarda o texto da minuta no navegador até os botões chamarem esses endpoints
+- IA da elaboração: LLM só no FastAPI (chave nunca `VITE_*`); minuta é rascunho; sem treino, fine-tune ou RAG jurídico nacional (ADR-016, ADR-019, ADR-023). Um modelo menor resume os autos; o modelo forte escreve numa chamada. O adapter (`stub`, `openrouter`, `anthropic`) gera, edita, sugere peça e extrai estilo; as versões ficam cifradas no servidor. A tela do hall ainda guarda o texto da minuta no navegador até os botões chamarem esses endpoints
 - Rate limit (429) nos pipes vira `bloqueado` com backoff, sem invalidar o cookie — só sessão inválida/erro de login zera o cookie (ADR-011)
 - `reauth_pendente` e cookie `ativo` expirado disparam reauth no próximo tick de 10 min; duplicata de Playwright no mesmo processo é barrada por `_VALIDACOES_EM_ANDAMENTO` (fecha o gap da ADR-008)
 - Contexto Playwright **isolado por advogado** — nunca compartilhado, sempre headless em produção
@@ -125,18 +125,18 @@ automacao-juridica/
 
 | Módulo | Camada | Arquivo | Status |
 |---|---|---|---|
-| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `f1c8a4e2b7d0`, Drive + versões da IA, 2026-10-15) |
-| Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo (hardening Etapa 13, 2026-09-09) |
+| Migrations e Camada de Dados | Infra / Backend | `/docs/modulos/migrations.md` | Completo (head `b8e2c4a91d07`, roteiro da preparação, 2026-10-28) |
+| Autenticação da Plataforma | Backend / Frontend | `/docs/modulos/auth.md` | Completo (link de senha pelo Resend, ADR-026, 2026-10-29) |
 | Credenciais do e-SAJ e Conexão de E-mail (OAuth2) | Backend / Frontend | `/docs/modulos/credenciais-esaj-email.md` | Completo |
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (Chromium Docker 2026-09-15) |
-| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (CPO com AJAX de movimentações, 2026-10-01) |
+| Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (leitura do PDF sob demanda em memória, 2026-10-21) |
 | Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (teto de 120s por advogado no ciclo de 10 min, 2026-10-01) |
-| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (consulta pública por CNJ em Consultas, 2026-10-15) |
+| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (ficha com barra dos autos e Preparar peça, ADR-025, 2026-10-28) |
 | Integração DataJud (CNJ) | Backend / Frontend | `/docs/modulos/datajud.md` | Completo (consulta avulsa sem gravar, 2026-10-15) |
 | Deploy (Railway) | Infra | `/docs/modulos/deploy.md` | Completo (digest UV, `/docs` só em dev, Chromium no container, 2026-09-15) |
-| Organizações e Convites | Backend / Frontend | `/docs/modulos/organizacoes.md` | Completo (2026-10-02) |
+| Organizações e Convites | Backend / Frontend | `/docs/modulos/organizacoes.md` | Completo (convite por e-mail, ADR-026, 2026-10-29) |
 | Tarefas (Kanban) | Backend / Frontend | `/docs/modulos/tarefas.md` | Completo (2026-10-06, ADR-018) |
-| Elaboração | Backend / Frontend | `/docs/modulos/elaboracao.md` | Completo (hall ADR-021; endpoints da IA ADR-016 no backend, 2026-10-15) |
+| Elaboração | Backend / Frontend | `/docs/modulos/elaboracao.md` | Preparar peça antes do editor (ADR-025, 2026-10-28). A redação inclui o dossiê quando ele existe |
 | Drive | Backend / Frontend | `/docs/modulos/drive.md` | Pastas livres e Google Drive implementados (2026-10-13). Conexão local feita; em produção, conferir as variáveis do Google no Railway (ADR-022) |
 
 ---
@@ -147,7 +147,7 @@ automacao-juridica/
 |---|---|---|
 | ADR-001 | Normalização da DATABASE_URL do Railway para asyncpg | `/docs/decisions/001-normalizacao-database-url-railway.md` |
 | ADR-002 | VARCHAR + constantes Python em vez de ENUM nativo do Postgres | `/docs/decisions/002-varchar-em-vez-de-enum-postgres.md` |
-| ADR-003 | Recuperação de senha via log (sem provedor de e-mail ainda) | `/docs/decisions/003-recuperacao-senha-via-log.md` |
+| ADR-003 | Recuperação de senha: token hasheado. A entrega por log ficou só no fallback sem provedor (ADR-026) | `/docs/decisions/003-recuperacao-senha-via-log.md` |
 | ADR-004 | Restauração silenciosa de sessão no boot da SPA | `/docs/decisions/004-bootstrap-sessao-spa.md` |
 | ADR-005 | Mascaramento de CPF sem decriptação (coluna `cpf_mascarado` em texto puro) | `/docs/decisions/005-mascaramento-cpf-sem-decriptacao.md` |
 | ADR-006 | `state` do OAuth2 como JWT assinado stateless | `/docs/decisions/006-oauth-state-jwt-stateless.md` |
@@ -161,12 +161,16 @@ automacao-juridica/
 | ADR-014 | Chrome em dois eixos: áreas no topo, rail operacional só em Gerências | `/docs/decisions/014-chrome-dois-eixos.md` |
 | ADR-015 | DataJud em tabela separada, job diário isolado, resolução de tribunal genérica por número CNJ | `/docs/decisions/015-datajud-complemento-generico.md` |
 | ADR-016 | IA da elaboração via API (copiloto da minuta; padrão Claude Sonnet 5; sem busca de jurisprudência na web no v1) | `/docs/decisions/016-ia-elaboracao-llm-api.md` |
-| ADR-017 | Convite de organização: token só como hash; link no log apenas em development | `/docs/decisions/017-convite-org-token-hash-e-log.md` |
+| ADR-017 | Convite de organização: token só como hash. O link sai por e-mail (ADR-026) | `/docs/decisions/017-convite-org-token-hash-e-log.md` |
 | ADR-018 | Tarefas com colunas do quadro e prazo vencido calculado na leitura | `/docs/decisions/018-tarefas-colunas-e-overdue.md` |
 | ADR-019 | Pacote da minuta sem treino: esqueleto por tipo de peça, capa, documento alvo e fatos do advogado | `/docs/decisions/019-pacote-da-minuta-sem-treino.md` |
 | ADR-020 | Cargo do perfil separado do papel na organização | `/docs/decisions/020-cargo-do-perfil-separado-do-papel.md` |
 | ADR-021 | Capa da elaboração por peça, com ou sem processo; texto da minuta continua no navegador | `/docs/decisions/021-capa-da-elaboracao-por-peca.md` |
 | ADR-022 | Cofre do Drive no Google Drive do advogado; a plataforma guarda só a ficha | `/docs/decisions/022-drive-google-como-cofre.md` |
+| ADR-023 | Dossiê dos autos por um modelo menor; a minuta sai numa chamada do modelo forte. Jurisprudência automática fica para depois | `/docs/decisions/023-dossie-dos-autos-e-uma-redacao.md` |
+| ADR-024 | Leitura dos autos em memória, sob demanda; ficha e resumo cifrados; o PDF não é persistido nem devolvido ao navegador | `/docs/decisions/024-leitura-dos-autos-em-memoria.md` |
+| ADR-025 | Tela de preparar a peça, com etapas visíveis e roteiro cifrado, antes do editor | `/docs/decisions/025-preparar-peca-antes-do-editor.md` |
+| ADR-026 | E-mail da plataforma via Resend: senha e convite. Andamentos continuam só no sino | `/docs/decisions/026-email-transacional-resend.md` |
 
 ---
 

@@ -21,7 +21,15 @@ import httpx
 
 from app.core.config import get_settings
 from app.services.elaboracao_pecas import PECAS_CATALOGO, PECAS_IDS_VALIDOS
-from app.services.llm.base import LLMLimiteAtingidoError, LLMProvider
+from app.services.dossie_prompt import (
+    MAX_TOKENS_FICHA,
+    SISTEMA_DOSSIE,
+    SISTEMA_FICHA,
+    montar_mensagem_dossie,
+    montar_mensagem_ficha,
+)
+from app.services.elaboracao_prompt import bloco_autos
+from app.services.llm.base import LLMAutenticacaoError, LLMLimiteAtingidoError, LLMProvider
 from app.services.llm.contexto import ElaboracaoContexto, SinaisSugestaoPeca, SugestaoPeca
 
 logger = logging.getLogger(__name__)
@@ -116,10 +124,15 @@ class OpenRouterProvider(LLMProvider):
             "X-OpenRouter-Title": "Automacao Juridica",
         }
 
-    def _garantir_modelo_permitido(self) -> None:
+    def _modelo_dossie(self) -> str:
+        especifico = get_settings().llm_model_dossie.strip()
+        return especifico or self._model
+
+    def _garantir_modelo_permitido(self, modelo: str | None = None) -> None:
         """`:free` só em development. Fora disso, nenhum prompt sai do processo."""
         global _aviso_modelo_free_emitido
-        if not self._model.endswith(":free"):
+        escolhido = modelo or self._model
+        if not escolhido.endswith(":free"):
             return
         if get_settings().is_development:
             if not _aviso_modelo_free_emitido:
@@ -127,18 +140,26 @@ class OpenRouterProvider(LLMProvider):
                 logger.warning(
                     "OpenRouter em development usando modelo gratuito (%s). "
                     "Fora de development essa rota é recusada.",
-                    self._model,
+                    escolhido,
                 )
             return
         raise LLMProviderNaoConfiguradoError(
             "Modelo gratuito do OpenRouter só é permitido em development."
         )
 
-    async def _completar(self, *, sistema: str, mensagem_usuario: str) -> str:
-        self._garantir_modelo_permitido()
+    async def _completar(
+        self,
+        *,
+        sistema: str,
+        mensagem_usuario: str,
+        modelo: str | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        escolhido = modelo or self._model
+        self._garantir_modelo_permitido(escolhido)
         payload = {
-            "model": self._model,
-            "max_tokens": self._max_tokens,
+            "model": escolhido,
+            "max_tokens": self._max_tokens if max_tokens is None else max_tokens,
             # Qwen gasta o teto de saída no raciocínio interno e devolve
             # `content` vazio (HTTP 200). Sem raciocínio, os tokens vão
             # para o texto da peça.
@@ -155,6 +176,8 @@ class OpenRouterProvider(LLMProvider):
         if resposta.status_code == 429:
             # Cota da rota (modelo grátis, em geral). O modelo não devolveu texto.
             raise LLMLimiteAtingidoError("OpenRouter recusou a chamada (429).")
+        if resposta.status_code in (401, 403):
+            raise LLMAutenticacaoError("OpenRouter recusou a chave.")
         resposta.raise_for_status()
         corpo = resposta.json()
         escolhas = corpo.get("choices") or []
@@ -188,6 +211,7 @@ class OpenRouterProvider(LLMProvider):
             f"Endereçamento: {f.enderecamento}\n"
             f"Fatos extras informados pelo advogado: {contexto.fatos_extras or 'nenhum'}\n"
             f"Perfil de estilo (JSON) desta sessão: {contexto.estilo_perfil or 'nenhum'}\n"
+            f"{bloco_autos(contexto)}"
         )
         return await self._completar(sistema=_SISTEMA_GERAR, mensagem_usuario=mensagem)
 
@@ -228,3 +252,25 @@ class OpenRouterProvider(LLMProvider):
     async def extrair_perfil_estilo(self, *, texto_amostra: str) -> str:
         mensagem = f"Texto do modelo de peça:\n{texto_amostra}"
         return await self._completar(sistema=_SISTEMA_ESTILO, mensagem_usuario=mensagem)
+
+    async def resumir_documento(
+        self, *, texto: str, titulo: str | None, data: str | None
+    ) -> str:
+        return await self._completar(
+            sistema=SISTEMA_FICHA,
+            mensagem_usuario=montar_mensagem_ficha(texto=texto, titulo=titulo, data=data),
+            modelo=self._modelo_dossie(),
+            max_tokens=MAX_TOKENS_FICHA,
+        )
+
+    async def consolidar_dossie(
+        self, *, fichas: tuple[str, ...], linha_do_tempo: tuple[str, ...]
+    ) -> str:
+        return await self._completar(
+            sistema=SISTEMA_DOSSIE,
+            mensagem_usuario=montar_mensagem_dossie(
+                fichas=list(fichas), linha_do_tempo=list(linha_do_tempo)
+            ),
+            modelo=self._modelo_dossie(),
+            max_tokens=MAX_TOKENS_FICHA,
+        )

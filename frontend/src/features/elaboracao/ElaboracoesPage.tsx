@@ -7,7 +7,6 @@ import { EstadoCarregando } from '#/features/secoes/EstadoCarregando'
 import { SecaoShell } from '#/features/secoes/SecaoShell'
 
 import { ElaboracaoCard } from './ElaboracaoCard'
-import { IniciarElaboracaoDialog } from './IniciarElaboracaoDialog'
 import { modelosPeca } from './elaboracao.mock'
 import { ProcessoParaIniciarCard } from './ProcessoParaIniciarCard'
 import { juntarPorId } from './elaboracoes.pagina'
@@ -17,7 +16,7 @@ import {
   useExcluirElaboracao,
   useProcessosParaIniciar,
 } from './elaboracoes.queries'
-import type { ProcessoParaIniciar, RascunhoManual } from './elaboracoes.types'
+import type { RascunhoManual } from './elaboracoes.types'
 
 const ERROS = {
   401: 'Sessão expirada. Entre novamente.',
@@ -28,7 +27,6 @@ export function ElaboracoesPage() {
   const navigate = useNavigate()
   const [texto, setTexto] = useState('')
   const [busca, setBusca] = useState('')
-  const [processoAlvo, setProcessoAlvo] = useState<ProcessoParaIniciar | null>(null)
   const [erroNova, setErroNova] = useState<string | null>(null)
   const elaboracoes = useElaboracoes('')
   const paraComecar = useProcessosParaIniciar(busca)
@@ -170,11 +168,7 @@ export function ElaboracoesPage() {
           <>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {processos.map((processo) => (
-                <ProcessoParaIniciarCard
-                  key={processo.id}
-                  processo={processo}
-                  onComecar={setProcessoAlvo}
-                />
+                <ProcessoParaIniciarCard key={processo.id} processo={processo} />
               ))}
             </div>
             {paraComecar.hasNextPage ? (
@@ -193,19 +187,6 @@ export function ElaboracoesPage() {
         )}
       </section>
 
-      <IniciarElaboracaoDialog
-        aberto={processoAlvo !== null}
-        processoId={processoAlvo?.id ?? null}
-        onAberto={(aberto) => {
-          if (!aberto) {
-            setProcessoAlvo(null)
-          }
-        }}
-        onCriada={(id) => {
-          setProcessoAlvo(null)
-          abrir(id)
-        }}
-      />
     </SecaoShell>
   )
 }

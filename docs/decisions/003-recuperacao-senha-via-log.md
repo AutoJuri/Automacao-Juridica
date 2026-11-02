@@ -1,7 +1,7 @@
 # ADR-003: Recuperação de senha via log do servidor (sem provedor de e-mail)
 
 **Data:** 2026-08-09
-**Status:** Aceito (temporário)
+**Status:** Substituído na entrega pelo ADR-026 (2026-10-29). O token continua só como hash. Sem `RESEND_API_KEY`, o link ainda vai ao log apenas em development.
 
 ---
 

@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { FileText, Trash2 } from 'lucide-react'
 
+import { FaixaAutos } from '#/features/processos/FaixaAutos'
 import { formatarNumeroCnj } from '#/features/processos/processos.format'
 
 import { atualizadaHa } from './elaboracao.tempo'
@@ -46,6 +48,18 @@ export function ElaboracaoCard({
         {polos ? <p className="mt-2 truncate text-[13px] text-[#374151]">{polos}</p> : null}
         <p className="mt-3 text-[12px] text-[#9CA3AF]">{atualizadaHa(elaboracao.updated_at)}</p>
       </button>
+      {elaboracao.processo_id ? (
+        <div className="mt-3 space-y-2">
+          <FaixaAutos processoId={elaboracao.processo_id} />
+          <Link
+            to="/preparar/$processoId"
+            params={{ processoId: elaboracao.processo_id }}
+            className="inline-flex text-[12px] font-semibold text-[#2563EB]"
+          >
+            Preparar
+          </Link>
+        </div>
+      ) : null}
       <div className="mt-3 flex justify-end">
         <button
           type="button"

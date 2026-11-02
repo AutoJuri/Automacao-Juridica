@@ -69,6 +69,7 @@ def _card(elaboracao: Elaboracao) -> ElaboracaoCardSchema:
             autor=_nome_parte(processo.parte_ativa),
             reu=_nome_parte(processo.parte_passiva),
             tem_processo=True,
+            processo_id=elaboracao.processo_id,
             updated_at=elaboracao.updated_at,
         )
     return ElaboracaoCardSchema(
@@ -80,6 +81,7 @@ def _card(elaboracao: Elaboracao) -> ElaboracaoCardSchema:
         autor=elaboracao.parte_ativa,
         reu=elaboracao.parte_passiva,
         tem_processo=False,
+        processo_id=None,
         updated_at=elaboracao.updated_at,
     )
 
@@ -103,7 +105,6 @@ def _manual(elaboracao: Elaboracao) -> ElaboracaoManualSchema | None:
 def _detalhe(elaboracao: Elaboracao) -> ElaboracaoDetalheSchema:
     return ElaboracaoDetalheSchema(
         **_card(elaboracao).model_dump(),
-        processo_id=elaboracao.processo_id,
         manual=_manual(elaboracao),
     )
 

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.permissions import ACOES_POR_PAPEL, CurrentOrgMember, require_role
-from app.core.rate_limit import LIMITE_ACEITE_CONVITE, limiter
+from app.core.rate_limit import LIMITE_ACEITE_CONVITE, LIMITE_ENVIO_CONVITE, limiter
 from app.models.organization import Organization, OrganizationMember
 from app.schemas.organization import (
     InviteAcceptedSchema,
@@ -286,7 +286,9 @@ async def listar_convites(
     response_model=InvitePendingSchema,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(LIMITE_ENVIO_CONVITE)
 async def convidar(
+    request: Request,
     org_id: UUID,
     dados: InviteCreateSchema,
     member: MembroGestor,

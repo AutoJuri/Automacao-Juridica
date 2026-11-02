@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # por padrão: não trava o boot, o job diário só loga e não consulta.
     datajud_api_key: str = ""
 
+    # E-mail da plataforma (ADR-026). Vazio = sem envio. Em development o
+    # link segue no log. Fora dele, o token não é logado. Não usa o OAuth
+    # do Gmail/Outlook do advogado.
+    resend_api_key: str = ""
+    email_from: str = ""
+
     # IA da elaboração (ADR-016) — adapter plugável, nunca chamado do
     # frontend. `stub` é o padrão: gera/edita a minuta sem rede, para testar
     # a canaleta completa antes de existir uma chave de provedor real.
@@ -64,6 +70,9 @@ class Settings(BaseSettings):
     # nenhum código de chamada muda.
     llm_provider: str = "stub"
     llm_model: str = ""
+    # Modelo barato da leitura dos autos (ADR-024). Vazio = usa `llm_model`.
+    # Fora de development, um id terminado em `:free` é recusado.
+    llm_model_dossie: str = ""
     anthropic_api_key: str = ""
     # Chave da conta OpenRouter (não é por modelo). Vazia por padrão: o
     # boot não trava; `LLM_PROVIDER=openrouter` falha na primeira chamada.

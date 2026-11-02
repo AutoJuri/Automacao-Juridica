@@ -23,11 +23,17 @@ LIMITE_CREDENCIAL_ESAJ = "5/hour"
 LIMITE_OAUTH_AUTHORIZE = "10/hour"
 LIMITE_OAUTH_CALLBACK = "20/hour"
 LIMITE_ACEITE_CONVITE = "10/hour"
+# Cada convite dispara um e-mail (ADR-026). O teto protege a cota do provedor.
+LIMITE_ENVIO_CONVITE = "10/hour"
 LIMITE_DRIVE_ENVIO = "60/hour"
 LIMITE_DRIVE_PICKER_TOKEN = "30/hour"
 LIMITE_CONSULTA_PUBLICA = "60/hour"
 # IA da elaboração (ADR-016). Compartilhado por gerar, editar, estilo e sugestão.
 LIMITE_ELABORACAO_GERAR = "30/hour"
+# Leitura dos autos (ADR-024). Por IP, no mesmo limiter das outras rotas.
+# A trava de uma leitura por usuário fica no serviço.
+LIMITE_DOSSIE_LER = "10/hour"
+LIMITE_DOSSIE_ROTEIRO = "30/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

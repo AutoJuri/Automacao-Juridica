@@ -1,6 +1,6 @@
 # Módulo: Contrato das APIs internas do e-SAJ (TJSP)
 
-> Última atualização: 2026-10-01
+> Última atualização: 2026-10-21
 > Camada: Backend / Scraping
 
 ---
@@ -260,6 +260,21 @@ Fetch de HTML inteiro é bem mais caro que os GETs JSON dos outros pipes, então
 - Linhas **já persistidas** de movimentação recebem backfill de `tem_documento` / `url_documento` no mesmo ciclo.
 - Notificação só `tipo="movimentacao"` para andamento novo. Petição diversa e audiência CPO **não** geram `Notification` (backfill geraria ruído, ADR-013).
 
+### 5.2 Leitura do PDF sob demanda (ADR-024)
+
+O ciclo de 10 minutos continua só com o HTML/JSON já descritos. O PDF só é pedido quando o advogado clica em "Ler autos".
+
+Contrato usado pelo cliente (`esaj_documentos.baixar_documento`), ainda sem medição autenticada nesta entrega:
+
+- Sem cookie, `abrirDocumentoVinculadoMovimentacao.do` responde HTML de acesso negado. Não é PDF.
+- Com a sessão do advogado, o corpo aceito começa com `%PDF`, ou há um único salto para `/pastadigital/getPDF.do` ou `/pastadigital/abrirDocumentoEdt.do`, sempre em `https://esaj.tjsp.jus.br`.
+- A URL é conferida de novo antes do GET (`url_documento_publica` na origem; o salto só nesses dois paths). Query string não entra em log: carrega `processo.codigo` e `cdDocumento`.
+- O corpo é lido em streaming, com teto de 15 MB. Acima disso, ou sem `%PDF`, o documento fica `ilegivel`. Timeout e portal fora ficam `erro` e podem ser retomados.
+- 429 interrompe o lote, marca a sessão `bloqueado` com o backoff já existente e preserva o cookie. Sessão inválida marca `reauth_pendente` e anula o cookie. A tarefa não chama o Playwright.
+- `#liberarAutoPorSenha` não tem URL. Entra como `sem_acesso`. Senha dos autos não é pedida nem gravada.
+
+Medir de verdade (status, content-type, tamanho, salto, `%PDF`, 429) fica no script `backend/scripts/sondar_documento_esaj.py`. A saída é só o stdout. O corpo não vai para `scripts/esaj/results/`.
+
 ---
 
 ## Validação ao vivo (2026-08-20)
@@ -405,7 +420,7 @@ Módulos que já dependem deste:
 - ❌ Não usar o texto do popup `#popupSenha` para decidir se o processo está bloqueado — ele existe em toda página, inclusive acessível; o sinal é a ausência da tabela de movimentações
 - ❌ Não buscar o HTML do CPO de todos os processos do advogado no mesmo ciclo — respeitar o lote/throttle de `Processo.movimentacoes_synced_at` (ADR-012)
 - ❌ Não transformar `#liberarAutoPorSenha` nem `javascript:` em `url_documento`
-- ❌ Não baixar, guardar ou fazer proxy do PDF vinculado — o advogado abre o e-SAJ no próprio browser
+- ❌ Não guardar nem fazer proxy do PDF vinculado. A leitura sob demanda baixa em memória e descarta o binário (ADR-024). O ícone da movimentação continua abrindo o e-SAJ no browser do advogado
 - ❌ Não varrer o e-SAJ atrás de "todas as APIs" — só XHR das telas que o produto mostra
 
 ---
@@ -454,3 +469,4 @@ O PRD falava "salva nova versão": no schema atual isso **já** é upsert + appe
 | 2026-08-26 | Hardening CPO: `url_cpo_publica` no ETL/pipe; throttle não avança em `IntegrityError`; flags de empty state não apagam `True` |
 | 2026-09-29 | Ficha com `#btnExibirMovimentacoes` busca `carregarMovimentacoesAjax.do` (até 40 páginas). Sem a tabela e sem o botão continua `requer_senha_processo`. Processos já marcados sem nenhuma movimentação voltam para a fila |
 | 2026-10-01 | Ficha `200` com o container principal vazio (sem tabela e sem botão) permanece no ramo de falta de acesso. Não é o popup de senha |
+| 2026-10-21 | Leitura sob demanda do PDF (ADR-024): em memória, um salto só para a pasta digital, sem persistir o binário e sem entrar no ciclo de 10 minutos |

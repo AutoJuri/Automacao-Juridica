@@ -24,6 +24,7 @@ import { Route as ConsultaPastaRouteImport } from './routes/consulta-pasta'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DriveIndexRouteImport } from './routes/drive.index'
+import { Route as PrepararProcessoIdRouteImport } from './routes/preparar.$processoId'
 import { Route as OrganizacoesOrgIdRouteImport } from './routes/organizacoes.$orgId'
 import { Route as ElaboracaoElaboracaoIdRouteImport } from './routes/elaboracao.$elaboracaoId'
 import { Route as DrivePastaIdRouteImport } from './routes/drive.$pastaId'
@@ -104,6 +105,11 @@ const DriveIndexRoute = DriveIndexRouteImport.update({
   path: '/drive/',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/drive.index.lazy').then((d) => d.Route))
+const PrepararProcessoIdRoute = PrepararProcessoIdRouteImport.update({
+  id: '/preparar/$processoId',
+  path: '/preparar/$processoId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganizacoesOrgIdRoute = OrganizacoesOrgIdRouteImport.update({
   id: '/organizacoes/$orgId',
   path: '/organizacoes/$orgId',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/drive/$pastaId': typeof DrivePastaIdRoute
   '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/preparar/$processoId': typeof PrepararProcessoIdRoute
   '/drive/': typeof DriveIndexRoute
 }
 export interface FileRoutesByTo {
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/drive/$pastaId': typeof DrivePastaIdRoute
   '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/preparar/$processoId': typeof PrepararProcessoIdRoute
   '/drive': typeof DriveIndexRoute
 }
 export interface FileRoutesById {
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/drive/$pastaId': typeof DrivePastaIdRoute
   '/elaboracao/$elaboracaoId': typeof ElaboracaoElaboracaoIdRoute
   '/organizacoes/$orgId': typeof OrganizacoesOrgIdRoute
+  '/preparar/$processoId': typeof PrepararProcessoIdRoute
   '/drive/': typeof DriveIndexRoute
 }
 export interface FileRouteTypes {
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/drive/$pastaId'
     | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/preparar/$processoId'
     | '/drive/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/drive/$pastaId'
     | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/preparar/$processoId'
     | '/drive'
   id:
     | '__root__'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/drive/$pastaId'
     | '/elaboracao/$elaboracaoId'
     | '/organizacoes/$orgId'
+    | '/preparar/$processoId'
     | '/drive/'
   fileRoutesById: FileRoutesById
 }
@@ -280,6 +292,7 @@ export interface RootRouteChildren {
   DrivePastaIdRoute: typeof DrivePastaIdRoute
   ElaboracaoElaboracaoIdRoute: typeof ElaboracaoElaboracaoIdRoute
   OrganizacoesOrgIdRoute: typeof OrganizacoesOrgIdRoute
+  PrepararProcessoIdRoute: typeof PrepararProcessoIdRoute
   DriveIndexRoute: typeof DriveIndexRoute
 }
 
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DriveIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preparar/$processoId': {
+      id: '/preparar/$processoId'
+      path: '/preparar/$processoId'
+      fullPath: '/preparar/$processoId'
+      preLoaderRoute: typeof PrepararProcessoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organizacoes/$orgId': {
       id: '/organizacoes/$orgId'
       path: '/organizacoes/$orgId'
@@ -440,6 +460,7 @@ const rootRouteChildren: RootRouteChildren = {
   DrivePastaIdRoute: DrivePastaIdRoute,
   ElaboracaoElaboracaoIdRoute: ElaboracaoElaboracaoIdRoute,
   OrganizacoesOrgIdRoute: OrganizacoesOrgIdRoute,
+  PrepararProcessoIdRoute: PrepararProcessoIdRoute,
   DriveIndexRoute: DriveIndexRoute,
 }
 export const routeTree = rootRouteImport

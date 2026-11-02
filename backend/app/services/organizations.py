@@ -1,10 +1,9 @@
 """Regras de organização: slug, convite com token hasheado e membership.
 
-O token cru só existe na memória até o log de development. A notificação
+O token cru só existe na memória até o envio do e-mail. A notificação
 in-app nunca leva o token.
 """
 
-import logging
 import re
 import unicodedata
 from datetime import UTC, datetime, timedelta
@@ -27,8 +26,7 @@ from app.models.organization import (
     OrganizationMember,
 )
 from app.models.user import User
-
-logger = logging.getLogger(__name__)
+from app.services.email_plataforma import entregar, mensagem_convite
 
 CONVITE_VALIDADE = timedelta(days=7)
 SLUG_MAX = 80
@@ -57,20 +55,6 @@ def novo_token_convite() -> tuple[str, str]:
     """UUID v4 cru (só para o link) e o hash que vai para o banco."""
     token = str(uuid4())
     return token, hash_token(token)
-
-
-def registrar_link_convite(invited_by: UUID, token: str) -> None:
-    """Em development, o link vai para o log. Fora disso, o token não aparece."""
-    settings = get_settings()
-    if settings.is_development:
-        link = f"{settings.frontend_url}/convite/{token}"
-        logger.warning(
-            "Link de convite gerado para user_id=%s: %s",
-            invited_by,
-            link,
-        )
-        return
-    logger.info("Convite de organização gerado para user_id=%s", invited_by)
 
 
 async def gerar_slug_unico(db: AsyncSession, nome: str) -> str:
@@ -264,7 +248,8 @@ async def criar_ou_renovar_convite(
         )
 
     await db.commit()
-    registrar_link_convite(invited_by, token)
+    link = f"{get_settings().frontend_url}/convite/{token}"
+    await entregar(mensagem_convite(email_normalizado, org.name, ROTULO_PAPEL[role], link))
     return convite
 
 

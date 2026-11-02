@@ -12,6 +12,13 @@ class LLMLimiteAtingidoError(Exception):
     """
 
 
+class LLMAutenticacaoError(Exception):
+    """A chave do provedor foi recusada (HTTP 401 ou 403).
+
+    A geração não aconteceu. A mensagem não leva o corpo da resposta.
+    """
+
+
 class LLMProvider(ABC):
     """Nunca chamado do frontend — sempre atrás do FastAPI (ADR-016 §4)."""
 
@@ -43,3 +50,15 @@ class LLMProvider(ABC):
         """Extrai um "perfil de estilo" (JSON serializado como string) a partir
         do texto de um modelo de peça (ADR-016 Fase 3). Alimenta
         `ElaboracaoContexto.estilo_perfil`."""
+
+    @abstractmethod
+    async def resumir_documento(
+        self, *, texto: str, titulo: str | None, data: str | None
+    ) -> str:
+        """Ficha curta de um documento. O texto já vem delimitado como dado."""
+
+    @abstractmethod
+    async def consolidar_dossie(
+        self, *, fichas: tuple[str, ...], linha_do_tempo: tuple[str, ...]
+    ) -> str:
+        """Um resumo só, a partir das fichas. A pasta crua não entra."""

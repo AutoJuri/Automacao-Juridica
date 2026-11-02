@@ -5,7 +5,6 @@ memória pelo cliente) e refresh token opaco em cookie HttpOnly, revogável no
 banco.
 """
 
-import logging
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
@@ -41,8 +40,8 @@ from app.schemas.auth import (
     UserLoginSchema,
     UserPublicSchema,
 )
+from app.services.email_plataforma import entregar, mensagem_redefinicao
 
-logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -257,10 +256,10 @@ async def recuperar_senha(
     dados: ForgotPasswordSchema,
     db: DbSession,
 ) -> MessageSchema:
-    """Gera um token de redefinição.
+    """Gera um token de redefinição e pede o envio do link.
 
-    Ainda não há provedor de e-mail configurado: o link é escrito no log do
-    servidor. Ao integrar o envio real, remover o log do link.
+    A resposta não revela se a conta existe. Sem a chave do Resend, o link
+    só aparece no log em development (ADR-026).
     """
     resposta = MessageSchema(
         message="Se o e-mail estiver cadastrado, enviaremos as instruções de redefinição."
@@ -291,19 +290,14 @@ async def recuperar_senha(
     )
     await db.commit()
 
-    # O link (com o token) só vai para o log em development. Fora disso, um
-    # leitor do log (agregador, suporte, vazamento) teria acesso a um token
-    # de reset válido e poderia sequestrar a conta — sem provedor de e-mail,
-    # não há como entregar o link de outra forma ainda (ADR-003).
-    if settings.is_development:
-        link = f"{settings.frontend_url}{ROTA_REDEFINIR_SENHA}?token={token}"
-        logger.warning(
-            "Link de redefinição de senha gerado para user_id=%s: %s",
-            user.id,
+    link = f"{settings.frontend_url}{ROTA_REDEFINIR_SENHA}?token={token}"
+    await entregar(
+        mensagem_redefinicao(
+            user.email,
             link,
+            settings.password_reset_token_expire_minutes,
         )
-    else:
-        logger.info("Token de redefinição de senha gerado para user_id=%s", user.id)
+    )
     return resposta
 
 

@@ -1,0 +1,68 @@
+name: build-backend
+
+# Build da imagem da API (backend/) e publicacao no GHCR.
+# O Coolify roda a imagem pronta (tipo "Docker Image") — nao builda na VPS.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/build-backend.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/autojuri/automacao-juridica
+
+concurrency:
+  group: build-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Avisar o Coolify (se o webhook estiver configurado)
+        if: ${{ github.ref == 'refs/heads/main' && secrets.COOLIFY_DEPLOY_WEBHOOK != '' }}
+        env:
+          HOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then
+            curl -fsS -X POST "$HOOK" && echo "Coolify notificado." || echo "Aviso ao Coolify falhou (seguindo)."
+          fi

@@ -59,7 +59,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Avisar o Coolify (se o webhook estiver configurado)
-        if: ${{ github.ref == 'refs/heads/main' && secrets.COOLIFY_DEPLOY_WEBHOOK != '' }}
+        if: github.ref == 'refs/heads/main'
         env:
           HOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
         run: |

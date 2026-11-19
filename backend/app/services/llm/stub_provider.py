@@ -78,6 +78,8 @@ class StubLLMProvider(LLMProvider):
             "<p></p>",
             _p("Termos em que, pede deferimento."),
         ]
+        if contexto.dossie and contexto.dossie.strip():
+            partes.append(_p(f"Dossiê dos autos: {e(contexto.dossie.strip())}"))
         return "".join(partes)
 
     async def editar_minuta(
@@ -151,3 +153,18 @@ class StubLLMProvider(LLMProvider):
             "tamanho_medio_frase_em_palavras": tamanho_medio_frase,
         }
         return json.dumps(perfil, ensure_ascii=False)
+
+    async def resumir_documento(
+        self, *, texto: str, titulo: str | None, data: str | None
+    ) -> str:
+        trecho = " ".join(texto.split())[:180]
+        return (
+            f"Ficha de teste. Título: {titulo or 'não consta'}. "
+            f"Data: {data or 'não consta'}. Trecho: {trecho or 'não consta'}."
+        )
+
+    async def consolidar_dossie(
+        self, *, fichas: tuple[str, ...], linha_do_tempo: tuple[str, ...]
+    ) -> str:
+        corpo = " | ".join(fichas)[:1500]
+        return f"Dossiê de teste com {len(fichas)} ficha(s). {corpo}"

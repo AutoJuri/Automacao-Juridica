@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '#/components/ui/button'
 import {
@@ -11,14 +12,17 @@ import {
 } from '#/components/ui/dialog'
 import { mensagemDeErro } from '#/features/auth/auth.errors'
 
+import { obterOuCriarElaboracao } from './elaboracao.api'
+import type { ElaboracaoSessao } from './elaboracao.types'
 import { modelosPeca } from './elaboracao.mock'
 import { SeletorPeca } from './SeletorPeca'
-import { useCriarElaboracao } from './elaboracoes.queries'
+import { ELABORACOES_QUERY_KEY } from './elaboracoes.constants'
 
 interface IniciarElaboracaoDialogProps {
   aberto: boolean
   processoId: string | null
   onAberto: (aberto: boolean) => void
+  aoCriar?: (sessao: ElaboracaoSessao) => Promise<void>
   onCriada: (elaboracaoId: string) => void
 }
 
@@ -26,20 +30,27 @@ export function IniciarElaboracaoDialog({
   aberto,
   processoId,
   onAberto,
+  aoCriar,
   onCriada,
 }: IniciarElaboracaoDialogProps) {
-  const criar = useCriarElaboracao()
+  const queryClient = useQueryClient()
   const [peca, setPeca] = useState(modelosPeca[0].id)
   const [erro, setErro] = useState<string | null>(null)
+  const [pendente, setPendente] = useState(false)
 
   async function confirmar() {
     if (!processoId) {
       return
     }
     setErro(null)
+    setPendente(true)
     try {
-      const detalhe = await criar.mutateAsync({ processoId, peca })
-      onCriada(detalhe.id)
+      const sessao = await obterOuCriarElaboracao(processoId, peca)
+      await queryClient.invalidateQueries({ queryKey: ELABORACOES_QUERY_KEY })
+      if (aoCriar) {
+        await aoCriar(sessao)
+      }
+      onCriada(sessao.id)
     } catch (falha) {
       setErro(
         mensagemDeErro(falha, {
@@ -47,6 +58,8 @@ export function IniciarElaboracaoDialog({
           404: 'Processo não encontrado.',
         }),
       )
+    } finally {
+      setPendente(false)
     }
   }
 
@@ -77,12 +90,12 @@ export function IniciarElaboracaoDialog({
           <Button
             type="button"
             className="bg-[#2563EB] text-white"
-            disabled={criar.isPending || !processoId}
+            disabled={pendente || !processoId}
             onClick={() => {
               void confirmar()
             }}
           >
-            {criar.isPending ? 'Abrindo…' : 'Continuar'}
+            {pendente ? 'Abrindo…' : 'Continuar'}
           </Button>
         </DialogFooter>
       </DialogContent>

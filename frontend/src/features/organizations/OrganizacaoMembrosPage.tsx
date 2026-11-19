@@ -5,7 +5,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { mensagemDeErro } from '#/features/auth/auth.errors'
+import { mensagemDeErro, MUITAS_TENTATIVAS } from '#/features/auth/auth.errors'
 import { SecaoShell } from '#/features/secoes/SecaoShell'
 import { formatarDataHoraSP } from '#/features/processos/processos.dates'
 import { useAuthStore } from '#/store/auth.store'
@@ -239,8 +239,7 @@ export function OrganizacaoMembrosPage({ orgId }: OrganizacaoMembrosPageProps) {
           <section className="rounded-xl border border-[#E5E7EB] bg-white p-4 space-y-3">
             <h2 className="text-sm font-semibold text-[#111827]">Convidar</h2>
             <p className="text-xs text-[#6B7280]">
-              Em development o link do convite aparece no log da API. Se a pessoa já tiver conta, ela
-              também recebe um aviso no sino.
+              O convite chega por e-mail. Se a pessoa já tiver conta, ela também recebe um aviso no sino.
             </p>
             <form
               className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end"
@@ -289,6 +288,7 @@ export function OrganizacaoMembrosPage({ orgId }: OrganizacaoMembrosPageProps) {
                   403: 'Você não pode convidar membros.',
                   409: 'Este e-mail já é membro da organização.',
                   422: 'Confira o e-mail e o papel.',
+                  429: MUITAS_TENTATIVAS,
                 })}
               </p>
             ) : null}

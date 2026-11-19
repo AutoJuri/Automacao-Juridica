@@ -3,7 +3,12 @@ tests/fixtures/ (a captura real é gitignorada, ver ADR-012)."""
 
 from pathlib import Path
 
-from app.services.esaj_cpo_parser import parsear_cpo_html, parsear_fragmento_movimentacoes, url_cpo_publica
+from app.services.esaj_cpo_parser import (
+    cd_documento_da_url,
+    parsear_cpo_html,
+    parsear_fragmento_movimentacoes,
+    url_cpo_publica,
+)
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
@@ -49,6 +54,15 @@ class TestParsearCpoHtml:
             "https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do"
             "?processo.codigo=FAKE0000&cdDocumento=123"
         )
+
+    def test_cd_documento_so_aceita_identificador_simples(self):
+        url = (
+            "https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do"
+            "?processo.codigo=FAKE0000&cdDocumento=123"
+        )
+        assert cd_documento_da_url(url) == "123"
+        assert cd_documento_da_url("https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do") is None
+        assert cd_documento_da_url("https://esaj.tjsp.jus.br/x?cdDocumento=a b") is None
 
     def test_href_javascript_nao_vira_url_documento(self):
         html = """

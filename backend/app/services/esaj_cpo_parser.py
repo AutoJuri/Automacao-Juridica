@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
-from urllib.parse import ParseResult, urlparse
+from urllib.parse import ParseResult, parse_qs, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -71,6 +71,7 @@ TITULO_PETICOES = "peticoes diversas"
 TITULO_AUDIENCIAS = "audiencias"
 
 PROTOCOLO_RE = re.compile(r"(?i)n[ºo°]\s*protocolo:\s*([A-Za-z0-9.\-]+)")
+_CD_DOCUMENTO_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 def _url_https_esaj(url: str | None) -> tuple[str, ParseResult] | None:
@@ -98,6 +99,19 @@ def url_documento_publica(url: str | None) -> str | None:
     if parsed.path != PATH_DOCUMENTO_CPO:
         return None
     return trimmed
+
+
+def cd_documento_da_url(url: str | None) -> str | None:
+    """Identificador do documento na query. Não logar o valor."""
+    if not url:
+        return None
+    valores = parse_qs(urlparse(url).query).get("cdDocumento") or []
+    if len(valores) != 1:
+        return None
+    valor = valores[0].strip()
+    if _CD_DOCUMENTO_RE.fullmatch(valor):
+        return valor
+    return None
 
 
 def url_cpo_publica(url: str | None) -> str | None:

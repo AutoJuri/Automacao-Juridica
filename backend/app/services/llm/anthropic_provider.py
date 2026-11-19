@@ -13,7 +13,9 @@ import httpx
 
 from app.core.config import get_settings
 from app.services.elaboracao_pecas import PECAS_CATALOGO, PECAS_IDS_VALIDOS
-from app.services.llm.base import LLMProvider
+from app.services.dossie_prompt import MAX_TOKENS_FICHA, SISTEMA_DOSSIE, SISTEMA_FICHA, montar_mensagem_dossie, montar_mensagem_ficha
+from app.services.elaboracao_prompt import bloco_autos
+from app.services.llm.base import LLMLimiteAtingidoError, LLMProvider
 from app.services.llm.contexto import ElaboracaoContexto, SinaisSugestaoPeca, SugestaoPeca
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
@@ -93,6 +95,8 @@ class AnthropicProvider(LLMProvider):
             resposta = await client.post(
                 ANTHROPIC_API_URL, headers=self._headers(), json=payload
             )
+        if resposta.status_code == 429:
+            raise LLMLimiteAtingidoError("Anthropic recusou a chamada (429).")
         resposta.raise_for_status()
         corpo = resposta.json()
         blocos = corpo.get("content") or []
@@ -114,6 +118,7 @@ class AnthropicProvider(LLMProvider):
             f"Endereçamento: {f.enderecamento}\n"
             f"Fatos extras informados pelo advogado: {contexto.fatos_extras or 'nenhum'}\n"
             f"Perfil de estilo (JSON) desta sessão: {contexto.estilo_perfil or 'nenhum'}\n"
+            f"{bloco_autos(contexto)}"
         )
         return await self._completar(sistema=_SISTEMA_GERAR, mensagem_usuario=mensagem)
 
@@ -154,3 +159,49 @@ class AnthropicProvider(LLMProvider):
     async def extrair_perfil_estilo(self, *, texto_amostra: str) -> str:
         mensagem = f"Texto do modelo de peça:\n{texto_amostra}"
         return await self._completar(sistema=_SISTEMA_ESTILO, mensagem_usuario=mensagem)
+
+    def _modelo_dossie(self) -> str:
+        especifico = get_settings().llm_model_dossie.strip()
+        modelo = especifico or self._model
+        if modelo.endswith(":free") and not get_settings().is_development:
+            raise LLMProviderNaoConfiguradoError(
+                "Modelo gratuito só é permitido em development."
+            )
+        return modelo
+
+    async def _completar_dossie(self, *, sistema: str, mensagem_usuario: str) -> str:
+        payload = {
+            "model": self._modelo_dossie(),
+            "max_tokens": MAX_TOKENS_FICHA,
+            "system": sistema,
+            "messages": [{"role": "user", "content": mensagem_usuario}],
+        }
+        async with httpx.AsyncClient(timeout=TIMEOUT_SEGUNDOS) as client:
+            resposta = await client.post(
+                ANTHROPIC_API_URL, headers=self._headers(), json=payload
+            )
+        if resposta.status_code == 429:
+            raise LLMLimiteAtingidoError("Anthropic recusou a chamada (429).")
+        resposta.raise_for_status()
+        corpo = resposta.json()
+        blocos = corpo.get("content") or []
+        textos = [bloco.get("text", "") for bloco in blocos if bloco.get("type") == "text"]
+        return "".join(textos).strip()
+
+    async def resumir_documento(
+        self, *, texto: str, titulo: str | None, data: str | None
+    ) -> str:
+        return await self._completar_dossie(
+            sistema=SISTEMA_FICHA,
+            mensagem_usuario=montar_mensagem_ficha(texto=texto, titulo=titulo, data=data),
+        )
+
+    async def consolidar_dossie(
+        self, *, fichas: tuple[str, ...], linha_do_tempo: tuple[str, ...]
+    ) -> str:
+        return await self._completar_dossie(
+            sistema=SISTEMA_DOSSIE,
+            mensagem_usuario=montar_mensagem_dossie(
+                fichas=list(fichas), linha_do_tempo=list(linha_do_tempo)
+            ),
+        )

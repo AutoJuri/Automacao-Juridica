@@ -1,7 +1,7 @@
 # ADR-017: Convite de organização com token hasheado e link só no log
 
 **Data:** 2026-10-02
-**Status:** Aceito
+**Status:** Aceito. A entrega do link passou para o Resend (ADR-026, 2026-10-29). O hash do token e a notificação sem segredo continuam valendo.
 
 ---
 
@@ -26,5 +26,5 @@ O PRD pede convite por e-mail com token UUID e validade de 7 dias. A plataforma 
 ## Consequências
 
 - Quem não tem conta só consegue o link pelo log, em development. Em produção o convite fica sem entrega até haver provedor de e-mail.
-- Trocar o provedor no futuro substitui `registrar_link_convite`, sem mudar a tabela.
+- A entrega do link ficou em `email_plataforma.py` (ADR-026). A tabela não mudou.
 - Reenviar o convite invalida o link anterior porque o hash é substituído.

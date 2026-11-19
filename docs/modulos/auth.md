@@ -1,6 +1,6 @@
 # Módulo: Autenticação da Plataforma
 
-> Última atualização: 2026-10-07
+> Última atualização: 2026-10-29
 > Camada: Backend / Frontend
 
 ---
@@ -27,6 +27,7 @@ Autentica advogados na plataforma AdvogAtiva: cadastro, login, logout, renovaç�
 | `backend/tests/test_auth.py` | Integração dos endpoints `/auth/*` (cadastro, login, refresh, logout, reset) |
 | `backend/tests/test_hardening.py` | Headers HTTP, CORS restrito, rate limit de refresh e redefinir-senha |
 | `backend/app/models/password_reset_token.py` | Tabela `password_reset_tokens` |
+| `backend/app/services/email_plataforma.py` | Envio do link de senha e do convite (ADR-026) |
 | `backend/app/db/migrations/versions/38d4177c211b_*.py` | Migration das tabelas de token |
 | `frontend/src/features/auth/auth.api.ts` | Wrappers tipados dos endpoints |
 | `frontend/src/features/auth/auth.types.ts` | Contratos TS (`TokenResponse`, etc.) |
@@ -122,7 +123,7 @@ Logout
 - **Cargo:** perfil escolhido no cadastro. Não entra no JWT e não substitui o papel em `organization_members` (ADR-020)
 - **Enumeração de e-mails:** login e recuperar-senha devolvem mensagens que não revelam se o e-mail existe; o login também equaliza o **tempo** de resposta com `verify_password_or_dummy` (roda bcrypt mesmo sem usuário) — ver `docs/backlog-auth-hardening.md` para o mesmo ajuste em `recuperar-senha`
 - **Reset de senha:** invalida tokens anteriores do usuário; ao redefinir, revoga **todos** os refresh tokens ativos
-- **Rate limit:** SlowAPI por IP, storage em memória (uma instância). Cadastro 5/h, login 10/h, recuperar-senha 3/h, refresh 20/h, redefinir-senha 10/h. 429 com mensagem genérica (não revela o limite). Ver ADR-003 para o envio do link
+- **Rate limit:** SlowAPI por IP, storage em memória (uma instância). Cadastro 5/h, login 10/h, recuperar-senha 3/h, refresh 20/h, redefinir-senha 10/h. 429 com mensagem genérica (não revela o limite). O link de senha sai pelo Resend (ADR-026)
 - **CORS:** origens só de `CORS_ORIGINS`; métodos `GET, POST, PATCH, DELETE, HEAD`; headers `Authorization, Content-Type, Accept` — nunca `*`
 - **Headers HTTP da API:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, CSP `default-src 'none'; frame-ancestors 'none'`, `Permissions-Policy` sem câmera/mic/geo. HSTS só fora de `development`
 - **Segredos:** fora de `development`, `Settings` rejeita `JWT_SECRET`/`AES_KEY` placeholder e exige `JWT_SECRET` ≥ 32 chars
@@ -188,7 +189,8 @@ Módulos futuros que vão depender deste:
 - ❌ Não confiar só na expiração do JWT no logout — sempre revogar o refresh no banco
 - ❌ Não aceitar `user_id` do cliente — sempre do `sub` do access token
 - ❌ Não colocar `cargo` no JWT nem usá-lo para autorizar rota, processo ou tarefa
-- ❌ Não enviar e-mail real ainda — ver ADR-003 (link no log do servidor)
+- ❌ Não logar o token de redefinição quando `RESEND_API_KEY` está preenchida — o link sai pelo Resend (ADR-026)
+- ❌ Não usar o OAuth do Gmail/Outlook do advogado para enviar e-mail da plataforma
 - ❌ Não voltar `allow_methods`/`allow_headers` do CORS para `*` — só o que a SPA usa
 - ❌ Não deixar `/auth/refresh` ou `/auth/redefinir-senha` sem `@limiter.limit`
 
@@ -204,3 +206,4 @@ Módulos futuros que vão depender deste:
 | 2026-09-08 | Integração `/auth/*` em `tests/test_auth.py` (fixture `cliente_auth`: savepoint + rollback, sem leftover no Postgres). Cobre 201/409/422, login 401 genérico, rotação e reuso do refresh, logout, `/me`, reset sem revelar e-mail e double-spend do token. Saiu do backlog de hardening. |
 | 2026-09-09 | Etapa 13: rate limit em `/auth/refresh` (20/h) e `/auth/redefinir-senha` (10/h); CORS sem `allow_methods`/`allow_headers` `*`; middleware de headers HTTP (`security_headers.py`). Testes em `tests/test_hardening.py`. Saiu do backlog de hardening. |
 | 2026-10-07 | Cadastro exige cargo de perfil (`users.cargo`). Conta antiga fica com `null` |
+| 2026-10-29 | O link de redefinição sai pelo Resend. Sem a chave, o log do link fica só em development (ADR-026) |

@@ -22,6 +22,7 @@ import os
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -84,6 +85,19 @@ COOKIE_CASTGC = "CASTGC"
 COOKIE_PREFIXO_K_JSESSIONID = "K-JSESSIONID-"
 COOKIE_SAJCAS_URL = "sajcasUrl"
 PATH_TAREFAS_ADV = "/tarefas-adv"
+# Cada aplicativo do e-SAJ tem o próprio JSESSIONID. O de /sajcas é só a
+# tela de login e não entra.
+PATHS_COM_SESSAO = ("/tarefas-adv", "/cpopg", "/pastadigital")
+
+# Depois do MFA a sessão nasce no browser. A pasta digital não aceita o
+# cookie da mensagem sozinho: o servlet dela exige uma passagem pelo CAS
+# enquanto o ticket ainda está no browser. Sem processo na URL, essa ida
+# só cria a sessão do aplicativo. A leitura de cada processo usa essa sessão.
+PAGINAS_DEPOIS_DO_LOGIN = (
+    *TAREFAS_ADV_MODULES,
+    "https://esaj.tjsp.jus.br/cpopg/open.do",
+    "https://esaj.tjsp.jus.br/cpopg/abrirPastaDigitalIntegracao.do",
+)
 
 
 class LoginEsajError(Exception):
@@ -100,36 +114,54 @@ class LoginEsajError(Exception):
         self.tipo = tipo
 
 
-def selecionar_cookies_sessao(cookies: list[dict]) -> dict[str, str]:
-    """Escolhe, da lista completa de cookies do contexto, só os que a sessão
-    autenticada do e-SAJ precisa para as próximas chamadas.
+def _path_do_aplicativo(path: str) -> bool:
+    """O cookie da sessão fica na raiz do aplicativo.
 
-    Existe mais de um cookie `JSESSIONID` no contexto (um por path); só o do
-    path `/tarefas-adv` importa — o de `/sajcas` pertence à tela de login e
-    não autentica nada depois dela.
+    Arquivos estáticos (`/cpopg/js/...`) também ganham um `JSESSIONID`.
+    Esse não autentica a pasta e não entra.
     """
-    selecionados: dict[str, str] = {}
+    normal = path.rstrip("/") or "/"
+    return normal in PATHS_COM_SESSAO
+
+
+def selecionar_cookies_sessao(cookies: list[dict]) -> list[dict]:
+    """Escolhe os cookies da sessão, cada um com o path do aplicativo.
+
+    Existe mais de um `JSESSIONID` (um por path). O de `/sajcas` é a tela
+    de login e fica de fora. `/cpopg` e `/pastadigital` entram quando o
+    warmup chegou a abri-los.
+    """
+    escolhidos: list[dict] = []
+    tem_tarefas = False
+    tem_castgc = False
     for cookie in cookies:
         nome = cookie.get("name", "")
         valor = cookie.get("value", "")
-        path = cookie.get("path", "")
-        if nome == COOKIE_JSESSIONID and path.startswith(PATH_TAREFAS_ADV):
-            selecionados[COOKIE_JSESSIONID] = valor
+        path = cookie.get("path") or "/"
+        domain = str(cookie.get("domain") or "esaj.tjsp.jus.br").lstrip(".")
+        if not isinstance(valor, str) or not valor or not isinstance(path, str):
+            continue
+        if not path.startswith("/"):
+            continue
+        guardar = False
+        if nome == COOKIE_JSESSIONID and _path_do_aplicativo(path):
+            guardar = True
+            if path.startswith(PATH_TAREFAS_ADV):
+                tem_tarefas = True
         elif nome == COOKIE_CASTGC:
-            selecionados[COOKIE_CASTGC] = valor
-        elif nome.startswith(COOKIE_PREFIXO_K_JSESSIONID):
-            selecionados[nome] = valor
-        elif nome == COOKIE_SAJCAS_URL:
-            selecionados[COOKIE_SAJCAS_URL] = valor
+            guardar = True
+            tem_castgc = True
+        elif nome.startswith(COOKIE_PREFIXO_K_JSESSIONID) or nome == COOKIE_SAJCAS_URL:
+            guardar = True
+        if guardar:
+            escolhidos.append(
+                {"name": nome, "value": valor, "domain": domain, "path": path}
+            )
 
-    faltantes = [nome for nome in (COOKIE_JSESSIONID, COOKIE_CASTGC) if nome not in selecionados]
-    if faltantes:
-        # Sessão "completou" o fluxo mas sem os cookies essenciais — trata
-        # como instabilidade do portal, não como credencial inválida (o
-        # login em si foi aceito).
+    if not tem_tarefas or not tem_castgc:
         raise LoginEsajError("portal_indisponivel")
 
-    return selecionados
+    return escolhidos
 
 
 def _detectar_resultado_pos_submit(page) -> str:
@@ -228,8 +260,17 @@ def _realizar_login_sync(
             page.click(SELETOR_SUBMIT_MFA)
             page.wait_for_selector(SELETOR_MODAL_MFA, state="hidden", timeout=TIMEOUT_MODAL_MFA_MS)
 
-            for url in TAREFAS_ADV_MODULES:
-                page.goto(url, wait_until="domcontentloaded")
+            for url in PAGINAS_DEPOIS_DO_LOGIN:
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=TIMEOUT_NAVEGACAO_MS)
+                    logger.info(
+                        "Warmup e-SAJ caminho=%s",
+                        urlparse(page.url).path or "-",
+                    )
+                except Exception as exc:
+                    # A pasta pode não abrir neste instante. O login da
+                    # carteira já vale; a leitura tenta de novo depois.
+                    logger.info("Warmup e-SAJ nao abriu (causa=%s)", type(exc).__name__)
 
             cookies = context.cookies()
             return selecionar_cookies_sessao(cookies)

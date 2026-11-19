@@ -1,6 +1,5 @@
-"""Slug, matriz de papéis e log do convite — sem banco."""
+"""Slug e matriz de papéis — sem banco."""
 
-import logging
 from uuid import uuid4
 
 import pytest
@@ -15,7 +14,7 @@ from app.models.organization import (
     ROLE_OWNER,
 )
 from app.schemas.organization import InviteCreateSchema, OrganizationCreateSchema
-from app.services.organizations import registrar_link_convite, slugificar
+from app.services.organizations import slugificar
 
 
 class TestSlug:
@@ -45,34 +44,6 @@ class TestMatrizDePapeis:
     def test_conjuntos_nao_incluem_papel_desconhecido(self):
         for papeis in ACOES_POR_PAPEL.values():
             assert "desconhecido" not in papeis
-
-
-class TestLogDoConvite:
-    def test_development_loga_o_link(self, monkeypatch, caplog):
-        class Ambiente:
-            is_development = True
-            frontend_url = "http://localhost:3000"
-
-        monkeypatch.setattr("app.services.organizations.get_settings", lambda: Ambiente())
-        token = "11111111-1111-4111-8111-111111111111"
-        with caplog.at_level(logging.WARNING):
-            registrar_link_convite(uuid4(), token)
-
-        assert f"http://localhost:3000/convite/{token}" in caplog.text
-
-    def test_fora_de_development_nao_loga_o_token(self, monkeypatch, caplog):
-        class Ambiente:
-            is_development = False
-            frontend_url = "https://app.exemplo.com"
-
-        monkeypatch.setattr("app.services.organizations.get_settings", lambda: Ambiente())
-        token = "22222222-2222-4222-8222-222222222222"
-        with caplog.at_level(logging.INFO):
-            registrar_link_convite(uuid4(), token)
-
-        assert token not in caplog.text
-        assert "convite/" not in caplog.text
-        assert "@" not in caplog.text
 
 
 class TestSchemaRecusaCampoExtra:

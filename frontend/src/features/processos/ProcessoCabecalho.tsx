@@ -1,8 +1,7 @@
-import { useState } from 'react'
 import { Download, Pin, WandSparkles } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { IniciarElaboracaoDialog } from '#/features/elaboracao/IniciarElaboracaoDialog'
+import { FaixaAutos } from './FaixaAutos'
 import { Button } from '#/components/ui/button'
 import { mensagemDeErro } from '#/features/auth/auth.errors'
 import { AudienciaCpoLista } from './AudienciaCpoLista'
@@ -82,7 +81,6 @@ function PartesCpo({ partes, pendente }: { partes: ParteCpoPublica[]; pendente: 
 export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [elaborarAberto, setElaborarAberto] = useState(false)
   const cpoPendente = processo.movimentacoes_status === 'pendente'
   const campoCpo = (valor: string | null | undefined) => textoCampoCpo(valor, cpoPendente)
   const numero = formatarNumeroCnj(processo.nu_processo)
@@ -190,7 +188,7 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
               href={hrefPasta}
               target="_blank"
               rel="noreferrer"
-              title="Abre a pasta digital no e-SAJ. Os PDFs não passam pelo nosso servidor."
+              title="Abre a pasta digital no e-SAJ, no seu navegador. A leitura dos autos não guarda o PDF."
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] font-semibold text-[#111827] hover:bg-[#F8F9FC]"
             >
               <Download className="w-3.5 h-3.5" aria-hidden />
@@ -216,14 +214,17 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
             <p className="text-[13px] text-[#9CA3AF] italic leading-snug">{PLACEHOLDER}</p>
           </div>
 
+          <FaixaAutos processoId={processo.id} />
           <Button
             type="button"
             size="sm"
-            onClick={() => setElaborarAberto(true)}
+            onClick={() => {
+              void navigate({ to: '/preparar/$processoId', params: { processoId: processo.id } })
+            }}
             className="h-9 px-3 bg-[#2563EB] text-white text-[12px] font-semibold rounded-lg"
           >
             <WandSparkles className="w-3.5 h-3.5" aria-hidden />
-            Elaborar
+            Preparar peça
           </Button>
         </div>
       </div>
@@ -275,15 +276,6 @@ export function ProcessoCabecalho({ processo }: ProcessoCabecalhoProps) {
           <ProcessoDatajudSecao datajud={processo.datajud} />
         </div>
       </details>
-      <IniciarElaboracaoDialog
-        aberto={elaborarAberto}
-        processoId={processo.id}
-        onAberto={setElaborarAberto}
-        onCriada={(elaboracaoId) => {
-          setElaborarAberto(false)
-          void navigate({ to: '/elaboracao/$elaboracaoId', params: { elaboracaoId } })
-        }}
-      />
     </section>
   )
 }

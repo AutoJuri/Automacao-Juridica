@@ -42,6 +42,7 @@ export function ProcessoAndamentos({
       </div>
       <div className="min-h-[50vh] lg:min-h-0 lg:h-full">
         <DetalheMovimentacao
+          processoId={processoId}
           movimentacao={selecionada}
           urlCpo={urlCpo}
           numeroProcesso={numeroProcesso}

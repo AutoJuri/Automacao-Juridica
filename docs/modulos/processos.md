@@ -1,6 +1,6 @@
 # Módulo: Painel de Processos e Notificações
 
-> Última atualização: 2026-10-06
+> Última atualização: 2026-11-09
 > Camada: Backend / Frontend
 
 ---
@@ -28,8 +28,10 @@ Expõe ao advogado autenticado os processos, intimações, audiências, moviment
 | `frontend/src/features/processos/ProcessoDetalhe.tsx` | Orquestra cabeçalho + andamentos |
 | `frontend/src/features/processos/ProcessoCabecalho.tsx` | Tags, CNJ, pin, capa e ações (pasta digital / Elaborar) |
 | `frontend/src/features/processos/ProcessoAndamentos.tsx` | Lista de movimentações + detalhe |
-| `frontend/src/features/processos/DetalheMovimentacao.tsx` / `VisualizadorPdfModal.tsx` | Texto da movimentação; modal visual de PDF (abre o e-SAJ) |
-| `frontend/src/features/processos/GabineteDocumentos.tsx` | Links da pasta/CPO no e-SAJ — PDF nunca é baixado |
+| `frontend/src/features/processos/DetalheMovimentacao.tsx` / `VisualizadorPdfModal.tsx` | Texto da movimentação; o modal mostra o PDF real (aba PDF) ou o texto (aba Texto). Só é montado aberto |
+| `frontend/src/features/processos/documento.api.ts` | `buscarPdfDaMovimentacao` e `usePdfDaMovimentacao`: `Blob` em memória, `gcTime: 0`, `blob:` revogado ao fechar (ADR-027) |
+| `backend/app/api/documento_movimentacao.py` / `backend/app/services/documento_movimentacao.py` | `GET /processos/{id}/movimentacoes/{mov_id}/documento`: baixa o PDF em memória com a sessão do dono e devolve os bytes (ADR-027) |
+| `frontend/src/features/processos/GabineteDocumentos.tsx` | Links da pasta/CPO no e-SAJ. O binário não passa por essa tela |
 | `frontend/src/features/processos/processos.format.ts` | CNJ, grau, foro/área/vara, escape para impressão |
 | `frontend/src/features/processos/IntimacaoTimeline.tsx` | Manifestações / ciência |
 | `frontend/src/features/processos/AudienciaLista.tsx` | Audiências da agenda JSON |
@@ -73,6 +75,10 @@ Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: 
 | GET | `/notifications` | Lista (não lidas primeiro). Query `somente_nao_lidas` | Bearer |
 | PATCH | `/notifications/{id}` | `{ "is_read": true }` | Bearer |
 | POST | `/notifications/marcar-lidas` | Marca todas do usuário | Bearer |
+| GET | `/processos/{id}/dossie` | Status da leitura, progresso, documentos (título, data, status) e resumo decifrado. 404 se não for dono. Sem URL e sem ficha individual | Bearer |
+| POST | `/processos/{id}/dossie/ler` | Inicia a leitura em segundo plano. 409 se já está rodando. 10/hora por IP, mais um teto por usuário. 404 se não for dono | Bearer |
+| GET | `/processos/{id}/movimentacoes/{mov_id}/documento` | PDF da movimentação (`application/pdf`, `no-store`). 404 se não for dono ou sem URL pública; 409 sessão do e-SAJ indisponível; 429 só desta abertura (não marca a sessão `bloqueado`); 422 sem PDF ou além de 8 páginas; 502 portal fora. 60/hora por IP. Sem cookie na resposta | Bearer |
+| PUT | `/processos/{id}/dossie/roteiro` | Grava o roteiro cifrado (resumo, tese, pedidos, pontos e jurisprudência colada). 30/hora por IP. 404 se não for dono. A resposta não traz ciphertext | Bearer |
 
 > Rotas protegidas usam `Depends(get_current_user)`.
 > `user_id` nunca é aceito via body ou query — sempre vem do JWT.
@@ -86,6 +92,7 @@ Navegação autenticada em dois eixos (ADR-014). A navbar cobre a largura toda: 
 | Nome | Arquivo | Descrição |
 |---|---|---|
 | `listarProcessos` / `buscarProcesso` / `atualizarFixado` / `listarIntimacoes` / `listarAudiencias` | `features/processos/processos.api.ts` | HTTP tipado |
+| `buscarDossie` / `iniciarLeitura` / `salvarRoteiro` | `features/processos/dossie.api.ts` | Leitura dos autos e roteiro da preparação |
 | `formatarNumeroCnj` / `tagTribunalGrau` / `juntarLocalProcesso` | `features/processos/processos.format.ts` | Exibição do CNJ e das tags da ficha |
 | `listarNotificacoes` / `marcarNotificacaoLida` / `marcarTodasNotificacoesLidas` | `features/notificacoes/notifications.api.ts` | HTTP tipado |
 | `formatarDataSP` / `formatarDataHoraSP` / `textoCampoCpo` | `features/processos/processos.dates.ts` | Exibição em `America/Sao_Paulo`; placeholder CPO pendente vs. após sync |
@@ -119,7 +126,7 @@ TanStack Query: chave `PROCESSOS_QUERY_KEY` (`['processos']` / `['processos', id
 - **Movimentações são só o que já foi buscado:** a lista não é o histórico completo do e-SAJ até o throttle (`Processo.movimentacoes_synced_at`, ADR-012) passar por aquele processo — pode aparecer incompleta num processo com muitos andamentos
 - **Título não se repete na descrição pública:** `movimentacao_para_publico` omite a primeira linha de `descricao` quando ela é igual ao `titulo` (o texto completo permanece no banco para o hash)
 - **CPO sem acesso pleno:** `movimentacoes_status=indisponivel` — a ficha não trouxe a tabela nem o botão "Exibir movimentações"; nunca pedimos senha dos autos. Ficha com esse botão busca as linhas em `carregarMovimentacoesAjax.do`. `pendente` = o lote do ciclo ainda não passou por aquele processo
-- **Documento da movimentação:** ícone na lista + “Visualizar PDF” no detalhe. O modal mostra o **texto coletado**; “Baixar PDF” abre o e-SAJ no browser do advogado. `url_documento` só quando o CPO deu `abrirDocumentoVinculadoMovimentacao.do` em https no host do e-SAJ; se o portal apontou `#liberarAutoPorSenha`, `tem_documento=true` e o link abre a ficha CPO (`url_cpo`). PDF nunca é baixado nem proxied.
+- **Documento da movimentação:** ícone na lista + “Visualizar PDF” no detalhe. Com `url_documento`, o modal busca o **PDF real** pelo nosso servidor (ADR-027): a ficha CPO é reaberta, o link vivo do documento é seguido até `getPDF.do`, e o arquivo aparece num `<iframe>` com `blob:` (nada é gravado); há uma aba “Texto” com o que o CPO coletou, e “Baixar PDF” salva o arquivo no computador do advogado. Sem URL direta, ou sem sessão do e-SAJ, o modal cai no texto e no link “Abrir no e-SAJ”. A consulta pública não passa `processoId` e fica só com o texto. `url_documento` só quando o CPO deu `abrirDocumentoVinculadoMovimentacao.do` em https no host do e-SAJ; se o portal apontou `#liberarAutoPorSenha`, `tem_documento=true` e o link abre a ficha CPO (`url_cpo`). A leitura dos autos sai da ficha: a ficha mostra a barra e o botão Preparar peça. O PDF é baixado em memória quando o advogado pede (ADR-024, ADR-025 e ADR-027): o binário nunca é gravado. Só o PDF de uma movimentação volta ao navegador do dono; a pasta digital e o cookie não.
 - **`url_cpo` no banco e no fetch:** só `https://esaj.tjsp.jus.br/cpopg/...` (`url_cpo_publica`); o pipe não GET em URL de outro host
 - **Throttle CPO:** `movimentacoes_synced_at` só após savepoint ok (ou senha dos autos); `IntegrityError` não marca sincronizado
 - **Incidentes/apensos:** só empty state quando a flag é `true`; `null` + status `pendente` não inventa texto; `True` no banco não volta a `False` só porque o marcador sumiu do HTML
@@ -204,8 +211,10 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 - ❌ Não tratar `localStorage` de versões como backup do servidor
 - ❌ Não usar `dangerouslySetInnerHTML` com texto vindo do e-SAJ
 - ❌ Não tratar a lista do painel como importação da carteira completa
-- ❌ Não baixar, guardar ou fazer proxy de PDF da pasta digital — o advogado abre o e-SAJ no próprio browser
-- ❌ Não fingir visualizador com PDF real, folha, ICP-Brasil ou número de páginas do tribunal — o modal é o texto da movimentação
+- ❌ Não guardar PDF, nem fazer proxy da pasta digital inteira, nem mandar cookie do e-SAJ ao navegador. A leitura sob demanda (ADR-024) e o visualizador da movimentação (ADR-027) baixam em memória e descartam o arquivo
+- ❌ Não servir o PDF da movimentação sem `WHERE user_id` do processo, sem `Cache-Control: no-store` ou logando a URL com `cdDocumento`
+- ❌ Não manter o `blob:` do PDF vivo depois de fechar o modal, nem cachear o arquivo no React Query ou em storage
+- ❌ Não fingir folha, ICP-Brasil ou número de páginas do tribunal no modal. A aba Texto é só o que o CPO coletou
 - ❌ Não colocar `<a>` dentro de `<button>` no card da movimentação
 - ❌ Não transformar `#liberarAutoPorSenha` em `href` da SPA
 - ❌ Não misturar `audiencias_cpo` com a agenda JSON no mesmo bloco
@@ -247,3 +256,8 @@ A lista da home **não** é a carteira completa do e-SAJ — só processos que p
 | 2026-10-08 | Hall `/elaboracoes` e minuta em `/elaboracao/$elaboracaoId` (ADR-021). O texto continua no navegador |
 | 2026-10-15 | Consultas: CNJ fora da carteira consulta `GET /processos/publico` e mostra a ficha pública sem gravar, com no máximo 100 movimentos. A busca local por CNJ acha o número com ou sem máscara |
 | 2026-10-15 | A IA da elaboração entra no backend sem trocar a capa: fatos, estilo e versões cifradas. A tela do hall permanece a da ADR-021 |
+| 2026-10-21 | Bloco Autos na ficha e na elaboração: "Ler autos", progresso e resumo (ADR-024). O PDF não é guardado nem mostrado na plataforma |
+| 2026-10-28 | A ficha deixa a lista dos autos e aponta para Preparar peça (ADR-025) |
+| 2026-11-02 | `PUT /processos/{id}/dossie/roteiro` documentado junto da leitura dos autos |
+| 2026-11-09 | PDF real da movimentação no modal, pelo servidor e em memória (ADR-027): `GET /processos/{id}/movimentacoes/{mov_id}/documento`, abas PDF/Texto, `blob:` revogado ao fechar |
+| 2026-11-19 | Visualizar PDF só segue a peça do mesmo `cdDocumento` (ou a única da árvore). A busca para em 8 páginas. 429 desta rota não bloqueia a coleta |

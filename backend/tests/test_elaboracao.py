@@ -41,7 +41,7 @@ async def _cadastrar(client, email: str | None = None):
     email = email or _email()
     resposta = await client.post(
         "/auth/cadastro",
-        json={"name": "Advogado Teste", "email": email, "password": SENHA},
+        json={"name": "Advogado Teste", "email": email, "password": SENHA, "cargo": "advogado"},
     )
     assert resposta.status_code == 201
     corpo = resposta.json()

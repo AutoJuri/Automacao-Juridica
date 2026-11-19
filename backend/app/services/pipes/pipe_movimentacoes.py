@@ -24,6 +24,7 @@ import httpx
 
 from app.schemas.esaj_cpo_raw import CpoDetalheRaw, MovimentacaoRaw
 from app.services.esaj_cpo_parser import (
+    cd_documento_da_url,
     parsear_cpo_html,
     parsear_fragmento_movimentacoes,
     url_cpo_publica,
@@ -48,6 +49,9 @@ MOVIMENTACOES_LOTE = 5
 # página). 40 páginas cobrem um histórico longo sem estourar o ciclo
 # quando o lote inteiro precisa paginar.
 MAX_PAGINAS_MOVIMENTACOES = 40
+# Uma abertura de PDF não pode varrer o histórico inteiro. Oito páginas
+# do AJAX cobrem o trecho recente. O ciclo de coleta continua nas 40.
+MAX_PAGINAS_VISUALIZAR = 8
 
 _CODIGO_PROCESSO_RE = re.compile(r"^[A-Za-z0-9]{1,40}$")
 _CURSOR_RE = re.compile(r"^[A-Za-z0-9+/=_-]{1,512}$")
@@ -113,6 +117,61 @@ async def _completar_movimentacoes(
     detalhe.movimentacoes_sob_demanda = False
     detalhe.cursor_movimentacoes = None
     return detalhe
+
+
+def _url_com_documento(movimentacoes: list[MovimentacaoRaw], cd_documento: str) -> str | None:
+    for mov in movimentacoes:
+        if cd_documento_da_url(mov.url_documento) == cd_documento:
+            return mov.url_documento
+    return None
+
+
+async def localizar_url_documento(
+    client: httpx.AsyncClient,
+    url_cpo: str,
+    cd_documento: str,
+    *,
+    max_paginas: int = MAX_PAGINAS_VISUALIZAR,
+) -> str | None:
+    """Reabre a ficha e acha o link vivo do documento.
+
+    A URL gravada na coleta perde a validação do portal. O e-SAJ pede a ficha
+    (e, se for o caso, o AJAX das movimentações) na mesma sessão. A query
+    não é logada. Para no teto de páginas: o restante do histórico fica
+    para o ciclo de coleta.
+    """
+    url_segura = url_cpo_publica(url_cpo)
+    if url_segura is None:
+        return None
+    html = await buscar_html(client, url_segura, referer=REFERER)
+    detalhe = parsear_cpo_html(html)
+    if detalhe.requer_senha_processo:
+        return None
+    achada = _url_com_documento(detalhe.movimentacoes, cd_documento)
+    if achada:
+        return achada
+
+    codigo = _codigo_processo(url_segura)
+    if codigo is None:
+        return None
+    cursor = detalhe.cursor_movimentacoes
+    paginas = 0
+    if detalhe.movimentacoes_sob_demanda:
+        linhas, cursor = await _buscar_fragmento(client, url_segura, codigo, None)
+        achada = _url_com_documento(linhas, cd_documento)
+        if achada:
+            return achada
+        paginas = 1
+
+    while cursor and paginas < max_paginas:
+        if _CURSOR_RE.fullmatch(cursor) is None:
+            break
+        linhas, cursor = await _buscar_fragmento(client, url_segura, codigo, cursor)
+        achada = _url_com_documento(linhas, cd_documento)
+        if achada:
+            return achada
+        paginas += 1
+    return None
 
 
 async def coletar(

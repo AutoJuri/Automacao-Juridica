@@ -280,6 +280,34 @@ class TestConvites:
         )
         assert aceite.status_code == 404
 
+    @pytest.mark.asyncio
+    async def test_envio_de_convite_estoura_limite_por_ip(self, cliente_auth, monkeypatch):
+        from app.core.rate_limit import limiter
+
+        monkeypatch.setattr("app.services.email_plataforma._enviar", lambda *_args, **_kwargs: "id-teste")
+        client, _db = cliente_auth
+        dono, _ = await _cadastrar(client)
+        org = await _criar_org(client, dono)
+        limiter.reset()
+        limiter.enabled = True
+        try:
+            respostas = [
+                await client.post(
+                    f"/organizations/{org['id']}/invites",
+                    json={"email": f"convite-{indice}@example.com", "role": "advogado"},
+                    headers=_auth(dono),
+                )
+                for indice in range(11)
+            ]
+        finally:
+            limiter.enabled = False
+            limiter.reset()
+
+        assert [resposta.status_code for resposta in respostas[:10]] == [201] * 10
+        assert respostas[10].status_code == 429
+        assert respostas[10].json()["detail"] == "Muitas tentativas. Tente novamente mais tarde."
+        assert "hour" not in respostas[10].text.lower()
+
 
 class TestPapeis:
     @pytest.mark.asyncio

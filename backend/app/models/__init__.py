@@ -20,6 +20,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.peticao_diversa import PeticaoDiversa
 from app.models.processo import Processo
 from app.models.processo_datajud import ProcessoDatajud
+from app.models.processo_documento import ProcessoDocumento, ProcessoDossie
 from app.models.refresh_token import RefreshToken
 from app.models.task import KanbanBoard, KanbanColumn, Task
 from app.models.tribunal import TribunalCredential, TribunalSession
@@ -47,6 +48,8 @@ __all__ = [
     "PeticaoDiversa",
     "Processo",
     "ProcessoDatajud",
+    "ProcessoDocumento",
+    "ProcessoDossie",
     "RefreshToken",
     "Task",
     "TribunalCredential",

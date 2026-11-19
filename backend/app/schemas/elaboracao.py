@@ -89,6 +89,7 @@ class ElaboracaoCardSchema(BaseModel):
     autor: str | None
     reu: str | None
     tem_processo: bool
+    processo_id: UUID | None = None
     updated_at: datetime
 
 

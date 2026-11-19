@@ -7,6 +7,7 @@ import { hrefDocumentoMovimentacao } from './processos.urls'
 import { VisualizadorPdfModal } from './VisualizadorPdfModal'
 
 interface DetalheMovimentacaoProps {
+  processoId: string
   movimentacao: MovimentacaoPublica | null
   urlCpo: string | null
   numeroProcesso: string | null
@@ -14,6 +15,7 @@ interface DetalheMovimentacaoProps {
 }
 
 export function DetalheMovimentacao({
+  processoId,
   movimentacao,
   urlCpo,
   numeroProcesso,
@@ -101,13 +103,15 @@ export function DetalheMovimentacao({
         )}
       </div>
 
-      {movimentacao ? (
+      {/* Monta só aberto: ao fechar, o PDF sai da memória do navegador. */}
+      {movimentacao && pdfAberto ? (
         <VisualizadorPdfModal
-          aberto={pdfAberto}
+          aberto
           onFechar={() => setPdfAberto(false)}
           movimentacao={movimentacao}
           numeroProcesso={numeroProcesso}
           hrefDocumento={hrefDocumento}
+          processoId={processoId}
         />
       ) : null}
     </div>

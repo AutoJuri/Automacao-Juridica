@@ -52,12 +52,30 @@ def montar_contexto_elaboracao(
     peca: str,
     fatos_extras: str | None,
     estilo_perfil: str | None = None,
+    dossie: str | None = None,
+    linha_do_tempo: tuple[str, ...] = (),
 ) -> ElaboracaoContexto:
-    """Pacote completo passado ao provider — anexos e jurisprudência marcada
-    (Fases 5/6 do ADR-016) ainda chegam vazios, esta etapa cobre Fases 2, 3 e 4."""
+    """Pacote completo passado ao provider. Sem dossiê, o redator é avisado
+    de que a pasta não foi lida — a pasta crua não entra no lugar."""
     return ElaboracaoContexto(
         ficha=montar_ficha_contexto(processo),
         peca=peca,
         fatos_extras=fatos_extras,
         estilo_perfil=estilo_perfil,
+        dossie=dossie,
+        linha_do_tempo=linha_do_tempo,
+    )
+
+
+def bloco_autos(contexto: ElaboracaoContexto) -> str:
+    dossie = (contexto.dossie or "").strip() or "A pasta dos autos ainda não foi lida."
+    if contexto.linha_do_tempo:
+        linha = "\n".join(contexto.linha_do_tempo)
+    else:
+        linha = "nenhuma"
+    return (
+        "Dossiê dos autos (resumo preparado; a pasta crua não está aqui):\n"
+        f"{dossie}\n"
+        "Linha do tempo (data e uma frase):\n"
+        f"{linha}\n"
     )

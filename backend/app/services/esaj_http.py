@@ -7,7 +7,11 @@ validou contra o portal real (ver `docs/modulos/esaj-apis.md`).
 """
 
 import logging
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from http.cookies import SimpleCookie
 from typing import TypeVar
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -109,21 +113,123 @@ def _headers_html(referer: str) -> dict[str, str]:
     }
 
 
-def montar_client(cookies: dict[str, str]) -> httpx.AsyncClient:
+@dataclass(frozen=True, slots=True)
+class CookiePortal:
+    """Cookie já descriptografado. `path` decide em qual aplicativo ele vale."""
+
+    name: str
+    value: str
+    path: str
+
+
+def normalizar_cookies(bruto: Mapping[str, str] | Sequence[Mapping[str, str]]) -> tuple[CookiePortal, ...]:
+    """Aceita o formato antigo (`nome → valor`, path `/`) e a lista com path."""
+    if isinstance(bruto, Mapping):
+        return tuple(
+            CookiePortal(str(nome), str(valor), "/")
+            for nome, valor in bruto.items()
+            if isinstance(nome, str) and isinstance(valor, str) and valor
+        )
+    itens: list[CookiePortal] = []
+    for item in bruto:
+        nome = item.get("name")
+        valor = item.get("value")
+        path = item.get("path") or "/"
+        if not isinstance(nome, str) or not isinstance(valor, str) or not valor:
+            continue
+        if not isinstance(path, str) or not path.startswith("/"):
+            continue
+        itens.append(CookiePortal(nome, valor, path))
+    return tuple(itens)
+
+
+def _caminho_casa(cookie_path: str, pedido: str) -> bool:
+    if cookie_path == "/":
+        return True
+    base = cookie_path if cookie_path.endswith("/") else f"{cookie_path}/"
+    alvo = pedido if pedido.endswith("/") else f"{pedido}/"
+    return alvo.startswith(base)
+
+
+def cookies_para_caminho(cookies: Sequence[CookiePortal], caminho: str) -> dict[str, str]:
+    """Um valor por nome. Se houver dois `JSESSIONID`, fica o path mais específico."""
+    melhor: dict[str, CookiePortal] = {}
+    for cookie in cookies:
+        if not _caminho_casa(cookie.path, caminho or "/"):
+            continue
+        atual = melhor.get(cookie.name)
+        if atual is None or len(cookie.path) > len(atual.path):
+            melhor[cookie.name] = cookie
+    return {cookie.name: cookie.value for cookie in melhor.values()}
+
+
+def _cookie_de_sessao(nome: str) -> bool:
+    return (
+        nome == "JSESSIONID"
+        or nome == "CASTGC"
+        or nome.startswith("K-JSESSIONID-")
+    )
+
+
+def absorver_set_cookie(jar: list[CookiePortal], brutos: Sequence[str]) -> None:
+    """Guarda o cookie que o portal devolve no meio da leitura.
+
+    A pasta digital troca o `JSESSIONID` ao abrir. O PDF só sai com esse
+    valor novo. Ele vive na lista em memória e morre com o client.
+    """
+    for bruto in brutos:
+        if not bruto or any(char in bruto for char in "\r\n"):
+            continue
+        lido = SimpleCookie()
+        try:
+            lido.load(bruto)
+        except Exception:
+            continue
+        for nome, morsel in lido.items():
+            if not _cookie_de_sessao(nome):
+                continue
+            valor = morsel.value
+            path = morsel["path"] or "/"
+            if not valor or not isinstance(path, str) or not path.startswith("/"):
+                continue
+            if any(char in valor for char in "\r\n;"):
+                continue
+            jar[:] = [cookie for cookie in jar if not (cookie.name == nome and cookie.path == path)]
+            jar.append(CookiePortal(nome, valor, path))
+
+
+def montar_client(cookies: Mapping[str, str] | Sequence[Mapping[str, str]]) -> httpx.AsyncClient:
     """Monta um `httpx.AsyncClient` autenticado com os cookies de sessão.
 
-    O chamador é responsável por descartar `cookies` (variável local) e
-    fechar o client (`async with`) logo depois do uso — nunca reaproveitar
-    entre advogados diferentes (ver `security.mdc` §8).
+    Cada pedido leva só o cookie do path daquele aplicativo. O chamador
+    descarta `cookies` e fecha o client em seguida — nunca reaproveitar
+    entre advogados (ver `security.mdc`).
     """
-    jar = httpx.Cookies()
-    for nome, valor in cookies.items():
-        jar.set(nome, valor, domain="esaj.tjsp.jus.br", path="/")
+    jar = list(normalizar_cookies(cookies))
+
+    async def _ajustar(request: httpx.Request) -> None:
+        partes = urlparse(str(request.url))
+        if "cookie" in request.headers:
+            del request.headers["cookie"]
+        if partes.hostname != "esaj.tjsp.jus.br":
+            return
+        escolhidos = cookies_para_caminho(jar, partes.path or "/")
+        if not escolhidos:
+            return
+        request.headers["Cookie"] = "; ".join(
+            f"{nome}={valor}" for nome, valor in escolhidos.items()
+        )
+
+    async def _guardar(response: httpx.Response) -> None:
+        if response.url.host != "esaj.tjsp.jus.br":
+            return
+        absorver_set_cookie(jar, response.headers.get_list("set-cookie"))
+
     return httpx.AsyncClient(
         base_url=ESAJ_BASE_URL,
-        cookies=jar,
         timeout=TIMEOUT_REQUISICAO_SEGUNDOS,
         follow_redirects=True,
+        event_hooks={"request": [_ajustar], "response": [_guardar]},
     )
 
 
@@ -134,6 +240,16 @@ def _e_html_de_login(content_type: str, corpo: str) -> bool:
     if "usernameform" in amostra and "passwordform" in amostra:
         return True
     return "<!doctype html" in amostra and "sajcas" in amostra
+
+
+def resposta_indica_login(content_type: str, corpo: str, final_url: str) -> bool:
+    """Cookie não autentica mais: caiu no CAS ou na tela de login.
+
+    `corpo` é só uma amostra. Quem chama não loga a URL nem o HTML.
+    """
+    if "/sajcas/" in final_url.lower():
+        return True
+    return _e_html_de_login(content_type, corpo)
 
 
 async def buscar_json(
@@ -161,7 +277,7 @@ async def buscar_json(
     content_type = response.headers.get("content-type", "")
     final_url = str(response.url)
 
-    if "/sajcas/" in final_url.lower() or _e_html_de_login(content_type, response.text):
+    if resposta_indica_login(content_type, response.text, final_url):
         raise EsajSessaoInvalidaError("redirecionado_para_login")
 
     if response.status_code == 429:
@@ -204,7 +320,7 @@ async def buscar_html(
     content_type = response.headers.get("content-type", "")
     final_url = str(response.url)
 
-    if "/sajcas/" in final_url.lower() or _e_html_de_login(content_type, response.text):
+    if resposta_indica_login(content_type, response.text, final_url):
         raise EsajSessaoInvalidaError("redirecionado_para_login")
 
     if response.status_code == 429:

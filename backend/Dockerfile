@@ -20,6 +20,12 @@ RUN mkdir -p /ms-playwright \
     && DEBIAN_FRONTEND=noninteractive uv run playwright install --with-deps chromium \
     && chmod -R a+rX /ms-playwright
 
+# OCR local da página escaneada (ADR-024). O pacote `por` é o português.
+# Roda antes do USER: o apt precisa de root. O processo da API continua appuser.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-por \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m appuser && chown -R appuser /app /ms-playwright
 USER appuser
 

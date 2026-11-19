@@ -294,6 +294,80 @@ class TestPipeMovimentacoes:
                 )
 
     @pytest.mark.asyncio
+    async def test_localiza_url_viva_e_para_ao_achar_o_documento(self):
+        html_ficha = """
+        <a id="btnExibirMovimentacoes" href="javascript:">Exibir movimentações</a>
+        """
+        html_pagina_1 = """
+        <input id="cursorMovimentacoesPaginado" type="hidden" value="CURSOR1">
+        <tr class="containerMovimentacao">
+          <td class="dataMovimentacao">01/02/2026</td>
+          <td class="descricaoMovimentacao">
+            <a class="linkMovVincProc" href="/cpopg/abrirDocumentoVinculadoMovimentacao.do?processo.codigo=CD1&amp;cdDocumento=123&amp;nmRecursoAcessado=vivo"></a>
+            Primeira
+          </td>
+        </tr>
+        """
+        chamadas: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            chamadas.append(request.url.path)
+            if request.url.path.endswith("carregarMovimentacoesAjax.do"):
+                return httpx.Response(200, headers={"content-type": "text/html"}, text=html_pagina_1)
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=html_ficha)
+
+        async with _client(handler) as client:
+            viva = await pipe_movimentacoes.localizar_url_documento(
+                client,
+                "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1",
+                "123",
+            )
+
+        assert viva == (
+            "https://esaj.tjsp.jus.br/cpopg/abrirDocumentoVinculadoMovimentacao.do"
+            "?processo.codigo=CD1&cdDocumento=123&nmRecursoAcessado=vivo"
+        )
+        assert chamadas == ["/cpopg/show.do", "/cpopg/carregarMovimentacoesAjax.do"]
+
+    @pytest.mark.asyncio
+    async def test_localizar_para_no_teto_de_paginas(self):
+        html_ficha = """
+        <a id="btnExibirMovimentacoes" href="javascript:">Exibir movimentações</a>
+        """
+        html_pagina = """
+        <input id="cursorMovimentacoesPaginado" type="hidden" value="CURSOR1">
+        <tr class="containerMovimentacao">
+          <td class="dataMovimentacao">01/02/2026</td>
+          <td class="descricaoMovimentacao">
+            <a class="linkMovVincProc" href="/cpopg/abrirDocumentoVinculadoMovimentacao.do?processo.codigo=CD1&amp;cdDocumento=999"></a>
+            Outra
+          </td>
+        </tr>
+        """
+        chamadas: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            chamadas.append(request.url.path)
+            if request.url.path.endswith("carregarMovimentacoesAjax.do"):
+                return httpx.Response(200, headers={"content-type": "text/html"}, text=html_pagina)
+            return httpx.Response(200, headers={"content-type": "text/html"}, text=html_ficha)
+
+        async with _client(handler) as client:
+            viva = await pipe_movimentacoes.localizar_url_documento(
+                client,
+                "https://esaj.tjsp.jus.br/cpopg/show.do?processo.codigo=CD1",
+                "123",
+                max_paginas=2,
+            )
+
+        assert viva is None
+        assert chamadas == [
+            "/cpopg/show.do",
+            "/cpopg/carregarMovimentacoesAjax.do",
+            "/cpopg/carregarMovimentacoesAjax.do",
+        ]
+
+    @pytest.mark.asyncio
     async def test_url_cpo_invalida_nao_faz_requisicao(self, caplog):
         chamadas = []
 

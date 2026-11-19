@@ -47,7 +47,7 @@ Guarda, de forma criptografada, o CPF e a senha que o advogado usa para logar no
 | POST | `/credentials/esaj/revalidar` | Revalida login no e-SAJ sem reenviar CPF/senha | Bearer | 5/hora por IP |
 | DELETE | `/credentials/esaj` | Remove a credencial **e** a `TribunalSession` (cookies) do mesmo tribunal | Bearer | — |
 | DELETE | `/credentials/email` | Desconecta o e-mail, anula o cookie e marca `session_status=email_desconectado` | Bearer | — |
-| GET | `/credentials/email/provider-sugerido` | Sugere `gmail`/`outlook` a partir do domínio de `current_user.email` (MX record, Etapa 9) — nunca decide, só simplifica o card | Bearer | — |
+| GET | `/credentials/email/provider-sugerido` | Sugere `gmail`/`outlook` a partir do domínio de `current_user.email` (MX record, Etapa 9). A tela de configurações não usa essa sugestão | Bearer | — |
 | GET | `/credentials/email/{provider}/authorize` | Gera `state` assinado e devolve a URL de consentimento | Bearer | 10/hora por IP |
 | GET | `/credentials/email/{provider}/callback` | Recebe o redirect do provedor, troca `code` por token, salva criptografado e dispara validação e-SAJ | **Pública** (chamada pelo browser, sem Bearer) | — |
 
@@ -112,7 +112,7 @@ O `/callback` é navegação pura do browser — nunca chega com header `Authori
 
 ## Sugestão de provedor por MX (Etapa 9)
 
-`EmailConnectionCard` só busca `/credentials/email/provider-sugerido` quando faz sentido (advogado já cadastrado no e-SAJ, e-mail ainda não conectado). Com sugestão, mostra um botão primário "Conectar {Gmail|Outlook}" (o detectado) + um link discreto "usar outro provedor" que revela os dois botões manuais; sem sugestão, mantém o comportamento original (os dois botões direto).
+`EmailConnectionCard` mostra os dois botões, Outlook e Gmail, assim que a credencial do e-SAJ existe e o e-mail ainda não está conectado. O endpoint `/credentials/email/provider-sugerido` continua no backend e não decide o que a tela exibe.
 
 `detectar_provedor_por_dominio` (`app/core/email_provider.py`):
 1. Atalho para domínios gratuitos conhecidos (`gmail.com`/`googlemail.com` → Gmail; `outlook.com`/`hotmail.com`/`live.com`/`msn.com` → Outlook) — sem consultar DNS.
@@ -135,7 +135,7 @@ A resolução de MX é bloqueante (`dnspython` é síncrono); o endpoint roda em
 - **Resposta:** `CredentialStatusSchema` / `AuthorizeUrlSchema` — nunca ORM, nunca CPF/senha/token reais
 - **Ownership:** toda query filtra por `user_id = current_user.id` (ou pelo `user_id` decodificado do `state`, no callback) — nunca aceita `user_id` do cliente
 - **Config sem segredo:** `google_client_id`/`secret`, `microsoft_client_id`/`secret` são `str = ""` por padrão; endpoints de `/authorize` respondem 503 com mensagem clara enquanto não configurados, em vez de travar o boot da aplicação
-- **Sugestão nunca decide:** `provider-sugerido` é só leitura e sem segredo (sem rate limit especial, mesmo padrão de `/status`); qualquer erro de DNS devolve `None`, nunca bloqueia a conexão manual
+- **Sugestão não escolhe o botão:** `provider-sugerido` é só leitura e sem segredo (sem rate limit especial, mesmo padrão de `/status`); a tela mostra Outlook e Gmail juntos. Qualquer erro de DNS devolve `None`
 
 ---
 
@@ -203,3 +203,4 @@ Módulos que já dependem deste (Etapa 6 — ver `/docs/modulos/login-esaj.md`):
 | 2026-08-17 | Callback OAuth passa a disparar validação; `POST /esaj` só valida se e-mail já conectado; endpoints de revalidar documentados na tabela |
 | 2026-08-17 | Hardening: DELETE `/esaj` apaga a sessão; DELETE `/email` devolve `email_desconectado`; rate limit no `/authorize`; `POST /esaj` invalida sessão antiga |
 | 2026-09-06 | Etapa 9: `GET /credentials/email/provider-sugerido` (detecção por MX/domínio conhecido) + botão sugerido no `EmailConnectionCard` com fallback manual |
+| 2026-10-22 | `EmailConnectionCard` passa a mostrar Outlook e Gmail juntos. O endpoint de sugestão permanece, sem decidir o botão |

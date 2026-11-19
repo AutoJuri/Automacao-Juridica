@@ -7,6 +7,7 @@ export interface ElaboracaoCard {
   autor: string | null
   reu: string | null
   tem_processo: boolean
+  processo_id: string | null
   updated_at: string
 }
 

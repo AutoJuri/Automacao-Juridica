@@ -56,15 +56,16 @@ O `railway.toml` é referência. **Preencha sempre no painel** (serviço novo po
 4. Generate domain no serviço da API.
 5. Depois do primeiro deploy: conferir no **log do pre-deploy** que o Alembic rodou; `https://<api>/health` e `https://<api>/health/db` devem responder `ok`.
 6. OAuth (Gmail/Outlook) e `DATAJUD_API_KEY` podem ficar vazios no primeiro ar. Sem OAuth, o advogado **não** conecta o e-mail do e-SAJ. Sem a chave, o job DataJud não consulta (só loga e sai).
-7. Memória: reserve folga (~1 GB) por causa do Chromium.
-8. **Google Drive (opcional no primeiro ar):** sem as variáveis abaixo, `/drive` funciona só com pastas e o cartão avisa que a conexão não foi configurada. Para ligar:
+7. E-mail da plataforma (ADR-026): `RESEND_API_KEY` e `EMAIL_FROM` ficam vazios até o domínio estar verificado no Resend. Sem eles, recuperação de senha e convite não são entregues, e o token não vai para o log porque `APP_ENV=production`. O endereço `vercel.app` não serve de remetente.
+8. Memória: reserve folga (~1 GB) por causa do Chromium.
+9. **Google Drive (opcional no primeiro ar):** sem as variáveis abaixo, `/drive` funciona só com pastas e o cartão avisa que a conexão não foi configurada. Para ligar:
    - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` — os mesmos do Gmail (cliente OAuth Web).
    - `GOOGLE_DRIVE_OAUTH_REDIRECT_URI` — `https://<api>/drive/google/callback`, **idêntica** à cadastrada no cliente OAuth do Google Cloud.
    - `GOOGLE_PICKER_API_KEY` — chave de API restrita por referrer ao domínio do frontend e à Picker API. É pública por natureza (vai ao navegador junto com o token curto).
    - `GOOGLE_PROJECT_NUMBER` — número do projeto no Google Cloud (não é o ID).
    - Escopo `drive.file` na tela de consentimento, Drive API e Picker API ativadas no projeto.
 
-Não cole `backend/.env` (development) no painel. Não commite `JWT_SECRET` / `AES_KEY`.
+Não cole `backend/.env` (development) no painel. Não commite `JWT_SECRET`, `AES_KEY` nem `RESEND_API_KEY`.
 
 ---
 
@@ -136,3 +137,4 @@ Chromium no container: `playwright.chromium.launch` usa `--no-sandbox` e `--disa
 |---|---|
 | 2026-09-15 | Dockerfile com Playwright Chromium + `$PORT`; `railway.toml` (healthcheck, 1 réplica, Alembic no pre-deploy); `.env.production.example` só com nomes |
 | 2026-09-15 | Review: UV por digest; `/docs` só em development; checklist da UI obrigatório; Chromium com flags de container; seções Endpoints/Dependências |
+| 2026-11-02 | Checklist: `RESEND_API_KEY` e `EMAIL_FROM` só depois do domínio verificado (ADR-026) |

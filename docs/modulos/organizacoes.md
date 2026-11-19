@@ -1,6 +1,6 @@
 # Módulo: Organizações e Convites
 
-> Última atualização: 2026-10-07
+> Última atualização: 2026-11-02
 > Camada: Backend / Frontend
 
 ---
@@ -43,7 +43,7 @@ Permite que um usuário autenticado crie um escritório, vire Owner e convide ou
 | DELETE | `/organizations/{org_id}/members/{member_id}` | Remove outro membro ou sai (não-Owner) | Bearer, membro | — |
 | POST | `/organizations/{org_id}/members/{member_id}/transfer-ownership` | Alvo vira Owner, Owner atual vira Admin | Bearer, Owner | — |
 | GET | `/organizations/{org_id}/invites` | Pendentes, sem token | Bearer, Owner/Admin | — |
-| POST | `/organizations/{org_id}/invites` | Convida ou renova (token antigo morre) | Bearer, Owner/Admin | — |
+| POST | `/organizations/{org_id}/invites` | Convida ou renova (token antigo morre) e envia o e-mail | Bearer, Owner/Admin | 10/hora por IP |
 | DELETE | `/organizations/{org_id}/invites/{invite_id}` | Cancela | Bearer, Owner/Admin | — |
 | GET | `/organizations/invites/received` | Pendentes do e-mail da conta, sem token | Bearer | — |
 | POST | `/organizations/invites/received/{invite_id}/accept` | Aceita | Bearer | 10/hora por IP |
@@ -74,7 +74,7 @@ Permite que um usuário autenticado crie um escritório, vire Owner e convide ou
 - **Resposta:** schemas Pydantic. Listagem de convite não tem `token` nem `token_hash`.
 - **Entrada:** os schemas de criar organização, atualizar, mudar papel e convidar usam `extra="forbid"`. Campo desconhecido é rejeitado antes do serviço.
 - **Token:** UUID v4 só no link. O banco guarda SHA-256 (`hash_token`). Ver ADR-017.
-- **E-mail:** mesmo gate da ADR-003. Development loga o link; qualquer outro ambiente loga só o `user_id` de quem convidou, sem token e sem e-mail do convidado.
+- **E-mail:** o link do convite sai pelo Resend (ADR-026). Com a chave, o log não leva token, link nem e-mail do convidado. Sem a chave, o link só aparece no log em development. O envio cabe em 10 convites por hora por IP.
 - **Notificação:** tipo `convite_org` para quem já tem conta. A mensagem não leva o token.
 - **Contexto ativo:** memória + `sessionStorage`. Se o id não estiver na lista da API, volta para Pessoal. Não substitui a checagem de membership.
 
@@ -103,7 +103,7 @@ Convite pendente é único por `(organization_id, email)` enquanto `accepted_at`
 - Não usar `users.cargo` para autorizar. O cargo é só o perfil da conta.
 - Não confiar no id de organização do `sessionStorage` para autorizar.
 - Não devolver o token do convite em listagem, notificação ou resposta de criação.
-- Não logar o token fora de `APP_ENV=development`, nem o e-mail do convidado.
+- Não logar o token, o link ou o e-mail do convidado quando o Resend está configurado. Sem a chave, o link só pode ir ao log em development.
 - Não promover a Owner pelo convite ou pelo PATCH de papel — só a transferência.
 - Não filtrar processos ou credenciais por organização nesta etapa.
 - Não usar o OAuth do e-mail do advogado para enviar o convite.
@@ -118,3 +118,5 @@ Convite pendente é único por `(organization_id, email)` enquanto `accepted_at`
 | 2026-10-07 | Esclarece que o id ativo é só UX e que o quadro de tarefas persiste no banco |
 | 2026-10-07 | Schemas de entrada recusam campo extra |
 | 2026-10-07 | Papel `estagiario` no convite e na troca de papel, com o limite do Assistente |
+| 2026-10-29 | O convite passa a ser enviado por e-mail (ADR-026). O sino continua sem o token |
+| 2026-11-02 | O envio do convite fica em 10 por hora por IP, para não estourar a cota do e-mail |

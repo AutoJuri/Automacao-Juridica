@@ -1,6 +1,6 @@
 # Módulo: Migrations e Camada de Dados
 
-> Última atualização: 2026-10-07
+> Última atualização: 2026-11-02
 > Camada: Infra / Backend
 
 ---
@@ -83,7 +83,7 @@ Revisar sempre o arquivo gerado em `app/db/migrations/versions/` antes do `upgra
 
 ## Modelo de dados relacionado
 
-Tabelas (head atual: `f1c8a4e2b7d0`):
+Tabelas (head atual: `a7d3c1e9b5f2`):
 
 ```
 users                   (+ cargo do perfil, nulo nas contas anteriores — ADR-020)
@@ -97,6 +97,8 @@ users                   (+ cargo do perfil, nulo nas contas anteriores — ADR-0
 ├── processos               (+ capa CPO, partes_cpo, movimentacoes_synced_at, fixado)
 │   ├── elaboracoes         (capa da peça; processo_id nulo se os dados foram digitados — ADR-021)
 │   ├── movimentacoes       (+ tem_documento, url_documento)
+│   ├── processo_documentos (ficha cifrada por documento; unique processo + movimentação — ADR-024)
+│   ├── processo_dossies    (resumo cifrado, 1:1 com o processo — ADR-024)
 │   ├── peticoes_diversas   (HTML CPO — ADR-013)
 │   ├── audiencias_cpo      (HTML CPO — ADR-013; ≠ agenda JSON)
 │   ├── processos_datajud   (1:1 — complemento DataJud, ADR-015; nunca sobrescreve `processos`)
@@ -215,4 +217,7 @@ Módulos futuros que vão depender deste:
 | 2026-10-08 | Tabela `elaboracoes` — migration `a9c4e2b7d1f6` (ADR-021). Se a tabela já existia no formato da branch de IA, a migration só completa a capa |
 | 2026-10-13 | Tabela `drive_pastas` — migration `b4d8f1a6c3e2` (ADR-022). `user_id` com CASCADE, `processo_id` opcional com SET NULL |
 | 2026-10-13 | Google Drive — migration `c7e2a9d4b1f8` (ADR-022). Cria `drive_conexoes` (token em BYTEA, `user_id` único) e `drive_arquivos` (ficha, `origem` com CHECK, único por pasta + id do Google); adiciona `drive_pastas.google_folder_id` |
-| 2026-10-15 | IA da elaboração — `e782fdd01295` continua depois do Drive e só acrescenta fatos extras e `elaboracao_versoes`. `c3a19f2d7b64` acrescenta o perfil de estilo. `f1c8a4e2b7d0` (head) reabre o CPO dos processos sem movimentação |
+| 2026-10-15 | IA da elaboração — `e782fdd01295` continua depois do Drive e só acrescenta fatos extras e `elaboracao_versoes`. `c3a19f2d7b64` acrescenta o perfil de estilo. `f1c8a4e2b7d0` reabre o CPO dos processos sem movimentação |
+| 2026-10-21 | Dossiê dos autos — `a7d3c1e9b5f2` cria `processo_documentos` e `processo_dossies`. Ficha e resumo em BYTEA (ADR-024) |
+| 2026-10-21 | Peças da pasta — `c4b8e1d7a903` adiciona `processo_dossies.pecas_encrypted` (BYTEA). Não guarda URL nem PDF |
+| 2026-10-28 | Roteiro da preparação — `b8e2c4a91d07` (head) adiciona `processo_dossies.roteiro_encrypted` (ADR-025) |

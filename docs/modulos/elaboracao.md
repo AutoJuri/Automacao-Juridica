@@ -1,13 +1,13 @@
 # Módulo: Elaboração
 
-> Última atualização: 2026-10-15
+> Última atualização: 2026-10-28
 > Camada: Backend / Frontend
 
 ---
 
 ## O que este módulo faz
 
-Guarda a capa de cada peça que o advogado começou a elaborar e mostra isso em `/elaboracoes`: o que já está em andamento e os processos que ainda não têm nenhuma elaboração. O texto que aparece no editor continua no navegador. No servidor, a IA (ADR-016) já gera e edita versões cifradas; a tela do hall ainda não chama esses endpoints.
+Guarda a capa de cada peça que o advogado começou a elaborar e mostra isso em `/elaboracoes`: o que já está em andamento e os processos que ainda não têm nenhuma elaboração. A leitura dos autos, o resumo e o roteiro (tese, pedidos, pontos e jurisprudência colada) ficam em `/preparar/$processoId`, antes do editor. Gerenciais e os cartões só mostram a barra de progresso. O texto que aparece no editor continua no navegador. No servidor, a IA (ADR-016) gera e edita versões cifradas. Quando existe dossiê do processo (ADR-024), a chamada de redação inclui esse resumo e uma linha do tempo curta. Sem dossiê, o pacote avisa que a pasta não foi lida. Redação por capítulo e jurisprudência buscada sozinha continuam fora (ADR-023). A jurisprudência que entra é a que o advogado colou no roteiro.
 
 ---
 
@@ -27,6 +27,10 @@ Guarda a capa de cada peça que o advogado começou a elaborar e mostra isso em 
 | `frontend/src/features/elaboracao/elaboracao.manual.ts` | Adapta os dados digitados para o formato da ficha |
 | `frontend/src/routes/elaboracoes.lazy.tsx` | Página da seção, carregada à parte |
 | `frontend/src/routes/elaboracao.$elaboracaoId.tsx` | Rota da minuta |
+| `backend/app/services/elaboracao_prompt.py` | Monta o pacote da minuta, agora com o dossiê e a linha do tempo |
+| `backend/app/services/dossie.py` | Leitura sob demanda e o resumo que o Elaborar consome |
+| `frontend/src/features/elaboracao/PrepararPecaPage.tsx` | Etapas, leitura dos autos e roteiro em `/preparar/$processoId` |
+| `frontend/src/features/processos/FaixaAutos.tsx` | Barra de progresso na ficha, nos cartões e no editor |
 
 ---
 
@@ -95,6 +99,18 @@ Constraints: `ck_elaboracoes_origem` (processo ou título) e `ck_elaboracoes_man
 
 ---
 
+## Como a minuta é montada
+
+Decisão de 2026-10-20 (ADR-023), leitura no código em 2026-10-21 (ADR-024).
+
+1. **Dossiê.** O advogado pede "Ler autos". Um modelo mais barato (`LLM_MODEL_DOSSIE`) lê cada arquivo à parte. Página com texto usa o texto. O carimbo do e-SAJ ("cópia do original") não conta: a página que só tem esse carimbo vai para o OCR. Cada arquivo vira uma ficha cifrada. As fichas viram um resumo só. O PDF não fica no banco.
+2. **Redação.** Uma chamada do modelo forte, com o pacote do ADR-019: instrução, esqueleto do tipo de peça, capa, esse dossiê, fatos do advogado e, se houver, o perfil de estilo. A pasta crua não entra. Sem dossiê, o pacote diz que a pasta ainda não foi lida. A resposta é o rascunho inteiro.
+3. **Edição.** Chat e grifo alteram essa minuta. Não geram a peça de novo.
+
+Fica para quando o rascunho único estiver estável: aprovar teses antes de redigir, escrever capítulo por capítulo e conferir citação numa passagem separada. Jurisprudência automática fica para uma versão futura; até lá só entra o que o advogado colou ou marcou.
+
+---
+
 ## Dependências de outros módulos
 
 | Módulo | Por quê depende |
@@ -113,6 +129,10 @@ Constraints: `ck_elaboracoes_origem` (processo ou título) e `ck_elaboracoes_man
 - ❌ Não deixar o cliente escolher o tamanho da página de "Para começar"
 - ❌ Não criar uma segunda elaboração da mesma peça no mesmo processo
 - ❌ Não misturar `processo_id` com os campos manuais na mesma linha
+- ❌ Não mandar a pasta crua (todos os PDFs) no prompt de quem redige — o redator lê o dossiê (ADR-023)
+- ❌ Não fazer OCR de página que já tem texto de verdade (o carimbo do e-SAJ não conta), nem juntar todos os PDFs numa chamada só do modelo menor
+- ❌ Não abrir agente por capítulo, tese ou citação antes de o rascunho de uma chamada estar estável
+- ❌ Não buscar jurisprudência sozinho nesta versão — só o que o advogado colou ou marcou
 
 ---
 
@@ -126,3 +146,6 @@ Constraints: `ck_elaboracoes_origem` (processo ou título) e `ck_elaboracoes_man
 | 2026-10-13 | Ficou decidido que o anexo da elaboração e a minuta exportada vão para a pasta do processo no Google Drive (ADR-022). Esta tela ainda guarda o arquivo só no navegador |
 | 2026-10-13 | O anexo da peça modelo ganhou "Guardar no Drive" (`GuardarNoDrive.tsx`): o `File` fica em memória e só sai do navegador por clique, para a pasta escolhida (a pasta ligada ao processo vem sugerida), com `origem=elaboracao`. Sem Google conectado, a tela só aponta para `/drive`. A minuta exportada ainda não vai ao Drive. A IA continua sem ler o anexo |
 | 2026-10-15 | A branch da IA entrou sem substituir a capa. Fatos, estilo e versões ficam cifrados. A tela ainda não dispara gerar/editar |
+| 2026-10-20 | Ficou a ordem de construção (ADR-023): dossiê arquivo por arquivo, redação numa chamada, jurisprudência automática só numa versão futura |
+| 2026-10-21 | A redação passa a incluir o dossiê quando ele existe (ADR-024). O bloco Autos mostra o progresso e o resumo na ficha e na tela da minuta |
+| 2026-10-28 | A ficha e os cartões ficam só com a barra. O roteiro cifrado é confirmado em `/preparar/$processoId` antes do editor (ADR-025) |

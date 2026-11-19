@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import (
     auth,
     credentials,
+    documento_movimentacao,
     dossie,
     drive,
     drive_google,
@@ -89,6 +90,7 @@ app.include_router(elaboracao.router)
 app.include_router(elaboracoes.router)
 app.include_router(processos.router)
 app.include_router(dossie.router)
+app.include_router(documento_movimentacao.router)
 app.include_router(processos.router_intimacoes)
 app.include_router(processos.router_audiencias)
 app.include_router(notifications.router)

@@ -1,7 +1,7 @@
 # ADR-024: Leitura dos autos em memória
 
 **Data:** 2026-10-21
-**Status:** Aceito (implementado)
+**Status:** Aceito (implementado). O PDF de uma movimentação passou a poder voltar ao dono pelo servidor, em memória: ver ADR-027
 
 Complementa o ADR-023. Aquele define a ordem (dossiê, depois uma redação). Este define como o PDF entra: baixa em memória, na hora em que o advogado pede, e só a ficha cifrada fica no banco.
 
@@ -38,7 +38,7 @@ Quem pode ler é o dono do processo (`WHERE user_id`). Recurso de outra pessoa �
 
 ## Consequências
 
-- A frase "não baixar o PDF" deixa de valer por inteiro. Continua valendo: não persistir o binário e não fazer proxy para o navegador. O ícone da movimentação ainda abre o e-SAJ no browser do advogado.
+- A frase "não baixar o PDF" deixa de valer por inteiro. Continua valendo: não persistir o binário. A parte "não fazer proxy para o navegador" foi relaxada pelo ADR-027, só para o PDF de uma movimentação e só para o dono.
 - O container precisa de `tesseract-ocr` e `tesseract-ocr-por`. No Windows local, o executável do Tesseract com o idioma `por` precisa estar instalado; a API que roda fora do Docker não herda o pacote da imagem. OCR de manuscrito pode falhar; a ficha marca trecho ilegível em vez de completar.
 - O provedor de IA recebe trechos dos autos. Em produção, o modelo tem de ser um que não use esses dados para treino.
 - Autos sob segredo de justiça ou com senha ficam de fora. A tela avisa.

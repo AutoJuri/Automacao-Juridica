@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from app.services.esaj_cpo_parser import url_documento_publica
+from app.services.esaj_cpo_parser import cd_documento_da_url, url_documento_publica
 from app.services.esaj_http import (
     ESAJ_BASE_URL,
     EsajPortalIndisponivelError,
@@ -97,8 +97,35 @@ def _absoluto(href: str) -> str | None:
     return None
 
 
-def primeiro_link_pdf(html: str) -> str | None:
-    """Primeiro link allowlisted. O resto do HTML é ignorado."""
+def _pdf_da_arvore(html: str, *, cd_documento: str | None) -> str | None:
+    """O visualizador da pasta declara o PDF em `requestScope`, não num <a>.
+
+    Com várias peças, só vale a que tem o mesmo `cdDocumento`. Sem esse
+    casamento, a primeira da lista seria outro documento do processo.
+    Uma peça só é o visualizador daquele arquivo: o id da árvore pode
+    não ser o do CPO.
+    """
+    from app.services.esaj_pasta import pecas_da_arvore
+
+    pecas = pecas_da_arvore(html)
+    if not pecas:
+        return None
+    if cd_documento:
+        marca = f"cdDocumento={cd_documento}"
+        for peca in pecas:
+            query = f"&{urlparse(peca.url).query}&"
+            if f"&{marca}&" in query:
+                return peca.url
+    if len(pecas) == 1:
+        return pecas[0].url
+    return None
+
+
+def primeiro_link_pdf(html: str, *, cd_documento: str | None = None) -> str | None:
+    """Primeiro PDF allowlisted. A árvore da pasta vem antes das tags."""
+    da_arvore = _pdf_da_arvore(html, cd_documento=cd_documento)
+    if da_arvore:
+        return da_arvore
     amostra = html[:_AMOSTRA_HTML]
     soup = BeautifulSoup(amostra, "lxml")
     for tag in soup.find_all(["a", "iframe", "embed"]):
@@ -184,23 +211,25 @@ async def baixar_documento(
     client: httpx.AsyncClient,
     url: str,
     *,
+    referer: str | None = None,
     tamanho_max: int = TAMANHO_MAX_BYTES,
 ) -> bytes:
     """Bytes do PDF. Quem chama descarta a variável ao terminar."""
     if url_documento_publica(url) is None:
         raise EsajPortalIndisponivelError("url_documento_invalida")
 
-    primeiro = await _ler(client, url, referer=REFERER_CPO, tamanho_max=tamanho_max)
+    origem = referer or REFERER_CPO
+    primeiro = await _ler(client, url, referer=origem, tamanho_max=tamanho_max)
     _validar_corpo(primeiro)
     if _e_pdf(primeiro.dados):
         return primeiro.dados
 
     texto = primeiro.dados.decode("utf-8", errors="ignore")
-    hop = primeiro_link_pdf(texto)
+    hop = primeiro_link_pdf(texto, cd_documento=cd_documento_da_url(url))
     if hop is None:
         raise EsajDocumentoNaoPdfError("sem_pdf")
 
-    segundo = await _ler(client, hop, referer=url, tamanho_max=tamanho_max)
+    segundo = await _ler(client, hop, referer=primeiro.final_url, tamanho_max=tamanho_max)
     _validar_corpo(segundo)
     if _e_pdf(segundo.dados):
         return segundo.dados
@@ -250,7 +279,10 @@ async def sondar_documento(
             "ok",
         )
 
-    hop = primeiro_link_pdf(primeiro.dados.decode("utf-8", errors="ignore"))
+    hop = primeiro_link_pdf(
+        primeiro.dados.decode("utf-8", errors="ignore"),
+        cd_documento=cd_documento_da_url(url),
+    )
     if hop is None:
         return SondaDocumento(
             primeiro.status_http,
@@ -263,7 +295,7 @@ async def sondar_documento(
         )
 
     try:
-        segundo = await _ler(client, hop, referer=url, tamanho_max=tamanho_max)
+        segundo = await _ler(client, hop, referer=primeiro.final_url, tamanho_max=tamanho_max)
         _validar_corpo(segundo)
     except EsajSessaoInvalidaError:
         return SondaDocumento(None, "", 0, False, False, _caminho(hop), "sessao_invalida")

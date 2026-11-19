@@ -34,6 +34,8 @@ LIMITE_ELABORACAO_GERAR = "30/hour"
 # A trava de uma leitura por usuário fica no serviço.
 LIMITE_DOSSIE_LER = "10/hour"
 LIMITE_DOSSIE_ROTEIRO = "30/hour"
+# Cada abertura de PDF faz uma ida ao e-SAJ com a sessão do advogado (ADR-027).
+LIMITE_DOCUMENTO_PDF = "60/hour"
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:

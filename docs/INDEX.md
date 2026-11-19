@@ -131,7 +131,7 @@ automacao-juridica/
 | Login Automatizado no e-SAJ (Playwright) | Backend | `/docs/modulos/login-esaj.md` | Completo (Chromium Docker 2026-09-15) |
 | Contrato das APIs internas do e-SAJ (TJSP) | Backend / Scraping | `/docs/modulos/esaj-apis.md` | Completo (leitura do PDF sob demanda em memória, 2026-10-21) |
 | Scheduler e Ciclo Automático | Backend | `/docs/modulos/scheduler.md` | Completo (teto de 120s por advogado no ciclo de 10 min, 2026-10-01) |
-| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (ficha com barra dos autos e Preparar peça, ADR-025, 2026-10-28) |
+| Painel de Processos e Notificações | Backend / Frontend | `/docs/modulos/processos.md` | Completo (PDF real da movimentação no modal, ADR-027, 2026-11-09) |
 | Integração DataJud (CNJ) | Backend / Frontend | `/docs/modulos/datajud.md` | Completo (consulta avulsa sem gravar, 2026-10-15) |
 | Deploy (Railway) | Infra | `/docs/modulos/deploy.md` | Completo (digest UV, `/docs` só em dev, Chromium no container, 2026-09-15) |
 | Organizações e Convites | Backend / Frontend | `/docs/modulos/organizacoes.md` | Completo (convite por e-mail, ADR-026, 2026-10-29) |
@@ -168,9 +168,10 @@ automacao-juridica/
 | ADR-021 | Capa da elaboração por peça, com ou sem processo; texto da minuta continua no navegador | `/docs/decisions/021-capa-da-elaboracao-por-peca.md` |
 | ADR-022 | Cofre do Drive no Google Drive do advogado; a plataforma guarda só a ficha | `/docs/decisions/022-drive-google-como-cofre.md` |
 | ADR-023 | Dossiê dos autos por um modelo menor; a minuta sai numa chamada do modelo forte. Jurisprudência automática fica para depois | `/docs/decisions/023-dossie-dos-autos-e-uma-redacao.md` |
-| ADR-024 | Leitura dos autos em memória, sob demanda; ficha e resumo cifrados; o PDF não é persistido nem devolvido ao navegador | `/docs/decisions/024-leitura-dos-autos-em-memoria.md` |
+| ADR-024 | Leitura dos autos em memória, sob demanda; ficha e resumo cifrados; o PDF não é persistido (a volta ao navegador, só da movimentação, está no ADR-027) | `/docs/decisions/024-leitura-dos-autos-em-memoria.md` |
 | ADR-025 | Tela de preparar a peça, com etapas visíveis e roteiro cifrado, antes do editor | `/docs/decisions/025-preparar-peca-antes-do-editor.md` |
 | ADR-026 | E-mail da plataforma via Resend: senha e convite. Andamentos continuam só no sino | `/docs/decisions/026-email-transacional-resend.md` |
+| ADR-027 | PDF da movimentação visto na plataforma: o servidor baixa em memória com a sessão do dono e devolve os bytes, sem gravar | `/docs/decisions/027-pdf-da-movimentacao-na-plataforma.md` |
 
 ---
 

@@ -19,7 +19,7 @@ import { processoDetalheQueryKey } from '#/features/processos/processos.constant
 import { formatarNumeroCnj } from '#/features/processos/processos.format'
 import { SecaoShell } from '#/features/secoes/SecaoShell'
 
-import { atualizarFatosExtras, obterOuCriarElaboracao } from './elaboracao.api'
+import { atualizarFatosExtras } from './elaboracao.api'
 import { ELABORACOES_QUERY_KEY } from './elaboracoes.constants'
 import { IniciarElaboracaoDialog } from './IniciarElaboracaoDialog'
 import { FOCO_CAMPO, propsFocoCampo } from './elaboracao.ui'

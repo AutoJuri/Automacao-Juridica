@@ -273,6 +273,8 @@ Contrato usado pelo cliente (`esaj_documentos.baixar_documento`), ainda sem medi
 - 429 interrompe o lote, marca a sessão `bloqueado` com o backoff já existente e preserva o cookie. Sessão inválida marca `reauth_pendente` e anula o cookie. A tarefa não chama o Playwright.
 - `#liberarAutoPorSenha` não tem URL. Entra como `sem_acesso`. Senha dos autos não é pedida nem gravada.
 
+O mesmo `baixar_documento` serve o visualizador da movimentação (ADR-027): `GET /processos/{id}/movimentacoes/{mov_id}/documento` reabre a ficha CPO, pega o link vivo do `cdDocumento` (a URL gravada na coleta é recusada pelo portal), segue o visualizador da pasta (`requestScope` → `/pastadigital/getPDF.do`) e devolve os bytes. A busca para em 8 páginas. Se a árvore tiver várias peças, só segue a do mesmo `cdDocumento`; uma peça só vale mesmo com outro id. O 429 desta rota não marca a sessão `bloqueado`. Login pedido de novo vira 409 sem apagar o cookie.
+
 Medir de verdade (status, content-type, tamanho, salto, `%PDF`, 429) fica no script `backend/scripts/sondar_documento_esaj.py`. A saída é só o stdout. O corpo não vai para `scripts/esaj/results/`.
 
 ---

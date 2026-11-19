@@ -62,6 +62,71 @@ async def test_html_segue_um_salto_allowlisted():
 
 
 @pytest.mark.asyncio
+async def test_arvore_com_varias_pecas_nao_pega_a_primeira():
+    html = (
+        '<script>var requestScope = ['
+        '{"parametros": "cdDocumento=99&origemDocumento=P", "title": "Outra"},'
+        '{"parametros": "cdDocumento=1&origemDocumento=P", "title": "Esta"}'
+        "];</script>"
+    )
+    caminhos: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        caminhos.append(request.url.path)
+        if request.url.path.endswith("getPDF.do"):
+            assert request.url.params.get("cdDocumento") == "1"
+            return httpx.Response(200, content=PDF, headers={"content-type": "application/pdf"})
+        return httpx.Response(200, text=html, headers={"content-type": "text/html"})
+
+    async with _client(handler) as client:
+        dados = await baixar_documento(client, URL)
+    assert dados.startswith(b"%PDF")
+    assert caminhos[-1] == "/pastadigital/getPDF.do"
+
+
+@pytest.mark.asyncio
+async def test_arvore_sem_o_documento_nao_escolhe_outro():
+    html = (
+        '<script>var requestScope = ['
+        '{"parametros": "cdDocumento=2&origemDocumento=P", "title": "Outra"},'
+        '{"parametros": "cdDocumento=3&origemDocumento=P", "title": "Mais"}'
+        "];</script>"
+    )
+    chamadas = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal chamadas
+        chamadas += 1
+        return httpx.Response(200, text=html, headers={"content-type": "text/html"})
+
+    async with _client(handler) as client:
+        with pytest.raises(EsajDocumentoNaoPdfError):
+            await baixar_documento(client, URL)
+    assert chamadas == 1
+
+
+@pytest.mark.asyncio
+async def test_html_da_arvore_segue_getpdf():
+    caminhos: list[str] = []
+    html = (
+        '<a href="/pastadigital/abrirDocumentoEdt.do?id=3">viewer</a>'
+        '<script>var requestScope = [{"parametros": "cdDocumento=10&origemDocumento=P",'
+        ' "title": "Petição"}];</script>'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        caminhos.append(request.url.path)
+        if request.url.path.endswith("getPDF.do"):
+            return httpx.Response(200, content=PDF, headers={"content-type": "application/pdf"})
+        return httpx.Response(200, text=html, headers={"content-type": "text/html"})
+
+    async with _client(handler) as client:
+        dados = await baixar_documento(client, URL)
+    assert dados.startswith(b"%PDF")
+    assert caminhos[-1] == "/pastadigital/getPDF.do"
+
+
+@pytest.mark.asyncio
 async def test_nao_segue_outro_host_nem_javascript():
     chamadas = 0
 
